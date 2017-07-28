@@ -1,0 +1,14 @@
+# artifacts
+*.o
+omegajail
+
+# test artifacts
+smoketest/c/
+smoketest/cpp/
+smoketest/cs/
+smoketest/hs/
+smoketest/java/
+smoketest/lua/
+smoketest/pas/
+smoketest/py/
+smoketest/rb/

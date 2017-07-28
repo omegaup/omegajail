@@ -1,0 +1,158 @@
+#!/usr/bin/python3
+
+import argparse
+import os
+import os.path
+import shutil
+import subprocess
+import sys
+
+LANGUAGES = ('c', 'cpp', 'hs', 'java', 'pas', 'py', 'rb', 'lua', 'cs')
+ROOT = '/var/lib/minijail'
+
+def minijail_compile(lang):
+  if os.path.isdir(lang):
+    shutil.rmtree(lang, True)
+  os.makedirs(lang)
+  target = 'Main.%s' % lang
+  os.link('sumas.' + lang, os.path.join(lang, target))
+  args = [
+      'strace', '-f', '-o', os.path.join(lang, 'strace-compiler.txt'), '-s', '512',
+      '../omegajail',
+      '--disable-ptrace',
+      '-C', os.path.join(ROOT, 'root-compilers'),
+      '-d', '/home',
+      '-b', lang + ',/home,1',
+      '-1', os.path.abspath(os.path.join(lang, 'compile.out')),
+      '-2', os.path.abspath(os.path.join(lang, 'compile.err')),
+      '-M', os.path.abspath(os.path.join(lang, 'compile.meta')),
+      '-t', '3000',
+      '-O', '10485100']
+  if lang == 'c':
+    args.extend([
+      '-S', os.path.join(ROOT, 'scripts/gcc'),
+      '--', '/usr/bin/gcc', '-o', 'Main', '-O2'])
+  elif lang == 'cpp':
+    args.extend([
+      '-S', os.path.join(ROOT, 'scripts/gcc'),
+      '--', '/usr/bin/g++', '--std=c++11', '-o', 'Main', '-O2'])
+  elif lang == 'hs':
+    args.extend([
+      '-S', os.path.join(ROOT, 'scripts/ghc'),
+      '-b', os.path.join(ROOT, 'root-hs') + ',/usr/lib/ghc',
+      '--', '/usr/lib/ghc/bin/ghc', '-B/usr/lib/ghc', '-O2', '-o', 'Main'])
+  elif lang == 'java':
+    args.extend([
+      '-S', os.path.join(ROOT, 'scripts/javac'),
+      '-b', os.path.join(ROOT, 'root-openjdk') + ',/usr/lib/jvm',
+      '--', '/usr/bin/javac', '-J-Xmx512M'])
+  elif lang == 'pas':
+    args.extend([
+      '-S', os.path.join(ROOT, 'scripts/fpc'),
+      '--', '/usr/bin/fpc', '-Tlinux', '-O2'])
+  elif lang == 'py':
+    args.extend([
+      '-S', os.path.join(ROOT, 'scripts/pyc'),
+      '-b', os.path.join(ROOT, 'root-python') + ',/usr/lib/python2.7',
+      '--', '/usr/bin/python', '-m', 'py_compile'])
+  elif lang == 'rb':
+    args.extend([
+      '-S', os.path.join(ROOT, 'scripts/ruby'),
+      '-b', os.path.join(ROOT, 'root-ruby') + ',/usr/lib/ruby',
+      '--', '/usr/bin/ruby', '-wc'])
+  elif lang == 'lua':
+    args.extend([
+      '-S', os.path.join(ROOT, 'scripts/lua'),
+      '--', '/usr/bin/luac', '-o', 'Main'])
+  elif lang == 'cs':
+    args.extend([
+      '-S', os.path.join(ROOT, 'scripts/csc'),
+      '-b', os.path.join(ROOT, 'root-dotnet') + ',/usr/share/dotnet',
+      '--', '/usr/share/dotnet/dotnet',
+      '/usr/share/dotnet/sdk/1.0.4/Roslyn/csc.exe', '/noconfig',
+      '@/usr/share/dotnet/Release.rsp', '/out:Main.dll', '/target:exe'])
+  subprocess.check_call(args + [target])
+
+def minijail_run(lang):
+  args = [
+      'strace', '-f', '-o', os.path.join(lang, 'strace-main.txt'), '-s', '512',
+      '../omegajail',
+      '--disable-ptrace',
+      '-C', os.path.join(ROOT, 'root'),
+      '-d', '/home',
+      '-b', os.path.abspath(lang) + ',/home',
+      '-0', os.path.abspath('input'),
+      '-1', os.path.abspath(os.path.join(lang, 'run.out')),
+      '-2', os.path.abspath(os.path.join(lang, 'run.err')),
+      '-M', os.path.abspath(os.path.join(lang, 'run.meta')),
+      '-t', '3000',
+      '-w', '3000',
+      '-O', '1048510']
+  if lang in ('c', 'cpp'):
+    args.extend([
+      '-S', os.path.join(ROOT, 'scripts/cpp'),
+      '-m', '268435456',
+      '--', './Main'])
+  elif lang == 'hs':
+    args.extend([
+      '-S', os.path.join(ROOT, 'scripts/hs'),
+      '-b', os.path.join(ROOT, 'root-hs') + ',/usr/lib/ghc',
+      '-m', '268435456',
+      '--', './Main'])
+  elif lang == 'java':
+    args.extend([
+      '-S', os.path.join(ROOT, 'scripts/java'),
+      '-b', os.path.join(ROOT, 'root-openjdk') + ',/usr/lib/jvm',
+      '--', '/usr/bin/java', '-Xmx268435456', 'Main'])
+  elif lang == 'pas':
+    args.extend([
+      '-S', os.path.join(ROOT, 'scripts/pas'),
+      '-m', '268435456',
+      '--', './Main'])
+  elif lang == 'py':
+    args.extend([
+      '-S', os.path.join(ROOT, 'scripts/py'),
+      '-b', os.path.join(ROOT, 'root-python') + ',/usr/lib/python2.7',
+      '-m', '268435456',
+      '--', '/usr/bin/python', 'Main.py'])
+  elif lang == 'rb':
+    args.extend([
+      '-S', os.path.join(ROOT, 'scripts/ruby'),
+      '-b', os.path.join(ROOT, 'root-ruby') + ',/usr/lib/ruby',
+      '-m', '268435456',
+      '--', '/usr/bin/ruby', 'Main.rb'])
+  elif lang == 'lua':
+    args.extend([
+      '-S', os.path.join(ROOT, 'scripts/lua'),
+      '-m', '268435456',
+      '--', '/usr/bin/lua', 'Main'])
+  elif lang == 'cs':
+    os.symlink('/usr/share/dotnet/Main.runtimeconfig.json',
+               os.path.join(os.path.abspath(lang), 'Main.runtimeconfig.json'))
+    args.extend([
+      '-S', os.path.join(ROOT, 'scripts/cs'),
+      '-b', os.path.join(ROOT, 'root-dotnet') + ',/usr/share/dotnet',
+      '-m', '-1',
+      '--', '/usr/share/dotnet/dotnet', 'Main.dll'])
+  subprocess.check_call(args)
+  with open(os.path.join(lang, 'run.out'), 'r') as f:
+    got = f.read().strip()
+  with open('output', 'r') as f:
+    expected = f.read().strip()
+  return got == expected
+
+def main():
+  parser = argparse.ArgumentParser()
+  for lang in LANGUAGES:
+    print('%-20s' % lang, end='')
+    minijail_compile(lang)
+    if minijail_run(lang):
+      print('OK')
+    else:
+      print('ERROR')
+  return 0
+
+if __name__ == '__main__':
+  sys.exit(main())
+
+# vim: set expandtab:ts=2:sw=2

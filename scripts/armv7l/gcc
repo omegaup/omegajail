@@ -1,0 +1,61 @@
+# Exit
+exit: 1
+exit_group: 1
+
+# I/O
+_llseek: 1
+access: 1
+chmod: 1
+close: 1
+dup2: 1
+dup: 1
+fstat64: 1
+lseek: 1
+lstat64: 1
+open: 1
+read: 1
+readlink: 1
+socket: return ENETDOWN
+stat64: 1
+tgkill: 1
+umask: 1
+uname: 1
+unlink: 1
+write: 1
+writev: 1
+
+# System
+gettimeofday: 1
+sysinfo: 1
+
+# Memory
+brk: 1
+mmap2: 1
+mprotect: 1
+mremap: 1
+munmap: 1
+
+# Environment
+getcwd: 1
+getpid: 1
+getrusage: 1
+prlimit64: arg1 == RLIMIT_STACK && arg2 != 0; return EPERM
+ugetrlimit: 1
+
+# Signals
+restart_syscall: 1
+rt_sigaction: 1
+rt_sigprocmask: 1
+rt_sigreturn: 1
+
+# Threads/processes
+ARM_set_tls: 1
+clone: 1
+vfork: 1
+execve: 1
+wait4: 1
+ioctl: 1
+futex: 1
+
+# Investigate
+fcntl64: 1

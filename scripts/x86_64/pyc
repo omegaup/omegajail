@@ -1,0 +1,40 @@
+@include /var/lib/minijail/scripts/omegajail
+
+socket: return ENETDOWN
+access: 1
+unlink: 1
+mprotect: 1
+mmap: 1
+munmap: 1
+brk: 1
+fstat: 1
+readlink: 1
+stat: 1
+write: 1
+exit_group: 1
+open: 1
+read: 1
+futex: 1
+lstat: 1
+openat: 1
+getdents: 1
+getcwd: 1
+lseek: 1
+getuid: 1
+getgid: 1
+geteuid: 1
+getegid: 1
+ioctl: return ENOTTY
+rename: 1
+sysinfo: 1
+getrlimit: 1
+
+# Threads
+arch_prctl: 1
+set_tid_address: 1
+set_robust_list: 1
+
+# Signals
+rt_sigaction: 1
+rt_sigprocmask: 1
+rt_sigtimedwait: 1

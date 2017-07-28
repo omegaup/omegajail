@@ -1,0 +1,7 @@
+[submodule "minijail"]
+	path = minijail
+	url = https://github.com/omegaup/minijail.git
+	branch = aosp_master_upstreamable
+[submodule "cxxopts"]
+	path = cxxopts
+	url = https://github.com/jarro2783/cxxopts.git
