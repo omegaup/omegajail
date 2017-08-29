@@ -263,7 +263,12 @@ def main(args):
 
     root.write('/etc/passwd',
       b'root:x:0:0:root:/:/bin/false\n'
+      b'user:x:1000:1000:root:/home:/bin/false\n'
       b'nobody:x:65534:65534:nobody:/nonexistent:/bin/false')
+    root.write('/etc/group',
+      b'root:x:0:\n'
+      b'user:x:1000:\n'
+      b'nobody:x:65534:')
 
     # Mountpoints for libraries
     root.mkdir(RUBY_ROOT)

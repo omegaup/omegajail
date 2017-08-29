@@ -342,11 +342,15 @@ int main(int argc, char* argv[]) {
     minijail_change_uid(j.get(), uid);
     minijail_change_gid(j.get(), gid);
   } else {
-    // Enter a user namespace. The current user will be root-in-the-namespace.
+    // Enter a user namespace. The current user will be user 1000.
     minijail_namespace_user(j.get());
     minijail_namespace_user_disable_setgroups(j.get());
-    minijail_uidmap(j.get(), StringPrintf("0 %d 1\n", uid).c_str());
-    minijail_gidmap(j.get(), StringPrintf("0 %d 1\n", gid).c_str());
+    constexpr uid_t kTargetUid = 1000;
+    constexpr gid_t kTargetGid = 1000;
+    minijail_set_userns_uid(j.get(), kTargetUid);
+    minijail_set_userns_gid(j.get(), kTargetGid);
+    minijail_uidmap(j.get(), StringPrintf("%d %d 1", kTargetUid, uid).c_str());
+    minijail_gidmap(j.get(), StringPrintf("%d %d 1", kTargetGid, gid).c_str());
   }
 
   // Perform some basic setup to tighten security as much as possible by
