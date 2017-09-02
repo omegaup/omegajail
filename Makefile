@@ -1,10 +1,16 @@
+.PHONY: all
 all: omegajail
 
+MINIJAIL_SOURCE_FILES := $(addprefix minijail/,\
+	$(cd minijail && git ls-tree --name-only HEAD -- *.c *.c))
 MINIJAIL_CORE_OBJECT_FILES := $(addprefix minijail/,$(patsubst %.o,%.pic.o,\
 	libminijail.o syscall_filter.o signal_handler.o bpf.o util.o system.o \
 	syscall_wrapper.o libconstants.gen.o libsyscalls.gen.o))
 
 ARCH ?= $(shell uname -m)
+CFLAGS += -Wall -Werror -O2
+CXXFLAGS += -std=c++11
+LDFLAGS += -lcap
 
 ifeq ($(ARCH),amd64)
 	SCRIPTS_ARCH := x86_64
@@ -12,20 +18,20 @@ else
 	SCRIPTS_ARCH := $(ARCH)
 endif
 
-${MINIJAIL_CORE_OBJECT_FILES}: minijail/*.h minijail/*.c
-	$(MAKE) OUT=${PWD}/minijail -C minijail
+${MINIJAIL_CORE_OBJECT_FILES}: ${MINIJAIL_SOURCE_FILES}
+	LDFLAGS= $(MAKE) OUT=${PWD}/minijail -C minijail
 
 util.o: util.cpp util.h logging.h macros.h
-	g++ -std=c++11 -Wall -Werror -fno-exceptions $< -c -o $@
+	g++ $(CFLAGS) $(CXXFLAGS) -fno-exceptions $< -c -o $@
 
 logging.o: logging.cpp logging.h
-	g++ -std=c++11 -Wall -Werror -fexceptions -I cxxopts/include $< -c -o $@
+	g++ $(CFLAGS) $(CXXFLAGS) -fno-exceptions $< -c -o $@
 
 args.o: args.cpp args.h logging.h
-	g++ -std=c++11 -Wall -Werror -fexceptions -I cxxopts/include $< -c -o $@
+	g++ $(CFLAGS) $(CXXFLAGS) -fexceptions -I cxxopts/include $< -c -o $@
 
 omegajail: main.cpp ${MINIJAIL_CORE_OBJECT_FILES} args.o util.o logging.o
-	g++ -std=c++11 -Wall -Werror -fno-exceptions $^ -lcap -o $@
+	g++ $(CFLAGS) $(CXXFLAGS) -fno-exceptions $^ $(LDFLAGS) -o $@
 
 .PHONY: install
 install: omegajail

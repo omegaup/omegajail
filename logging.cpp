@@ -9,6 +9,9 @@ namespace logging {
 
 namespace {
 
+template <typename T>
+inline void ignore_result(T /* unused result */) {}
+
 int g_logging_fd = 2;
 LogLevel g_min_log_level = INFO;
 
@@ -46,7 +49,8 @@ ScopedLogger::~ScopedLogger() {
 
   if (g_logging_fd != -1 && level_ >= g_min_log_level) {
     const std::string str = buffer_.str();
-    ::write(g_logging_fd, str.c_str(), str.size());
+		// Perform best-effort writing into the log file.
+    ignore_result(::write(g_logging_fd, str.c_str(), str.size()));
   }
 
   if (level_ == LogLevel::FATAL)

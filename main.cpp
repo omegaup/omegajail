@@ -198,7 +198,7 @@ int MetaInit(void* raw_payload) {
   bool init_exited = false;
   int status, init_exitstatus = 0;
   int init_exitsyscall = -1;
-  struct rusage usage, init_usage;
+  struct rusage usage = {}, init_usage = {};
   siginfo_t info;
   t = t0;
   bool attached = false;
