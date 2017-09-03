@@ -72,7 +72,7 @@ class FileResolver:
           break
     return self.files[name]
 
-# Utilities to set up a chroot jail filesystem for minijail.  Files are
+# Utilities to set up a chroot jail filesystem for omegajail.  Files are
 # hardlinked instead of copied when possible.
 class Chroot:
   def __init__(self, path, mountpoint, link=True):
@@ -390,8 +390,8 @@ def main(args):
                b'}')
 
 if __name__ == '__main__':
-  parser = argparse.ArgumentParser(description='Build a chroot environment for minijail')
-  parser.add_argument('--target', default='/var/lib/minijail',
+  parser = argparse.ArgumentParser(description='Build a chroot environment for omegajail')
+  parser.add_argument('--target', default='/var/lib/omegajail',
                       help='The directory in which the chroot environment will '
                       'be built')
   parser.add_argument('--no-link', dest='link', action='store_false',

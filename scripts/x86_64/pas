@@ -1,4 +1,4 @@
-@include /var/lib/minijail/scripts/omegajail
+@include /var/lib/omegajail/scripts/omegajail
 
 # Exit
 exit: 1

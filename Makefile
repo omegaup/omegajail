@@ -34,11 +34,11 @@ omegajail: main.cpp ${MINIJAIL_CORE_OBJECT_FILES} args.o util.o logging.o
 	g++ $(CFLAGS) $(CXXFLAGS) -fno-exceptions $^ $(LDFLAGS) -o $@
 
 .PHONY: install
-install: omegajail
-	install -d $(DESTDIR)/var/lib/minijail/bin
-	install -t $(DESTDIR)/var/lib/minijail/bin $^
-	install -d $(DESTDIR)/var/lib/minijail/scripts
-	install -t $(DESTDIR)/var/lib/minijail/scripts -m 0644 scripts/$(SCRIPTS_ARCH)/*
+install: omegajail omegajail-setup
+	install -d $(DESTDIR)/var/lib/omegajail/bin
+	install -t $(DESTDIR)/var/lib/omegajail/bin $^
+	install -d $(DESTDIR)/var/lib/omegajail/scripts
+	install -t $(DESTDIR)/var/lib/omegajail/scripts -m 0644 scripts/$(SCRIPTS_ARCH)/*
 
 .PHONY: clean
 clean:

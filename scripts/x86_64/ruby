@@ -1,4 +1,4 @@
-@include /var/lib/minijail/scripts/omegajail
+@include /var/lib/omegajail/scripts/omegajail
 
 read: 1
 readlink: 1

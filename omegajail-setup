@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# Performs per-boot setup of the environment needed for omegajail.
+# Should be run as root.
+
+set -e
+
+# Create a memory cgroup and make omegaup an admin.
+/bin/mkdir -p -m 0775 /sys/fs/cgroup/memory/omegajail
+/bin/chgrp omegaup /sys/fs/cgroup/memory/omegajail
