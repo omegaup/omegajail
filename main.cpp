@@ -87,20 +87,24 @@ int OpenStdio(const std::string& path, int expected_fd, bool writable) {
 int RedirectStdio(void* payload) {
   Args* args = reinterpret_cast<Args*>(payload);
   if (!args->stdin_redirect.empty()) {
-    int ret = OpenStdio("/dev/stdin", STDIN_FILENO, false);
+    int ret = OpenStdio("/mnt/stdio/stdin", STDIN_FILENO, false);
     if (ret)
       return ret;
   }
   if (!args->stdout_redirect.empty()) {
-    int ret = OpenStdio("/dev/stdout", STDOUT_FILENO, true);
+    int ret = OpenStdio("/mnt/stdio/stdout", STDOUT_FILENO, true);
     if (ret)
       return ret;
   }
   if (!args->stderr_redirect.empty()) {
-    int ret = OpenStdio("/dev/stderr", STDERR_FILENO, true);
+    int ret = OpenStdio("/mnt/stdio/stderr", STDERR_FILENO, true);
     if (ret)
       return ret;
   }
+  // Now that the fds are opened in the correct namespace, unmount the parent
+  // so that the original paths are not disclosed in /proc/self/mountinfo.
+  if (umount2("/mnt/stdio", MNT_DETACH))
+    return -errno;
 
   return 0;
 }
@@ -347,8 +351,8 @@ int main(int argc, char* argv[]) {
     minijail_namespace_user_disable_setgroups(j.get());
     constexpr uid_t kTargetUid = 1000;
     constexpr gid_t kTargetGid = 1000;
-    minijail_set_userns_uid(j.get(), kTargetUid);
-    minijail_set_userns_gid(j.get(), kTargetGid);
+    minijail_change_uid(j.get(), kTargetUid);
+    minijail_change_gid(j.get(), kTargetGid);
     minijail_uidmap(j.get(), StringPrintf("%d %d 1", kTargetUid, uid).c_str());
     minijail_gidmap(j.get(), StringPrintf("%d %d 1", kTargetGid, gid).c_str());
   }
@@ -373,6 +377,12 @@ int main(int argc, char* argv[]) {
     LOG(ERROR) << "Failed to mount /proc";
     return 1;
   }
+  if (minijail_mount_with_data(j.get(), "none", "/mnt/stdio", "tmpfs",
+                               MS_NOEXEC | MS_NODEV | MS_NOSUID,
+                               "size=4096,mode=555")) {
+    LOG(ERROR) << "Failed to mount /mnt/stdio";
+    return 1;
+  }
   if (minijail_add_hook(j.get(), RemountRootReadOnly, nullptr,
                         MINIJAIL_HOOK_EVENT_PRE_DROP_CAPS)) {
     PLOG(ERROR) << "Failed to add a hook to remount / read-only";
@@ -388,16 +398,16 @@ int main(int argc, char* argv[]) {
                       MINIJAIL_HOOK_EVENT_PRE_DROP_CAPS);
   }
   if (!args.stdin_redirect.empty()) {
-    InstallStdioRedirectOrDie(j.get(), args.stdin_redirect, "/dev/stdin",
+    InstallStdioRedirectOrDie(j.get(), args.stdin_redirect, "/mnt/stdio/stdin",
                               false);
   }
   if (!args.stdout_redirect.empty()) {
-    InstallStdioRedirectOrDie(j.get(), args.stdout_redirect, "/dev/stdout",
-                              true);
+    InstallStdioRedirectOrDie(j.get(), args.stdout_redirect,
+                              "/mnt/stdio/stdout", true);
   }
   if (!args.stderr_redirect.empty()) {
-    InstallStdioRedirectOrDie(j.get(), args.stderr_redirect, "/dev/stderr",
-                              true);
+    InstallStdioRedirectOrDie(j.get(), args.stderr_redirect,
+                              "/mnt/stdio/stderr", true);
   }
 
   InitPayload payload;

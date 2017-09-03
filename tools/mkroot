@@ -282,9 +282,10 @@ def main(args):
     root.mkdir('/dev/')
     root.mkdir('/proc/')
     root.mkdir('/home/')
-    root.touch('/dev/stdout')
-    root.touch('/dev/stderr')
-    root.touch('/dev/stdin')
+    root.symlink('/dev/stdin', '/proc/self/fd/0')
+    root.symlink('/dev/stdout', '/proc/self/fd/1')
+    root.symlink('/dev/stderr', '/proc/self/fd/2')
+    root.mkdir('/mnt/stdio')
 
     # Java wants to see which CPUs are online
     root.write('/sys/devices/system/cpu/online', b'0')

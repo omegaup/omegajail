@@ -1,9 +1,11 @@
 #include "args.h"
 
 #include <sys/resource.h>
+#include <unistd.h>
 
 #include <cxxopts.hpp>
 
+#include "logging.h"
 #include "minijail/libminijail.h"
 
 namespace {
@@ -23,6 +25,21 @@ std::vector<std::string> Split(const std::string& str, const std::string& sep) {
   result.push_back(str.substr(pos));
 
   return result;
+}
+
+std::string GetCWD() {
+  char path[4096];
+  if (!getcwd(path, sizeof(path)))
+    PLOG(FATAL) << "Failed to get cwd";
+
+  return std::string(path);
+}
+
+std::string MakeAbsolute(const std::string& path, const std::string& cwd) {
+  if (path.size() && path[0] == '/')
+    return path;
+
+  return cwd + "/" + path;
 }
 
 }  // namespace
@@ -115,12 +132,14 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
     }
   }
 
+  std::string cwd = GetCWD();
+
   if (options.count("stdin"))
-    stdin_redirect = options["stdin"].as<std::string>();
+    stdin_redirect = MakeAbsolute(options["stdin"].as<std::string>(), cwd);
   if (options.count("stdout"))
-    stdout_redirect = options["stdout"].as<std::string>();
+    stdout_redirect = MakeAbsolute(options["stdout"].as<std::string>(), cwd);
   if (options.count("stderr"))
-    stderr_redirect = options["stderr"].as<std::string>();
+    stderr_redirect = MakeAbsolute(options["stderr"].as<std::string>(), cwd);
   if (options.count("meta"))
     meta = options["meta"].as<std::string>();
   if (options.count("disable-ptrace"))
