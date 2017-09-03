@@ -82,6 +82,8 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
 		 cxxopts::value<uint64_t>(), "bytes")
 		("m,memory-limit", "sets the memory limit",
 		 cxxopts::value<int64_t>(), "bytes")
+		("cgroup-memory-limit", "sets the memory limit with cgroups",
+		 cxxopts::value<ssize_t>(), "bytes")
 		("program", "", cxxopts::value<std::vector<std::string>>());
   // clang-format on
 
@@ -170,6 +172,8 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
       }
     }
   }
+  if (options.count("cgroup-memory-limit"))
+    memory_limit_in_bytes = options["cgroup-memory-limit"].as<ssize_t>();
   if (options.count("output-limit")) {
     uint64_t limit_bytes = options["output-limit"].as<uint64_t>();
     int ret = minijail_rlimit(j, RLIMIT_FSIZE, limit_bytes, limit_bytes);

@@ -157,7 +157,7 @@ def minijail_run(lang, strace):
     args.extend([
       '-S', os.path.join(ROOT, 'scripts/cs'),
       '-b', os.path.join(ROOT, 'root-dotnet') + ',/usr/share/dotnet',
-      '-m', '-1',
+      '--cgroup-memory-limit', '268435456',
       '--', '/usr/share/dotnet/dotnet', 'Main.dll'])
   check_call(args)
   with open(os.path.join(lang, 'run.out'), 'r') as f:

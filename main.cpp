@@ -47,6 +47,7 @@ const std::map<int, std::string> kSignalMap = {
 struct InitPayload {
   ScopedMinijail jail;
   bool use_ptrace;
+  ssize_t memory_limit_in_bytes;
   struct timespec timeout;
 };
 
@@ -161,6 +162,16 @@ int TimespecCmp(struct timespec* dst, const struct timespec* src) {
 int MetaInit(void* raw_payload) {
   InitPayload* payload = reinterpret_cast<InitPayload*>(raw_payload);
 
+  std::unique_ptr<ScopedCgroup> memory_cgroup;
+  if (payload->memory_limit_in_bytes >= 0) {
+    memory_cgroup.reset(new ScopedCgroup("/sys/fs/cgroup/memory/omegajail"));
+    if (!*memory_cgroup)
+      return -errno;
+    WriteFile(
+        StringPrintf("%s/memory.limit_in_bytes", memory_cgroup->path().c_str()),
+        StringPrintf("%zd", payload->memory_limit_in_bytes));
+  }
+
   sigset_t mask;
   sigset_t orig_mask;
 
@@ -180,6 +191,11 @@ int MetaInit(void* raw_payload) {
   if (child_pid < 0) {
     _exit(child_pid);
   } else if (child_pid == 0) {
+    if (memory_cgroup) {
+      WriteFile(StringPrintf("%s/tasks", memory_cgroup->path().c_str()), "2\n",
+                true);
+      memory_cgroup->release();
+    }
     if (sigprocmask(SIG_BLOCK, &orig_mask, nullptr) < 0)
       return -errno;
     if (payload->use_ptrace) {
@@ -258,6 +274,8 @@ int MetaInit(void* raw_payload) {
 
   clock_gettime(CLOCK_REALTIME, &t1);
   TimespecSub(&t1, &t0);
+
+  memory_cgroup.reset();
 
   FILE* meta_file = fdopen(kMetaFd, "w");
   fprintf(meta_file, "time:%ld\ntime-sys:%ld\ntime-wall:%ld\nmem:%ld\n",
@@ -410,8 +428,15 @@ int main(int argc, char* argv[]) {
     InstallStdioRedirectOrDie(j.get(), args.stderr_redirect,
                               "/mnt/stdio/stderr", true);
   }
+  if (args.memory_limit_in_bytes >= 0 &&
+      minijail_mount(j.get(), "/sys/fs/cgroup/memory/omegajail",
+                     "/sys/fs/cgroup/memory/omegajail", "", MS_BIND)) {
+    LOG(ERROR) << "Failed to mount /sys/fs/cgroup/memory";
+    return 1;
+  }
 
   InitPayload payload;
+  payload.memory_limit_in_bytes = args.memory_limit_in_bytes;
   payload.use_ptrace = args.use_ptrace;
   payload.timeout.tv_sec = args.wall_time_limit_msec / 1000;
   payload.timeout.tv_nsec = (args.wall_time_limit_msec % 1000) * 1000000ul;

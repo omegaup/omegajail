@@ -288,6 +288,9 @@ def main(args):
     # Java wants to see which CPUs are online
     root.write('/sys/devices/system/cpu/online', b'0')
 
+    # cgroups support
+    root.mkdir('/sys/fs/cgroup/memory/omegajail')
+
     # Node.js really wants a source of randomness.
     root.symlink('/dev/urandom', '/opt/nodejs/urandom')
 

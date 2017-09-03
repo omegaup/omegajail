@@ -18,6 +18,7 @@ struct Args {
   std::string stdout_redirect;
   std::string stderr_redirect;
   std::string meta;
+  ssize_t memory_limit_in_bytes = -1;
   uint64_t wall_time_limit_msec = kMaxWallTimeLimitMsec;
   bool use_ptrace = true;
   std::unique_ptr<const char* []> program_args;

@@ -24,7 +24,7 @@ ${MINIJAIL_CORE_OBJECT_FILES}: ${MINIJAIL_SOURCE_FILES}
 util.o: util.cpp util.h logging.h macros.h
 	g++ $(CFLAGS) $(CXXFLAGS) -fno-exceptions $< -c -o $@
 
-logging.o: logging.cpp logging.h
+logging.o: logging.cpp logging.h util.h
 	g++ $(CFLAGS) $(CXXFLAGS) -fno-exceptions $< -c -o $@
 
 args.o: args.cpp args.h logging.h

@@ -5,12 +5,11 @@
 
 #include <iomanip>
 
+#include "util.h"
+
 namespace logging {
 
 namespace {
-
-template <typename T>
-inline void ignore_result(T /* unused result */) {}
 
 int g_logging_fd = 2;
 LogLevel g_min_log_level = INFO;

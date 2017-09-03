@@ -75,6 +75,22 @@ class ScopedMmap {
   DISALLOW_COPY_AND_ASSIGN(ScopedMmap);
 };
 
+class ScopedCgroup {
+ public:
+  ScopedCgroup(const std::string& subsystem);
+  ~ScopedCgroup();
+
+  operator bool() const { return path_.size() > 0; }
+  const std::string& path() const { return path_; }
+  void reset();
+  void release();
+
+ private:
+  std::string path_;
+
+  DISALLOW_COPY_AND_ASSIGN(ScopedCgroup);
+};
+
 std::string StringPrintf(const char* format, ...);
 
 bool ReadUint64(const std::string& path, uint64_t* value);
@@ -82,5 +98,8 @@ bool ReadUint64(const std::string& path, uint64_t* value);
 bool WriteFile(const std::string& path,
                const std::string& contents,
                bool append = false);
+
+template <typename T>
+inline void ignore_result(T /* unused result */) {}
 
 #endif  // UTIL_H_

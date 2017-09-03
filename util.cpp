@@ -95,6 +95,34 @@ void ScopedMmap::reset(void* ptr, size_t size) {
     PLOG(ERROR) << "Failed to unmap memory";
 }
 
+ScopedCgroup::ScopedCgroup(const std::string& subsystem) : path_() {
+  for (int attempts = 0; attempts <= 1000; ++attempts) {
+    std::string path =
+        StringPrintf("%s/omegajail_%d", subsystem.c_str(), attempts);
+    if (mkdir(path.c_str(), 0755)) {
+      if (errno == EEXIST)
+        continue;
+      return;
+    }
+    path_ = path;
+    break;
+  }
+}
+
+ScopedCgroup::~ScopedCgroup() {
+  reset();
+}
+
+void ScopedCgroup::reset() {
+  if (path_.size() > 0)
+    rmdir(path_.c_str());
+  release();
+}
+
+void ScopedCgroup::release() {
+  path_ = std::string();
+}
+
 std::string StringPrintf(const char* format, ...) {
   char path[4096];
 
@@ -111,7 +139,7 @@ bool WriteFile(const std::string& path,
                bool append) {
   LOG(DEBUG) << "Writing '" << contents << "' to " << path;
 
-  ScopedFD fd(open(path.c_str(), append ? O_WRONLY | O_APPEND : O_WRONLY));
+  ScopedFD fd(open(path.c_str(), O_WRONLY | (append ? O_APPEND : O_TRUNC)));
   if (!fd)
     return false;
   if (write(fd.get(), contents.c_str(), contents.size()) !=
