@@ -250,10 +250,8 @@ def main(args):
   # that directory, so we need a new resolver that does not exclude those
   # files.
   raw_resolver = FileResolver(exclude_files=())
-  DOTNET_FILES = raw_resolver.files_for(['dotnet-dev-1.0.4', 'dotnet-host',
-      'dotnet-hostfxr-1.0.1', 'dotnet-hostfxr-1.1.0',
-      'dotnet-sharedframework-microsoft.netcore.app-1.0.5',
-      'dotnet-sharedframework-microsoft.netcore.app-1.1.2'], recursive=False)
+  DOTNET_FILES = raw_resolver.files_for(['dotnet-host', 'dotnet-hostfxr-2.0.0',
+      'dotnet-runtime-2.0.0', 'dotnet-sdk-2.0.0'], recursive=False)
 
   def install_common(root):
     if not os.path.exists('/usr/lib/locale/locale-archive'):
@@ -383,7 +381,10 @@ def main(args):
     root.copyfromhost('/usr/share/dotnet/ref', relative_to=DOTNET_ROOT)
     root.copyfromhost('/usr/share/dotnet/Release.rsp', relative_to=DOTNET_ROOT)
     root.write('/usr/share/dotnet/Main.runtimeconfig.json',
-               b'{"runtimeOptions": {"framework":{"name":"Microsoft.NETCore.App","version":"1.1.2"}}}')
+               b'{"runtimeOptions": {'
+               b'"tfm": "netcoreapp2.0", '
+               b'"framework":{"name":"Microsoft.NETCore.App","version":"2.0.0"}}'
+               b'}')
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Build a chroot environment for minijail')

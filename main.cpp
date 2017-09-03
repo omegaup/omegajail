@@ -325,6 +325,7 @@ int main(int argc, char* argv[]) {
   setenv("HOME", "/home", 1);
   setenv("LANG", "en_US.UTF-8", 1);
   setenv("PATH", "/usr/bin", 1);
+  setenv("DOTNET_CLI_TELEMETRY_OPTOUT", "1", 1);
 
   ScopedMinijail j(minijail_new());
 

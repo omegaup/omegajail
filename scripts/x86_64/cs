@@ -16,8 +16,9 @@ getdents: 1
 lseek: 1
 lstat: 1
 mknod: arg1 == S_IFIFO|0700
+mkdir: return EROFS
 open: 1
-pipe: 1
+pipe2: 1
 poll: 1
 read: 1
 readlink: 1
@@ -42,6 +43,7 @@ clone: 1
 futex: 1
 rt_sigaction: 1
 rt_sigprocmask: 1
+rt_sigreturn: 1
 sched_get_priority_max: 1
 sched_get_priority_min: 1
 sched_getaffinity: 1
@@ -51,6 +53,7 @@ sched_setscheduler: return EPERM
 sched_yield: 1
 set_robust_list: 1
 set_tid_address: 1
+sigaltstack: 1
 
 # system
 arch_prctl: arg0 == ARCH_SET_FS

@@ -1,25 +1,44 @@
 #!/usr/bin/python3
 
 import argparse
+import logging
 import os
 import os.path
 import shutil
 import subprocess
 import sys
 
+try:
+  from shlex import quote
+except ImportError:
+  from pipes import quote
+
 LANGUAGES = ('c', 'cpp', 'hs', 'java', 'pas', 'py', 'rb', 'lua', 'cs')
 ROOT = '/var/lib/minijail'
 
-def minijail_compile(lang):
+def check_call(args):
+  try:
+    subprocess.check_call(list(args))
+  except subprocess.CalledProcessError as e:
+    logging.error('Failed to run \'%s\'',
+                  ' '.join(quote(arg) for arg in args))
+
+def minijail_compile(lang, strace):
   if os.path.isdir(lang):
     shutil.rmtree(lang, True)
   os.makedirs(lang)
   target = 'Main.%s' % lang
   os.link('sumas.' + lang, os.path.join(lang, target))
-  args = [
-      'strace', '-f', '-o', os.path.join(lang, 'strace-compiler.txt'), '-s', '512',
-      '../omegajail',
-      '--disable-ptrace',
+  if strace:
+    args = [
+        'strace', '-f', '-o', os.path.join(lang, 'strace-compiler.txt'),
+        '-s', '512',
+        '../omegajail',
+        '--disable-ptrace']
+  else:
+    args = ['../omegajail']
+
+  args += [
       '-C', os.path.join(ROOT, 'root-compilers'),
       '-d', '/home',
       '-b', lang + ',/home,1',
@@ -69,15 +88,21 @@ def minijail_compile(lang):
       '-S', os.path.join(ROOT, 'scripts/csc'),
       '-b', os.path.join(ROOT, 'root-dotnet') + ',/usr/share/dotnet',
       '--', '/usr/share/dotnet/dotnet',
-      '/usr/share/dotnet/sdk/1.0.4/Roslyn/csc.exe', '/noconfig',
+      '/usr/share/dotnet/sdk/2.0.0/Roslyn/csc.exe', '/noconfig',
       '@/usr/share/dotnet/Release.rsp', '/out:Main.dll', '/target:exe'])
-  subprocess.check_call(args + [target])
+  check_call(args + [target])
 
-def minijail_run(lang):
-  args = [
-      'strace', '-f', '-o', os.path.join(lang, 'strace-main.txt'), '-s', '512',
-      '../omegajail',
-      '--disable-ptrace',
+def minijail_run(lang, strace):
+  if strace:
+    args = [
+        'strace', '-f', '-o', os.path.join(lang, 'strace-main.txt'),
+        '-s', '512',
+        '../omegajail',
+        '--disable-ptrace']
+  else:
+    args = ['../omegajail']
+
+  args += [
       '-C', os.path.join(ROOT, 'root'),
       '-d', '/home',
       '-b', os.path.abspath(lang) + ',/home',
@@ -134,7 +159,7 @@ def minijail_run(lang):
       '-b', os.path.join(ROOT, 'root-dotnet') + ',/usr/share/dotnet',
       '-m', '-1',
       '--', '/usr/share/dotnet/dotnet', 'Main.dll'])
-  subprocess.check_call(args)
+  check_call(args)
   with open(os.path.join(lang, 'run.out'), 'r') as f:
     got = f.read().strip()
   with open('output', 'r') as f:
@@ -143,10 +168,18 @@ def minijail_run(lang):
 
 def main():
   parser = argparse.ArgumentParser()
-  for lang in LANGUAGES:
+  parser.add_argument('--languages', type=str)
+  parser.add_argument('--strace', action='store_true')
+  args = parser.parse_args()
+
+  languages = LANGUAGES
+  if args.languages:
+      languages = args.languages.split(',')
+
+  for lang in languages:
     print('%-20s' % lang, end='')
-    minijail_compile(lang)
-    if minijail_run(lang):
+    minijail_compile(lang, args.strace)
+    if minijail_run(lang, args.strace):
       print('OK')
     else:
       print('ERROR')

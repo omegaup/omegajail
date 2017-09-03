@@ -16,7 +16,8 @@ getdents: 1
 lseek: 1
 lstat: 1
 mknod: arg1 == S_IFIFO|0700
-pipe: 1
+mkdir: return EROFS
+pipe2: 1
 poll: 1
 read: 1
 readlink: 1
@@ -50,6 +51,7 @@ sched_setscheduler: return EPERM
 sched_yield: 1
 set_robust_list: 1
 set_tid_address: 1
+sigaltstack: 1
 
 # system
 arch_prctl: arg0 == ARCH_SET_FS
@@ -66,3 +68,4 @@ getuid: 1
 setrlimit: return EPERM
 socket: return ENETDOWN
 sysinfo: return ENOSYS
+ioctl: return ENOSYS
