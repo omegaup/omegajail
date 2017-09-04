@@ -57,9 +57,6 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
 		("C,chroot", "sets the root of the chroot",
 		 cxxopts::value<std::string>(), "path")
 		("h,help", "prints this message")
-		("p,disable-ptrace",
-		 "do not use ptrace to get the exit syscall",
-		 cxxopts::value<bool>())
 		("S,seccomp-script",
 		 "the filename of the seccomp script to load",
 		 cxxopts::value<std::string>(), "filename")
@@ -84,6 +81,9 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
 		 cxxopts::value<int64_t>(), "bytes")
 		("cgroup-memory-limit", "sets the memory limit with cgroups",
 		 cxxopts::value<ssize_t>(), "bytes")
+		("sigsys-detector",
+		 "one of 'sigsys_tracer' (default), 'ptrace', 'none'.",
+		 cxxopts::value<std::string>())
 		("program", "", cxxopts::value<std::vector<std::string>>());
   // clang-format on
 
@@ -144,8 +144,20 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
     stderr_redirect = MakeAbsolute(options["stderr"].as<std::string>(), cwd);
   if (options.count("meta"))
     meta = options["meta"].as<std::string>();
-  if (options.count("disable-ptrace"))
-    use_ptrace = false;
+  if (options.count("sigsys-detector")) {
+    std::string detector = options["sigsys-detector"].as<std::string>();
+    if (detector == "sigsys_tracer") {
+      sigsys_detector = SigsysDetector::SIGSYS_TRACER;
+    } else if (detector == "ptrace") {
+      sigsys_detector = SigsysDetector::PTRACE;
+    } else if (detector == "none") {
+      sigsys_detector = SigsysDetector::NONE;
+    } else {
+      std::cerr << "invalid value for --sigsys-detector: \"" << detector
+                << "\"";
+      return false;
+    }
+  }
 
   if (options.count("seccomp-script")) {
     minijail_use_seccomp_filter(j);

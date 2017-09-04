@@ -1,6 +1,7 @@
 # artifacts
 *.o
 omegajail
+sigsys-tracer
 
 # test artifacts
 smoketest/c/

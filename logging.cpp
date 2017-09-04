@@ -48,7 +48,7 @@ ScopedLogger::~ScopedLogger() {
 
   if (g_logging_fd != -1 && level_ >= g_min_log_level) {
     const std::string str = buffer_.str();
-		// Perform best-effort writing into the log file.
+    // Perform best-effort writing into the log file.
     ignore_result(::write(g_logging_fd, str.c_str(), str.size()));
   }
 

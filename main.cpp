@@ -29,6 +29,7 @@ namespace {
 
 constexpr int kLoggingFd = 3;
 constexpr int kMetaFd = 4;
+constexpr int kSigsysTracerFd = 5;
 
 const std::map<int, std::string> kSignalMap = {
 #define ENTRY(x) \
@@ -46,7 +47,7 @@ const std::map<int, std::string> kSignalMap = {
 
 struct InitPayload {
   ScopedMinijail jail;
-  bool use_ptrace;
+  SigsysDetector sigsys_detector = SigsysDetector::SIGSYS_TRACER;
   ssize_t memory_limit_in_bytes;
   struct timespec timeout;
 };
@@ -58,6 +59,23 @@ int CloseLoggingFd(void* payload) {
   if (close(kLoggingFd))
     return -errno;
   return 0;
+}
+
+bool MoveToWellKnownFd(struct minijail* j, ScopedFD fd, int well_known_fd) {
+  if (fd.get() == well_known_fd) {
+    // Leak the FD so the child process can access it.
+    fd.release();
+  } else {
+    if (dup2(fd.get(), well_known_fd) == -1)
+      return false;
+  }
+  int ret = minijail_preserve_fd(j, well_known_fd, well_known_fd);
+  if (ret) {
+    errno = -ret;
+    return false;
+  }
+
+  return true;
 }
 
 int RemountRootReadOnly(void* payload) {
@@ -198,10 +216,13 @@ int MetaInit(void* raw_payload) {
     }
     if (sigprocmask(SIG_BLOCK, &orig_mask, nullptr) < 0)
       return -errno;
-    if (payload->use_ptrace) {
+    if (payload->sigsys_detector == SigsysDetector::PTRACE) {
       if (ptrace(PTRACE_TRACEME, 0, nullptr, nullptr) < 0)
         return -errno;
       if (raise(SIGSTOP) < 0)
+        return -errno;
+    } else if (payload->sigsys_detector == SigsysDetector::SIGSYS_TRACER) {
+      if (close(kSigsysTracerFd) < 0)
         return -errno;
     }
     if (close(kMetaFd) < 0)
@@ -274,6 +295,13 @@ int MetaInit(void* raw_payload) {
 
   clock_gettime(CLOCK_REALTIME, &t1);
   TimespecSub(&t1, &t0);
+
+  if (payload->sigsys_detector == SigsysDetector::SIGSYS_TRACER) {
+    SigsysTracerClient sigsys_tracer{ScopedFD(kSigsysTracerFd)};
+    if (!sigsys_tracer.Read(&init_exitsyscall)) {
+      return -errno;
+    }
+  }
 
   memory_cgroup.reset();
 
@@ -438,7 +466,7 @@ int main(int argc, char* argv[]) {
 
   InitPayload payload;
   payload.memory_limit_in_bytes = args.memory_limit_in_bytes;
-  payload.use_ptrace = args.use_ptrace;
+  payload.sigsys_detector = args.sigsys_detector;
   payload.timeout.tv_sec = args.wall_time_limit_msec / 1000;
   payload.timeout.tv_nsec = (args.wall_time_limit_msec % 1000) * 1000000ul;
 
@@ -449,21 +477,23 @@ int main(int argc, char* argv[]) {
       PLOG(ERROR) << "Failed to open meta file " << args.meta;
       return 1;
     }
-    if (meta_fd.get() == kMetaFd) {
-      // Leak the FD so the child process can access it.
-      meta_fd.release();
-    } else {
-      if (dup2(meta_fd.get(), kMetaFd) == -1) {
-        PLOG(ERROR) << "Failed to dup2 meta file";
-        return 1;
-      }
-      meta_fd.reset();
+    if (!MoveToWellKnownFd(j.get(), std::move(meta_fd), kMetaFd)) {
+      PLOG(ERROR) << "Failed to dup meta fd";
+      return 1;
     }
 
-    int ret = minijail_preserve_fd(j.get(), kMetaFd, kMetaFd);
-    if (ret) {
-      LOG(ERROR) << "Failed to set up meta redirect: " << strerror(-ret);
-      return 1;
+    SigsysTracerClient sigsys_tracer;
+    if (args.sigsys_detector == SigsysDetector::SIGSYS_TRACER) {
+      if (sigsys_tracer.Initialize()) {
+        if (!MoveToWellKnownFd(j.get(), sigsys_tracer.TakeFD(),
+                               kSigsysTracerFd)) {
+          PLOG(ERROR) << "Failed to dup meta fd";
+          return 1;
+        }
+      } else {
+        // Fallback to using ptrace.
+        payload.sigsys_detector = SigsysDetector::PTRACE;
+      }
     }
 
     // Setup init's jail
@@ -475,7 +505,9 @@ int main(int argc, char* argv[]) {
     minijail_no_new_privs(payload.jail.get());
     minijail_set_ambient_caps(payload.jail.get());
     minijail_use_caps(payload.jail.get(),
-                      args.use_ptrace ? (1 << CAP_SYS_PTRACE) : 0);
+                      (payload.sigsys_detector == SigsysDetector::PTRACE)
+                          ? (1 << CAP_SYS_PTRACE)
+                          : 0);
 
     // Run MetaInit() as the container's init.
     ret = minijail_add_hook(j.get(), MetaInit, &payload,

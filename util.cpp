@@ -1,9 +1,11 @@
 #include "util.h"
 
-#include <unistd.h>
 #include <stdarg.h>
-#include <sys/stat.h>
 #include <sys/fcntl.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/un.h>
+#include <unistd.h>
 
 #include <utility>
 #include <fstream>
@@ -18,6 +20,12 @@ ScopedFD::~ScopedFD() {
 
 ScopedFD::ScopedFD(ScopedFD&& fd) : fd_(kInvalidFd) {
   std::swap(fd_, fd.fd_);
+}
+
+ScopedFD& ScopedFD::operator=(ScopedFD&& fd) {
+  reset();
+  std::swap(fd_, fd.fd_);
+  return *this;
 }
 
 int ScopedFD::get() const {
@@ -96,6 +104,21 @@ void ScopedMmap::reset(void* ptr, size_t size) {
 }
 
 ScopedCgroup::ScopedCgroup(const std::string& subsystem) : path_() {
+  reset(subsystem);
+}
+
+ScopedCgroup::~ScopedCgroup() {
+  reset();
+}
+
+void ScopedCgroup::reset(const std::string& subsystem) {
+  if (path_.size() > 0) {
+    rmdir(path_.c_str());
+    release();
+  }
+  if (subsystem.size() == 0)
+    return;
+
   for (int attempts = 0; attempts <= 1000; ++attempts) {
     std::string path =
         StringPrintf("%s/omegajail_%d", subsystem.c_str(), attempts);
@@ -109,18 +132,92 @@ ScopedCgroup::ScopedCgroup(const std::string& subsystem) : path_() {
   }
 }
 
-ScopedCgroup::~ScopedCgroup() {
+void ScopedCgroup::release() {
+  path_ = std::string();
+}
+
+ScopedUnlink::ScopedUnlink(std::string path) : path_(std::move(path)) {}
+
+ScopedUnlink::~ScopedUnlink() {
   reset();
 }
 
-void ScopedCgroup::reset() {
-  if (path_.size() > 0)
-    rmdir(path_.c_str());
-  release();
+void ScopedUnlink::reset(std::string path) {
+  std::swap(path, path_);
+  if (path.empty())
+    return;
+  unlink(path.c_str());
 }
 
-void ScopedCgroup::release() {
+void ScopedUnlink::release() {
   path_ = std::string();
+}
+
+SigsysTracerClient::SigsysTracerClient(ScopedFD fd) : fd_(std::move(fd)) {}
+SigsysTracerClient::~SigsysTracerClient() = default;
+
+bool SigsysTracerClient::Initialize() {
+  ScopedFD sock(socket(AF_UNIX, SOCK_STREAM, 0));
+  if (!sock) {
+    PLOG(ERROR) << "Error allocating the socket for sigsys_tracer";
+    return false;
+  }
+
+  struct sockaddr_un addr = {};
+  addr.sun_family = AF_UNIX;
+  strncpy(addr.sun_path, "/run/sigsys_tracer.socket",
+          sizeof(addr.sun_path) - 1);
+  if (HANDLE_EINTR(connect(sock.get(),
+                           reinterpret_cast<const struct sockaddr*>(&addr),
+                           sizeof(addr)))) {
+    PLOG(ERROR) << "Failed to connect. Falling back to ptrace";
+    return false;
+  }
+
+  char buffer[1024];
+  ssize_t bytes_read = HANDLE_EINTR(read(sock.get(), buffer, sizeof(buffer)));
+  if (bytes_read == -1) {
+    PLOG(ERROR) << "Failed to get initial OK";
+    return false;
+  }
+
+  if (strncmp(buffer, "OK\n", 3)) {
+    PLOG(ERROR) << "Failed to get OK from sigsys_tracer";
+    return false;
+  }
+
+  fd_ = std::move(sock);
+  return true;
+}
+
+bool SigsysTracerClient::Read(int* signal) {
+  if (!fd_)
+    return false;
+  if (shutdown(fd_.get(), SHUT_WR)) {
+    PLOG(ERROR) << "Failed to perform half-shutdown";
+    return false;
+  }
+
+  char buffer[16] = {};
+  ssize_t bytes_read = HANDLE_EINTR(read(fd_.get(), buffer, sizeof(buffer)));
+  if (bytes_read <= 0) {
+    PLOG(ERROR) << "Failed to read from server";
+    return false;
+  }
+
+  errno = 0;
+  long signal_long = strtol(buffer, nullptr, 10);
+  if (errno) {
+    PLOG(ERROR) << "Failed to parse reply from sigsys_tracer";
+    return false;
+  }
+
+  *signal = static_cast<int>(signal_long);
+  return true;
+}
+
+ScopedFD SigsysTracerClient::TakeFD() {
+  return std::move(fd_);
 }
 
 std::string StringPrintf(const char* format, ...) {

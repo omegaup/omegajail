@@ -8,6 +8,12 @@
 
 struct minijail;
 
+enum class SigsysDetector {
+  SIGSYS_TRACER,
+  PTRACE,
+  NONE,
+};
+
 struct Args {
   static constexpr uint64_t kMaxWallTimeLimitMsec =
       std::numeric_limits<uint64_t>::max();
@@ -20,7 +26,7 @@ struct Args {
   std::string meta;
   ssize_t memory_limit_in_bytes = -1;
   uint64_t wall_time_limit_msec = kMaxWallTimeLimitMsec;
-  bool use_ptrace = true;
+  SigsysDetector sigsys_detector = SigsysDetector::PTRACE;
   std::unique_ptr<const char* []> program_args;
 
   bool Parse(int argc, char* argv[], struct minijail* j) throw();

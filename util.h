@@ -16,6 +16,7 @@ class ScopedFD {
   explicit ScopedFD(int fd = kInvalidFd);
   ~ScopedFD();
   ScopedFD(ScopedFD&& fd);
+  ScopedFD& operator=(ScopedFD&& fd);
 
   int get() const;
   int release();
@@ -77,18 +78,49 @@ class ScopedMmap {
 
 class ScopedCgroup {
  public:
-  ScopedCgroup(const std::string& subsystem);
+  ScopedCgroup(const std::string& subsystem = std::string());
   ~ScopedCgroup();
 
   operator bool() const { return path_.size() > 0; }
   const std::string& path() const { return path_; }
-  void reset();
+  void reset(const std::string& subsystem = std::string());
   void release();
 
  private:
   std::string path_;
 
   DISALLOW_COPY_AND_ASSIGN(ScopedCgroup);
+};
+
+class ScopedUnlink {
+ public:
+  ScopedUnlink(std::string path = std::string());
+  ~ScopedUnlink();
+
+  operator bool() const { return !path_.empty(); }
+  const std::string& path() const { return path_; }
+  void reset(std::string path = std::string());
+  void release();
+
+ private:
+  std::string path_;
+
+  DISALLOW_COPY_AND_ASSIGN(ScopedUnlink);
+};
+
+class SigsysTracerClient {
+ public:
+  explicit SigsysTracerClient(ScopedFD fd = ScopedFD());
+  ~SigsysTracerClient();
+
+  operator bool() const { return fd_; }
+  bool Initialize();
+  bool Read(int* syscall);
+  ScopedFD TakeFD();
+
+ private:
+  ScopedFD fd_;
+  DISALLOW_COPY_AND_ASSIGN(SigsysTracerClient);
 };
 
 std::string StringPrintf(const char* format, ...);
