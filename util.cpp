@@ -220,6 +220,11 @@ ScopedFD SigsysTracerClient::TakeFD() {
   return std::move(fd_);
 }
 
+ScopedErrnoPreserver::ScopedErrnoPreserver() : errno_(errno) {}
+ScopedErrnoPreserver::~ScopedErrnoPreserver() {
+  errno = errno_;
+}
+
 std::string StringPrintf(const char* format, ...) {
   char path[4096];
 

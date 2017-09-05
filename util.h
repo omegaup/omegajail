@@ -123,6 +123,16 @@ class SigsysTracerClient {
   DISALLOW_COPY_AND_ASSIGN(SigsysTracerClient);
 };
 
+class ScopedErrnoPreserver {
+ public:
+  ScopedErrnoPreserver();
+  ~ScopedErrnoPreserver();
+
+ private:
+  const int errno_;
+  DISALLOW_COPY_AND_ASSIGN(ScopedErrnoPreserver);
+};
+
 std::string StringPrintf(const char* format, ...);
 
 bool ReadUint64(const std::string& path, uint64_t* value);

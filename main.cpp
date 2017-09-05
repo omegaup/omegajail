@@ -56,8 +56,13 @@ struct InitPayload {
 extern "C" const char* lookup_syscall_name(int nr);
 
 int CloseLoggingFd(void* payload) {
-  if (close(kLoggingFd))
+  if (close(kLoggingFd)) {
+    {
+      ScopedErrnoPreserver preserve_errno;
+      PLOG(ERROR) << "Failed to close the logging fd";
+    }
     return -errno;
+  }
   return 0;
 }
 
@@ -79,27 +84,49 @@ bool MoveToWellKnownFd(struct minijail* j, ScopedFD fd, int well_known_fd) {
 }
 
 int RemountRootReadOnly(void* payload) {
-  if (mount(nullptr, "/", nullptr, MS_RDONLY | MS_REMOUNT | MS_BIND, nullptr))
+  if (mount(nullptr, "/", nullptr, MS_RDONLY | MS_REMOUNT | MS_BIND, nullptr)) {
+    {
+      ScopedErrnoPreserver preserve_errno;
+      PLOG(ERROR) << "Failed to remount root read-only";
+    }
     return -errno;
+  }
   return 0;
 }
 
 int Chdir(void* payload) {
-  if (chdir(reinterpret_cast<const char*>(const_cast<const void*>(payload))))
+  const char* dir =
+      reinterpret_cast<const char*>(const_cast<const void*>(payload));
+  if (chdir(dir)) {
+    {
+      ScopedErrnoPreserver preserve_errno;
+      PLOG(ERROR) << "Failed to chdir to " << dir;
+    }
     return -errno;
+  }
   return 0;
 }
 
 int OpenStdio(const std::string& path, int expected_fd, bool writable) {
   ScopedFD fd(open(path.c_str(), writable ? O_WRONLY : O_RDONLY));
-  if (!fd)
+  if (!fd) {
+    {
+      ScopedErrnoPreserver preserve_errno;
+      PLOG(ERROR) << "Failed to open " << path << " as fd " << expected_fd;
+    }
     return -errno;
+  }
   if (fd.get() == expected_fd) {
     fd.release();
     return 0;
   }
-  if (dup2(fd.get(), expected_fd) == -1)
+  if (dup2(fd.get(), expected_fd) == -1) {
+    {
+      ScopedErrnoPreserver preserve_errno;
+      PLOG(ERROR) << "Failed to dup2 " << path << " as fd " << expected_fd;
+    }
     return -errno;
+  }
   return 0;
 }
 
@@ -122,9 +149,13 @@ int RedirectStdio(void* payload) {
   }
   // Now that the fds are opened in the correct namespace, unmount the parent
   // so that the original paths are not disclosed in /proc/self/mountinfo.
-  if (umount2("/mnt/stdio", MNT_DETACH))
+  if (umount2("/mnt/stdio", MNT_DETACH)) {
+    {
+      ScopedErrnoPreserver preserve_errno;
+      PLOG(ERROR) << "Failed to detach /mnt/stdio";
+    }
     return -errno;
-
+  }
   return 0;
 }
 
@@ -183,8 +214,13 @@ int MetaInit(void* raw_payload) {
   std::unique_ptr<ScopedCgroup> memory_cgroup;
   if (payload->memory_limit_in_bytes >= 0) {
     memory_cgroup.reset(new ScopedCgroup("/sys/fs/cgroup/memory/omegajail"));
-    if (!*memory_cgroup)
+    if (!*memory_cgroup) {
+      {
+        ScopedErrnoPreserver preserve_errno;
+        PLOG(ERROR) << "Failed to create an omegajail memory cgroup";
+      }
       return -errno;
+    }
     WriteFile(
         StringPrintf("%s/memory.limit_in_bytes", memory_cgroup->path().c_str()),
         StringPrintf("%zd", payload->memory_limit_in_bytes));
@@ -196,8 +232,13 @@ int MetaInit(void* raw_payload) {
   sigemptyset(&mask);
   sigaddset(&mask, SIGCHLD);
 
-  if (sigprocmask(SIG_BLOCK, &mask, &orig_mask) < 0)
+  if (sigprocmask(SIG_BLOCK, &mask, &orig_mask) < 0) {
+    {
+      ScopedErrnoPreserver preserve_errno;
+      PLOG(ERROR) << "Failed to block SIGCHLD";
+    }
     return -errno;
+  }
 
   struct timespec t0, t1, t, deadline, timeout;
   clock_gettime(CLOCK_REALTIME, &t0);
@@ -214,21 +255,49 @@ int MetaInit(void* raw_payload) {
                 true);
       memory_cgroup->release();
     }
-    if (sigprocmask(SIG_BLOCK, &orig_mask, nullptr) < 0)
+    if (sigprocmask(SIG_SETMASK, &orig_mask, nullptr) < 0) {
+      {
+        ScopedErrnoPreserver preserve_errno;
+        PLOG(ERROR) << "Failed to restore signals";
+      }
       return -errno;
-    if (payload->sigsys_detector == SigsysDetector::PTRACE) {
-      if (ptrace(PTRACE_TRACEME, 0, nullptr, nullptr) < 0)
-        return -errno;
-      if (raise(SIGSTOP) < 0)
-        return -errno;
-    } else if (payload->sigsys_detector == SigsysDetector::SIGSYS_TRACER) {
-      if (close(kSigsysTracerFd) < 0)
-        return -errno;
     }
-    if (close(kMetaFd) < 0)
+    if (payload->sigsys_detector == SigsysDetector::PTRACE) {
+      if (ptrace(PTRACE_TRACEME, 0, nullptr, nullptr) < 0) {
+        {
+          ScopedErrnoPreserver preserve_errno;
+          PLOG(ERROR) << "Failed to PTRACE_TRACEME";
+        }
+        return -errno;
+      }
+      if (raise(SIGSTOP) < 0) {
+        {
+          ScopedErrnoPreserver preserve_errno;
+          PLOG(ERROR) << "Failed to raise(SIGSTOP)";
+        }
+        return -errno;
+      }
+    } else if (payload->sigsys_detector == SigsysDetector::SIGSYS_TRACER) {
+      if (close(kSigsysTracerFd) < 0) {
+        {
+          ScopedErrnoPreserver preserve_errno;
+          PLOG(ERROR) << "Failed to close the sigsys_tracer FD";
+        }
+        return -errno;
+      }
+    }
+    if (close(kMetaFd) < 0) {
+      {
+        ScopedErrnoPreserver preserve_errno;
+        PLOG(ERROR) << "Failed to close the meta FD";
+      }
       return -errno;
+    }
     return 0;
   }
+
+  // From here on, returns mean nothing. We should try as hard as possible to
+  // keep going.
 
   prctl(PR_SET_NAME, "minijail-init");
 
@@ -298,9 +367,7 @@ int MetaInit(void* raw_payload) {
 
   if (payload->sigsys_detector == SigsysDetector::SIGSYS_TRACER) {
     SigsysTracerClient sigsys_tracer{ScopedFD(kSigsysTracerFd)};
-    if (!sigsys_tracer.Read(&init_exitsyscall)) {
-      return -errno;
-    }
+    sigsys_tracer.Read(&init_exitsyscall);
   }
 
   memory_cgroup.reset();
