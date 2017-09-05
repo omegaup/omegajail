@@ -218,6 +218,7 @@ int MetaInit(void* raw_payload) {
   bool init_exited = false;
   int status, init_exitstatus = 0;
   int init_exitsyscall = -1;
+  int init_exitsignal = -1;
   struct rusage usage = {}, init_usage = {};
   siginfo_t info;
   t = t0;
@@ -226,12 +227,8 @@ int MetaInit(void* raw_payload) {
   do {
     timeout = deadline;
     TimespecSub(&timeout, &t);
-    if (sigtimedwait(&mask, &info, &timeout) == -1) {
-      if (errno == EINTR)
-        continue;
-      else
-        break;
-    }
+    if (HANDLE_EINTR(sigtimedwait(&mask, &info, &timeout)) == -1)
+      break;
 
     while ((pid = wait3(&status, __WALL | WNOHANG, &usage)) > 0) {
       if (WIFSTOPPED(status)) {
@@ -263,6 +260,9 @@ int MetaInit(void* raw_payload) {
     clock_gettime(CLOCK_REALTIME, &t);
   } while (!init_exited && TimespecCmp(&t, &deadline) < 0);
 
+  if (TimespecCmp(&t, &deadline) >= 0)
+    init_exitsignal = SIGXCPU;
+
   kill(-1, SIGKILL);
   while ((pid = wait3(&status, 0, &usage)) > 0) {
     if (init_exited || pid != child_pid)
@@ -292,14 +292,15 @@ int MetaInit(void* raw_payload) {
     else
       fprintf(meta_file, "signal:SIGSYS\nsyscall:#%d\n", init_exitsyscall);
     ret = SIGSYS;
-  } else if (WIFSIGNALED(init_exitstatus)) {
-    int exit_signal = WTERMSIG(init_exitstatus);
-    const auto& signal_name = kSignalMap.find(exit_signal);
+  } else if (WIFSIGNALED(init_exitstatus) || init_exitsignal != -1) {
+    if (init_exitsignal == -1)
+      init_exitsignal = WTERMSIG(init_exitstatus);
+    const auto& signal_name = kSignalMap.find(init_exitsignal);
     if (signal_name == kSignalMap.end())
-      fprintf(meta_file, "signal_number:%d\n", exit_signal);
+      fprintf(meta_file, "signal_number:%d\n", init_exitsignal);
     else
       fprintf(meta_file, "signal:%s\n", signal_name->second.c_str());
-    ret = exit_signal;
+    ret = init_exitsignal;
   } else if (WIFEXITED(init_exitstatus)) {
     fprintf(meta_file, "status:%d\n", WEXITSTATUS(init_exitstatus));
     ret = WEXITSTATUS(init_exitstatus);
