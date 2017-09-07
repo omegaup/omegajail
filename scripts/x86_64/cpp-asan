@@ -1,12 +1,18 @@
+@include /var/lib/omegajail/scripts/omegajail
+
 # Exit
 exit: 1
 exit_group: 1
 
 # I/O
+access: 1
+stat: 1
+arch_prctl: arg0 == ARCH_SET_FS
 close: 1
 dup: 1
 dup2: 1
 dup3: 1
+fcntl: arg1 == F_GETFL || arg1 == F_SETFD
 fstat: 1
 lseek: 1
 open: 1
@@ -17,7 +23,6 @@ writev: 1
 
 # Memory
 brk: 1
-futex: return ENOSYS
 mmap: 1
 mremap: 1
 munmap: 1
@@ -33,12 +38,24 @@ times: 1
 # abort()
 getpid: 1
 gettid: 1
-rt_sigaction: arg0 != SIGSYS
+rt_sigaction: 1
 rt_sigprocmask: 1
 rt_sigreturn: 1
 tgkill: arg0 == 2
 
 # Address Sanitizer
-ioctl: 1
+clone: 1
+futex: 1
+getdents: 1
+getppid: 1
+getrlimit: 1
+ioctl: return ENOSYS
+lstat: 1
+prctl: arg0 == PR_SET_PDEATHSIG || arg0 == PR_GET_DUMPABLE || arg0 == PR_SET_PTRACER
+ptrace: arg0 == 0 || arg1 == 2
 readlink: 1
-fcntl: 1
+set_robust_list: 1
+set_tid_address: 1
+setrlimit: return 0
+sigaltstack: 1
+wait4: 1
