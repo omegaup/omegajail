@@ -6,6 +6,7 @@ exit_group: 1
 _llseek: 1
 access: 1
 close: 1
+dup2: 1
 fcntl64: arg1 == F_GETFD || arg1 == F_SETFD && arg2 == FD_CLOEXEC
 fstat64: 1
 getdents64: 1
