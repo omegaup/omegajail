@@ -221,9 +221,17 @@ int MetaInit(void* raw_payload) {
       }
       return -errno;
     }
-    WriteFile(
-        StringPrintf("%s/memory.limit_in_bytes", memory_cgroup->path().c_str()),
-        StringPrintf("%zd", payload->memory_limit_in_bytes));
+    std::string memory_limit_path =
+        StringPrintf("%s/memory.limit_in_bytes", memory_cgroup->path().c_str());
+    WriteFile(memory_limit_path,
+              StringPrintf("%zd", payload->memory_limit_in_bytes));
+    if (chmod(memory_limit_path.c_str(), 0444)) {
+      {
+        ScopedErrnoPreserver preserve_errno;
+        PLOG(ERROR) << "Failed to make the cgroup memory limit read-only";
+      }
+      return -errno;
+    }
   }
 
   sigset_t mask;
@@ -251,9 +259,17 @@ int MetaInit(void* raw_payload) {
     _exit(child_pid);
   } else if (child_pid == 0) {
     if (memory_cgroup) {
-      WriteFile(StringPrintf("%s/tasks", memory_cgroup->path().c_str()), "2\n",
-                true);
+      std::string tasks_path =
+          StringPrintf("%s/tasks", memory_cgroup->path().c_str());
+      WriteFile(tasks_path.c_str(), "2\n", true);
       memory_cgroup->release();
+      if (chmod(tasks_path.c_str(), 0444)) {
+        {
+          ScopedErrnoPreserver preserve_errno;
+          PLOG(ERROR) << "Failed to make the cgroup task list read-only";
+        }
+        return -errno;
+      }
     }
     if (sigprocmask(SIG_SETMASK, &orig_mask, nullptr) < 0) {
       {
