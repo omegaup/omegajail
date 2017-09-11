@@ -47,6 +47,12 @@ class RemoteFile:
   def path(self):
     return self._path
 
+  def __enter__(self):
+    return self
+
+  def __exit__(self, *_):
+    return self
+
 # Class that enumerates all files installed by a certain Debian package.
 # Can work both recursively and non-recursively.
 class FileResolver:
@@ -221,7 +227,7 @@ class Chroot:
       f.write(contents)
     os.utime(self.__chroot_path(path), (0, 0))
 
-  def extract(self, url, sha1, skip_prefix='', exclude=[]):
+  def extract(self, url, sha1, skip_prefix='', exclude=[], include=None):
     f = RemoteFile(url, sha1)
     with tarfile.open(f.path) as tar:
       for member in tar.getmembers():
@@ -229,6 +235,7 @@ class Chroot:
         if not path.startswith(skip_prefix): continue
         path = self.mountpoint + path[len(skip_prefix):]
         if any([path.startswith(e) for e in exclude]): continue
+        if include is not None and path not in include: continue
         if member.issym():
           self.symlink(path, member.linkname)
         elif member.isfile():
@@ -331,7 +338,7 @@ def main(args):
     root.symlink('/usr/bin/java',
             [x for x in JAVA_FILES if x.endswith('bin/java')][0])
     root.symlink('/usr/bin/python', os.path.join(PYTHON_ROOT, 'python'))
-    root.symlink('/usr/bin/node', os.path.join(JS_ROOT, 'node'))
+    root.symlink('/usr/bin/node', os.path.join(JS_ROOT, 'bin/node'))
     root.symlink('/usr/lib/node_modules', os.path.join(JS_ROOT, 'node_modules'))
     for f in RUBY_FILES:
         if f.startswith(RUBY_ROOT): continue
@@ -385,9 +392,10 @@ def main(args):
         if filename.startswith(PYTHON_ROOT):
             root.copyfromhost(filename)
 
-    with urllib.request.urlopen(
-            'https://raw.githubusercontent.com/omegaup/karel.js/master/libkarel/libkarel.py') as f:
-        root.write('/usr/lib/python2.7/libkarel.py', f.read())
+    with RemoteFile(
+	    'https://raw.githubusercontent.com/omegaup/karel.js/master/libkarel/libkarel.py',
+	    '6cce38b8f4bb8ead80409360e3233a8971690489') as f:
+        root.install('/usr/lib/python2.7/libkarel.py', f.path)
 
   with Chroot(os.path.join(args.target, 'root-ruby'), RUBY_ROOT, link=args.link) as root:
     root.install(os.path.join(RUBY_ROOT, 'ruby'), '/usr/bin/ruby')
@@ -413,15 +421,26 @@ def main(args):
             root.copyfromhost(filename)
     root.copyfromhost('/usr/share/dotnet/ref', relative_to=DOTNET_ROOT)
     root.copyfromhost('/usr/share/dotnet/Release.rsp', relative_to=DOTNET_ROOT)
-    root.write('/usr/share/dotnet/Main.runtimeconfig.json',
+    root.write(os.path.join(DOTNET_ROOT, 'Main.runtimeconfig.json'),
                b'{"runtimeOptions": {'
                b'"tfm": "netcoreapp2.0", '
                b'"framework":{"name":"Microsoft.NETCore.App","version":"2.0.0"}}'
                b'}')
 
   with Chroot(os.path.join(args.target, 'root-js'), JS_ROOT) as root:
-    root.extract('https://s3.amazonaws.com/omegaup-omegajail/omegajail-root-js-x86_64.tar.xz',
-                 '1fa6befba145f129e06ce9acb5bbba34a7f64644')
+    root.extract('https://nodejs.org/dist/v6.11.3/node-v6.11.3-linux-x64.tar.xz',
+                 'ffb03a2f2c4caefe6ce6c535598a3a299ca4a5a7',
+                 skip_prefix='node-v6.11.3-linux-x64/',
+		 include=[os.path.join(JS_ROOT, 'LICENSE'),
+                          os.path.join(JS_ROOT, 'bin/node')])
+    with RemoteFile(
+            'https://github.com/omegaup/karel.js/releases/download/v0.2.1/karel.js',
+            'e5aecd4a305aaaf810df6b5d038d2535fd52d857') as f:
+        root.install(os.path.join(JS_ROOT, 'karel.js'), f.path)
+
+    random.seed(b'\u03A9\u1F512') # Ω🔒
+    root.write(os.path.join(JS_ROOT, 'urandom'),
+               bytes(random.randint(0, 255) for _ in range(4096)))
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Build a chroot environment for omegajail')

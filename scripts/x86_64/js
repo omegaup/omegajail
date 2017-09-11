@@ -42,9 +42,9 @@ clone: 1
 arch_prctl: 1
 set_tid_address: 1
 rt_sigreturn: 1
-# TODO(lhchavez): Try to block re-routing SIGSYS.
 rt_sigaction: 1
 rt_sigprocmask: 1
 mprotect: 1
 
 prctl: arg0 == PR_SET_NAME
+socket: return ENETDOWN
