@@ -333,8 +333,10 @@ int MetaInit(void* raw_payload) {
   do {
     timeout = deadline;
     TimespecSub(&timeout, &t);
-    if (HANDLE_EINTR(sigtimedwait(&mask, &info, &timeout)) == -1)
+    if (HANDLE_EINTR(sigtimedwait(&mask, &info, &timeout)) == -1) {
+      clock_gettime(CLOCK_REALTIME, &t);
       break;
+    }
 
     while ((pid = wait3(&status, __WALL | WNOHANG, &usage)) > 0) {
       if (WIFSTOPPED(status)) {
