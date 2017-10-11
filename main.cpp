@@ -465,7 +465,7 @@ int main(int argc, char* argv[]) {
     return 1;
   }
   logging::Init(kLoggingFd, ERROR);
-  minijail_log_to_fd(j.get(), kLoggingFd, LOG_WARNING);
+  minijail_log_to_fd(kLoggingFd, LOG_WARNING);
   int ret = minijail_preserve_fd(j.get(), kLoggingFd, kLoggingFd);
   if (ret) {
     LOG(ERROR) << "Failed to set up stderr redirect: " << strerror(-ret);
@@ -502,6 +502,7 @@ int main(int argc, char* argv[]) {
   minijail_no_new_privs(j.get());
   minijail_set_ambient_caps(j.get());
   minijail_use_caps(j.get(), 0);
+  minijail_reset_signal_mask(j.get());
   minijail_run_as_init(j.get());
   if (minijail_mount(j.get(), "proc", "/proc", "proc",
                      MS_RDONLY | MS_NOEXEC | MS_NODEV | MS_NOSUID)) {
