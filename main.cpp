@@ -353,7 +353,14 @@ int MetaInit(void* raw_payload) {
           init_exitsyscall = info.si_syscall;
           kill(pid, SIGKILL);
         } else {
-          if (ptrace(PTRACE_CONT, pid, nullptr, nullptr) == -1)
+          // If the signal is SIGSTOP (the one we sent before the process
+          // started) or SIGTRAP (a signal injected by ptrace(2)), stop
+          // delivery of the signal.
+          int delivered_signal =
+              (WSTOPSIG(status) == SIGSTOP || WSTOPSIG(status) == SIGTRAP)
+                  ? 0
+                  : WSTOPSIG(status);
+          if (ptrace(PTRACE_CONT, pid, nullptr, delivered_signal) == -1)
             PLOG(ERROR) << "Failed to continue process";
         }
         continue;
