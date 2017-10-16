@@ -347,21 +347,37 @@ int MetaInit(void* raw_payload) {
           }
           attached = true;
         }
-        if (WSTOPSIG(status) == SIGSYS) {
-          if (ptrace(PTRACE_GETSIGINFO, pid, nullptr, &info) == -1)
-            PLOG(ERROR) << "Failed to PTRACE_GETSIGINFO";
-          init_exitsyscall = info.si_syscall;
-          kill(pid, SIGKILL);
-        } else {
-          // If the signal is SIGSTOP (the one we sent before the process
-          // started) or SIGTRAP (a signal injected by ptrace(2)), stop
-          // delivery of the signal.
-          int delivered_signal =
-              (WSTOPSIG(status) == SIGSTOP || WSTOPSIG(status) == SIGTRAP)
-                  ? 0
-                  : WSTOPSIG(status);
-          if (ptrace(PTRACE_CONT, pid, nullptr, delivered_signal) == -1)
-            PLOG(ERROR) << "Failed to continue process";
+        int stop_signal = WSTOPSIG(status);
+        switch (stop_signal) {
+          case SIGSYS:
+            // For the SIGSYS case we want to get the syscall that caused it.
+            if (ptrace(PTRACE_GETSIGINFO, pid, nullptr, &info) == -1)
+              PLOG(ERROR) << "Failed to PTRACE_GETSIGINFO";
+            init_exitsyscall = info.si_syscall;
+            kill(pid, SIGKILL);
+            break;
+
+          case SIGXCPU:
+          case SIGXFSZ:
+            // Signals that are delivered due to exceeding a resource limit will
+            // terminate the process.
+            init_exitsignal = stop_signal;
+            kill(pid, SIGKILL);
+            break;
+
+          case SIGSTOP:
+          case SIGTRAP:
+            // If the signal is SIGSTOP (the one we sent before the process
+            // started) or SIGTRAP (a signal injected by ptrace(2)), stop
+            // delivery of the signal.
+            if (ptrace(PTRACE_CONT, pid, nullptr, 0) == -1)
+              PLOG(ERROR) << "Failed to continue process";
+            break;
+
+          default:
+            // Any other signal will be delivered normally.
+            if (ptrace(PTRACE_CONT, pid, nullptr, stop_signal) == -1)
+              PLOG(ERROR) << "Failed to continue process";
         }
         continue;
       }
