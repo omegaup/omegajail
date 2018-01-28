@@ -529,6 +529,7 @@ int main(int argc, char* argv[]) {
   minijail_use_caps(j.get(), 0);
   minijail_reset_signal_mask(j.get());
   minijail_run_as_init(j.get());
+  minijail_rlimit(j.get(), RLIMIT_STACK, RLIM_INFINITY, RLIM_INFINITY);
   if (minijail_mount(j.get(), "proc", "/proc", "proc",
                      MS_RDONLY | MS_NOEXEC | MS_NODEV | MS_NOSUID)) {
     LOG(ERROR) << "Failed to mount /proc";
