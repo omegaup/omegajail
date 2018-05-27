@@ -23,10 +23,12 @@ read: 1
 readlink: 1
 stat64: 1
 write: 1
+writev: 1
 
 # Events
 _newselect: 1
 poll: 1
+ppoll: 1
 
 # Environment
 getegid32: 1
