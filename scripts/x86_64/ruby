@@ -28,6 +28,7 @@ lstat: 1
 select: 1
 getcwd: 1
 munmap: 1
+mremap: 1
 futex: 1
 exit_group: 1
 gettimeofday: 1
