@@ -393,8 +393,8 @@ def main(args):
             root.copyfromhost(filename)
 
     with RemoteFile(
-	    'https://raw.githubusercontent.com/omegaup/karel.js/master/libkarel/libkarel.py',
-	    '6cce38b8f4bb8ead80409360e3233a8971690489') as f:
+            'https://raw.githubusercontent.com/omegaup/libkarel/master/libkarel.py',
+            '9b67427877bb8ba5bbf3bbde9dcf828c81d3f2cd') as f:
         root.install('/usr/lib/python2.7/libkarel.py', f.path)
 
   with Chroot(os.path.join(args.target, 'root-ruby'), RUBY_ROOT, link=args.link) as root:
