@@ -19,6 +19,7 @@
 #include <fstream>
 #include <map>
 #include <memory>
+#include <utility>
 
 #include "args.h"
 #include "logging.h"
@@ -48,6 +49,7 @@ const std::map<int, std::string> kSignalMap = {
 struct InitPayload {
   ScopedMinijail jail;
   SigsysDetector sigsys_detector = SigsysDetector::SIGSYS_TRACER;
+  std::string cgroup_path;
   ssize_t memory_limit_in_bytes;
   struct timespec timeout;
 };
@@ -234,6 +236,18 @@ int MetaInit(void* raw_payload) {
     }
   }
 
+  std::unique_ptr<ScopedCgroup> pid_cgroup;
+  if (!payload->cgroup_path.empty()) {
+    pid_cgroup.reset(new ScopedCgroup(payload->cgroup_path));
+    if (!*pid_cgroup) {
+      {
+        ScopedErrnoPreserver preserve_errno;
+        PLOG(ERROR) << "Failed to create an omegajail memory cgroup";
+      }
+      return -errno;
+    }
+  }
+
   sigset_t mask;
   sigset_t orig_mask;
 
@@ -258,11 +272,13 @@ int MetaInit(void* raw_payload) {
   if (child_pid < 0) {
     _exit(child_pid);
   } else if (child_pid == 0) {
-    if (memory_cgroup) {
-      std::string tasks_path =
-          StringPrintf("%s/tasks", memory_cgroup->path().c_str());
+    for (auto* cgroup_ptr : {&memory_cgroup, &pid_cgroup}) {
+      auto& cgroup = *cgroup_ptr;
+      if (!cgroup)
+        continue;
+      std::string tasks_path = StringPrintf("%s/tasks", cgroup->path().c_str());
       WriteFile(tasks_path.c_str(), "2\n", true);
-      memory_cgroup->release();
+      cgroup->release();
       if (chmod(tasks_path.c_str(), 0444)) {
         {
           ScopedErrnoPreserver preserve_errno;
@@ -412,6 +428,7 @@ int MetaInit(void* raw_payload) {
   }
 
   memory_cgroup.reset();
+  pid_cgroup.reset();
 
   FILE* meta_file = fdopen(kMetaFd, "w");
   fprintf(meta_file, "time:%ld\ntime-sys:%ld\ntime-wall:%ld\nmem:%ld\n",
@@ -574,8 +591,22 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
+  std::string cgroup_path;
+  if (!args.script_basename.empty()) {
+    cgroup_path = StringPrintf("/sys/fs/cgroup/pids/omegajail/%s",
+                               args.script_basename.c_str());
+    if (access(cgroup_path.c_str(), W_OK) != 0) {
+      cgroup_path.clear();
+    } else if (minijail_mount(j.get(), "/sys/fs/cgroup/pids/omegajail",
+                              "/sys/fs/cgroup/pids/omegajail", "", MS_BIND)) {
+      LOG(ERROR) << "Failed to mount /sys/fs/cgroup/pids";
+      return 1;
+    }
+  }
+
   InitPayload payload;
   payload.memory_limit_in_bytes = args.memory_limit_in_bytes;
+  payload.cgroup_path = cgroup_path;
   payload.sigsys_detector = args.sigsys_detector;
   payload.timeout.tv_sec = args.wall_time_limit_msec / 1000;
   payload.timeout.tv_nsec = (args.wall_time_limit_msec % 1000) * 1000000ul;

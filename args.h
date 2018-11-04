@@ -24,6 +24,7 @@ struct Args {
   std::string stdout_redirect;
   std::string stderr_redirect;
   std::string meta;
+  std::string script_basename;
   ssize_t memory_limit_in_bytes = -1;
   uint64_t wall_time_limit_msec = kMaxWallTimeLimitMsec;
   SigsysDetector sigsys_detector = SigsysDetector::PTRACE;

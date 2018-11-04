@@ -327,6 +327,7 @@ def main(args):
 
     # cgroups support
     root.mkdir('/sys/fs/cgroup/memory/omegajail')
+    root.mkdir('/sys/fs/cgroup/pids/omegajail')
 
     # Node.js really wants a source of randomness.
     root.symlink('/dev/urandom', os.path.join(JS_ROOT, 'urandom'))

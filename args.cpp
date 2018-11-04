@@ -160,10 +160,17 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
   }
 
   if (options.count("seccomp-script")) {
+    std::string seccomp_script_path =
+        options["seccomp-script"].as<std::string>();
+    size_t basename_pos = seccomp_script_path.find_last_of('/');
+    if (basename_pos == std::string::npos)
+      basename_pos = 0;
+    else
+      basename_pos++;
+    script_basename = seccomp_script_path.substr(basename_pos);
     minijail_use_seccomp_filter(j);
     minijail_set_seccomp_filter_tsync(j);
-    minijail_parse_seccomp_filters(
-        j, options["seccomp-script"].as<std::string>().c_str());
+    minijail_parse_seccomp_filters(j, seccomp_script_path.c_str());
   }
 
   if (options.count("time-limit")) {
