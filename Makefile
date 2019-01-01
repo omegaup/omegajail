@@ -1,5 +1,5 @@
 .PHONY: all
-all: omegajail sigsys-tracer
+all: omegajail sigsys-tracer stdio-mux
 
 MINIJAIL_SOURCE_FILES := $(addprefix minijail/,\
 	$(cd minijail && git ls-tree --name-only HEAD -- *.c *.c))
@@ -9,7 +9,7 @@ MINIJAIL_CORE_OBJECT_FILES := $(addprefix minijail/,$(patsubst %.o,%.pic.o,\
 
 ARCH ?= $(shell uname -m)
 CFLAGS += -Wall -Werror -O2
-CXXFLAGS += -std=c++11
+CXXFLAGS += -std=c++14
 LDFLAGS += -lcap
 
 ifeq ($(ARCH),amd64)
@@ -36,8 +36,11 @@ omegajail: main.cpp ${MINIJAIL_CORE_OBJECT_FILES} args.o util.o logging.o
 sigsys-tracer: sigsys_tracer.cpp ${MINIJAIL_CORE_OBJECT_FILES} util.o logging.o
 	g++ $(CFLAGS) $(CXXFLAGS) -fno-exceptions $^ $(LDFLAGS) -o $@
 
+stdio-mux: stdio_mux.cpp util.o logging.o
+	g++ $(CFLAGS) $(CXXFLAGS) -fno-exceptions $^ -o $@
+
 .PHONY: install
-install: omegajail omegajail-setup sigsys-tracer
+install: omegajail omegajail-setup sigsys-tracer stdio-mux
 	install -d $(DESTDIR)/var/lib/omegajail/bin
 	install -t $(DESTDIR)/var/lib/omegajail/bin $^
 	install -d $(DESTDIR)/var/lib/omegajail/scripts
@@ -45,5 +48,5 @@ install: omegajail omegajail-setup sigsys-tracer
 
 .PHONY: clean
 clean:
-	rm -f omegajail sigsys-tracer *.o
+	rm -f omegajail sigsys-tracer stdio-mux *.o
 	$(MAKE) OUT=${PWD}/minijail -C minijail clean

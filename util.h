@@ -6,6 +6,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "macros.h"
 
@@ -134,6 +135,8 @@ class ScopedErrnoPreserver {
 };
 
 std::string StringPrintf(const char* format, ...);
+
+std::vector<std::string> StringSplit(const std::string& input, char delim);
 
 bool ReadUint64(const std::string& path, uint64_t* value);
 

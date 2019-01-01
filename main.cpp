@@ -10,6 +10,7 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/un.h>
 #include <sys/wait.h>
 #include <syslog.h>
 #include <unistd.h>
@@ -49,6 +50,7 @@ const std::map<int, std::string> kSignalMap = {
 struct InitPayload {
   ScopedMinijail jail;
   SigsysDetector sigsys_detector = SigsysDetector::SIGSYS_TRACER;
+  std::string comm;
   std::string cgroup_path;
   ssize_t memory_limit_in_bytes;
   struct timespec timeout;
@@ -109,8 +111,31 @@ int Chdir(void* payload) {
   return 0;
 }
 
+ScopedFD OpenFile(const std::string& path, bool writable) {
+  ScopedFD fd(
+      open(path.c_str(), O_NOFOLLOW | (writable ? O_WRONLY : O_RDONLY)));
+  if (fd || errno != ENXIO)
+    return fd;
+
+  // If we got here, it's a muxed stdio socket.
+  fd.reset(socket(AF_UNIX, SOCK_SEQPACKET, 0));
+  if (!fd)
+    return fd;
+
+  struct sockaddr_un addr = {};
+  addr.sun_family = AF_UNIX;
+  strncpy(addr.sun_path, path.c_str(), sizeof(addr.sun_path) - 1);
+  if (connect(fd.get(), reinterpret_cast<const struct sockaddr*>(&addr),
+              sizeof(addr)) == -1) {
+    return ScopedFD();
+  }
+  if (shutdown(fd.get(), writable ? SHUT_RD : SHUT_WR) == -1)
+    return ScopedFD();
+  return fd;
+}
+
 int OpenStdio(const std::string& path, int expected_fd, bool writable) {
-  ScopedFD fd(open(path.c_str(), writable ? O_WRONLY : O_RDONLY));
+  ScopedFD fd = OpenFile(path, writable);
   if (!fd) {
     {
       ScopedErrnoPreserver preserve_errno;
@@ -172,7 +197,7 @@ void InstallStdioRedirectOrDie(struct minijail* j,
   } else {
     fd.reset(open(src.c_str(), O_RDONLY | O_NOFOLLOW));
   }
-  if (!fd)
+  if (!fd && errno != ENXIO)
     PLOG(FATAL) << "Failed to open " << src;
   if (minijail_mount(j, src.c_str(), dest.c_str(), "",
                      MS_BIND | (writeable ? 0 : MS_RDONLY))) {
@@ -272,6 +297,8 @@ int MetaInit(void* raw_payload) {
   if (child_pid < 0) {
     _exit(child_pid);
   } else if (child_pid == 0) {
+    if (!payload->comm.empty())
+      prctl(PR_SET_NAME, payload->comm.c_str());
     for (auto* cgroup_ptr : {&memory_cgroup, &pid_cgroup}) {
       auto& cgroup = *cgroup_ptr;
       if (!cgroup)
@@ -606,6 +633,7 @@ int main(int argc, char* argv[]) {
 
   InitPayload payload;
   payload.memory_limit_in_bytes = args.memory_limit_in_bytes;
+  payload.comm = args.comm;
   payload.cgroup_path = cgroup_path;
   payload.sigsys_detector = args.sigsys_detector;
   payload.timeout.tv_sec = args.wall_time_limit_msec / 1000;

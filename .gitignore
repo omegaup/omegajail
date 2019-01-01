@@ -2,6 +2,7 @@
 *.o
 omegajail
 sigsys-tracer
+stdio-mux
 
 # test artifacts
 smoketest/c/

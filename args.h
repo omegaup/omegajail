@@ -18,6 +18,7 @@ struct Args {
   static constexpr uint64_t kMaxWallTimeLimitMsec =
       std::numeric_limits<uint64_t>::max();
 
+  std::string comm;
   std::string program;
   std::string chdir;
   std::string stdin_redirect;

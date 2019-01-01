@@ -236,6 +236,22 @@ std::string StringPrintf(const char* format, ...) {
   return std::string(path, ret);
 }
 
+std::vector<std::string> StringSplit(const std::string& input, char delim) {
+  std::vector<std::string> result;
+  size_t pos = 0;
+
+  while (true) {
+    size_t next = input.find(delim, pos);
+    if (next == std::string::npos)
+      break;
+    result.emplace_back(input.substr(pos, next - pos));
+    pos = next + 1;
+  }
+  result.emplace_back(input.substr(pos));
+
+  return result;
+}
+
 bool WriteFile(const std::string& path,
                const std::string& contents,
                bool append) {

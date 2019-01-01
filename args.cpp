@@ -55,6 +55,8 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
 
   // clang-format off
   options.add_options()
+		("comm", "the reported name of the program",
+		 cxxopts::value<std::string>(), "name")
 		("b,bind", "binds a directory",
 		 cxxopts::value<std::vector<std::string>>(), "src,dest[,1]")
 		("d,chdir", "changes directory to |path|",
@@ -108,6 +110,9 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
     std::cerr << options.help({""}) << std::endl;
     return false;
   }
+
+  if (options.count("comm"))
+    comm = options["comm"].as<std::string>() + "\n";
 
   for (const auto& bind_description :
        options["bind"].as<std::vector<std::string>>()) {
