@@ -1,11 +1,16 @@
 #include "args.h"
 
+#include <fcntl.h>
+#include <linux/filter.h>
 #include <sys/resource.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include <cxxopts.hpp>
 
 #include "logging.h"
+#include "util.h"
 #include "minijail/libminijail.h"
 
 namespace {
@@ -59,6 +64,9 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
 		("h,help", "prints this message")
 		("S,seccomp-script",
 		 "the filename of the seccomp script to load",
+		 cxxopts::value<std::string>(), "filename")
+		("seccomp-program",
+		 "the filename of the seccomp BPF program to load",
 		 cxxopts::value<std::string>(), "filename")
 		("0,stdin", "redirects stdin", cxxopts::value<std::string>(),
 		 "filename")
@@ -159,7 +167,36 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
     }
   }
 
-  if (options.count("seccomp-script")) {
+  if (options.count("seccomp-program")) {
+    std::string seccomp_program_path =
+        options["seccomp-program"].as<std::string>();
+    size_t basename_pos = seccomp_program_path.find_last_of('/');
+    if (basename_pos == std::string::npos)
+      basename_pos = 0;
+    else
+      basename_pos++;
+    struct sock_filter filter[BPF_MAXINSNS];
+    struct sock_fprog seccomp_program;
+    {
+      ScopedFD program_fd(
+          open(seccomp_program_path.c_str(), O_RDONLY | O_CLOEXEC));
+      if (!program_fd)
+        PLOG(FATAL) << "Failed to open BPF program";
+      ssize_t bytes_read = read(program_fd.get(), filter, sizeof(filter));
+      if (bytes_read < 0)
+        PLOG(FATAL) << "Failed to read BPF program";
+      if (bytes_read % sizeof(struct sock_filter) != 0)
+        LOG(FATAL) << "Bad size: " << bytes_read;
+      seccomp_program.filter = filter;
+      seccomp_program.len = bytes_read / sizeof(struct sock_filter);
+    }
+
+    script_basename = seccomp_program_path.substr(
+        basename_pos, seccomp_program_path.size() - basename_pos - 4);
+    minijail_use_seccomp_filter(j);
+    minijail_set_seccomp_filter_tsync(j);
+    minijail_set_seccomp_filters(j, &seccomp_program);
+  } else if (options.count("seccomp-script")) {
     std::string seccomp_script_path =
         options["seccomp-script"].as<std::string>();
     size_t basename_pos = seccomp_script_path.find_last_of('/');
