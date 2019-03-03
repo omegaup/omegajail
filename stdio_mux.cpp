@@ -286,8 +286,9 @@ int main(int argc, char* argv[]) {
         if (shutdown(client.get(), SHUT_WR) == -1)
           PLOG(ERROR) << "Failed to shutdown writing to socket";
 
-        auto client_data = std::make_unique<EpollData>(EpollData{
-            ++stream_counter, std::move(client), GetProcessName(ucred.pid)});
+        auto client_data = std::make_unique<EpollData>(
+            EpollData{++stream_counter, std::move(client),
+                      GetProcessName(ucred.pid), false, 0, 0, ScopedFD{}});
 
         auto it = comm_mapping.find(client_data->comm);
         if (it != comm_mapping.end()) {
