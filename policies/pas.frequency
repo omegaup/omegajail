@@ -1,0 +1,14 @@
+close: 14408
+exit_group: 80113
+getrlimit: 86421
+mmap: 97131
+munmap: 74730
+open: 30259
+read: 143564392
+readlink: 86421
+rt_sigaction: 345684
+rt_sigprocmask: 13361249
+select: 2941
+stat: 14408
+time: 14632
+write: 29016303

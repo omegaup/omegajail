@@ -1,0 +1,51 @@
+@include ./omegajail.policy
+@frequency ./fpc.frequency
+
+# Exit
+{exit, exit_group}: allow
+
+# I/O
+access: allow
+chmod: allow
+close: allow
+{fcntl[arch=x86_64], fcntl64[arch=armv7]}: arg1 == F_GETFD || arg1 == F_GETFL || arg1 == F_SETFD || arg1 == F_SETFL
+{fstat[arch=x86_64], fstat64[arch=armv7]}: allow
+getcwd: allow
+getdents64: allow
+ioctl: return ENOTTY
+{lseek, _llseek[arch=armv7]}: allow
+{lstat[arch=x86_64], lstat64[arch=armv7]}: allow
+{open, openat}: allow
+read: allow
+readlink: allow
+{stat[arch=x86_64], stat64[arch=armv7]}: allow
+umask: allow
+unlink: allow
+write: allow
+
+# Memory
+{arch_prctl[arch=x86_64], ARM_set_tls[arch=armv7]}: allow
+brk: allow
+madvise: allow
+{mmap[arch=x86_64], mmap2[arch=armv7]}: allow
+mprotect: allow
+mremap: allow
+munmap: allow
+
+# Environment
+{getrlimit[arch=x86_64], ugetrlimit[arch=armv7]}: allow
+getrusage: allow
+prlimit64: {arg1 == RLIMIT_STACK || arg2 == 0; allow, return EPERM}
+
+# Signals
+rt_sigaction: arg0 != SIGSYS
+rt_sigprocmask: allow
+rt_sigreturn: allow
+
+# Time
+time: allow
+gettimeofday: allow
+
+# Processes / threads
+{fork, vfork}: allow
+wait4: allow

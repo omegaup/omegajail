@@ -1,0 +1,61 @@
+@include ./omegajail.policy
+@frequency ./java.frequency
+
+# Exit
+{exit, exit_group}: allow
+
+# I/O
+access: allow
+close: allow
+dup2: allow
+fchdir: allow
+{fcntl[arch=x86_64], fcntl64[arch=armv7]}: arg1 == F_GETFD || arg1 == F_GETFL || arg1 == F_SETFD || arg1 == F_SETFL
+ftruncate: allow
+{fstat[arch=x86_64], fstat64[arch=armv7]}: allow
+getcwd: allow
+{getdents[arch=x86_64], getdents64[arch=armv7]}: allow
+{lseek, _llseek[arch=armv7]}: allow
+{lstat[arch=x86_64], lstat64[arch=armv7]}: allow
+mkdir: allow
+openat: allow
+{read, pread64}: allow
+readlink: allow
+socket: return ENETDOWN
+{stat[arch=x86_64], stat64[arch=armv7]}: allow
+unlink: allow
+write: allow
+
+# Memory
+{arch_prctl[arch=x86_64], ARM_set_tls[arch=armv7]}: allow
+brk: allow
+madvise: allow
+{mmap[arch=x86_64], mmap2[arch=armv7]}: allow
+mprotect: allow
+mremap: allow
+munmap: allow
+
+# Environment
+{geteuid[arch=x86_64], geteuid32[arch=armv7]}: allow
+getpid: allow
+gettid: allow
+{getuid[arch=x86_64], getuid32[arch=armv7]}: allow
+prlimit64: {arg1 == RLIMIT_STACK || arg2 == 0; allow, return EPERM}
+sysinfo: allow
+uname: allow
+
+# Processes / threads
+clone: arg0 == CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID
+futex: allow
+nanosleep: allow
+rt_sigaction: arg0 != SIGSYS
+rt_sigprocmask: allow
+rt_sigreturn: allow
+sched_getaffinity: allow
+sched_yield: allow
+prctl: arg0 == PR_SET_NAME
+set_robust_list: allow
+set_tid_address: allow
+
+# Time
+clock_getres: allow
+clock_gettime: allow

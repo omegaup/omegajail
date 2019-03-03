@@ -1,0 +1,15 @@
+access: 870
+arch_prctl: 435
+brk: 1305
+close: 2997
+dup3: 419
+exit_group: 435
+fstat: 3329
+lseek: 109
+mmap: 5978
+mprotect: 5124
+openat: 6477
+read: 3535
+rt_sigaction: 838
+stat: 3045
+write: 944

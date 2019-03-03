@@ -1,0 +1,27 @@
+
+access: 57026
+arch_prctl: 28513
+brk: 440954
+close: 1112045
+exit_group: 28513
+fstat: 2195577
+getcwd: 28513
+getdents: 57026
+lseek: 142563
+lstat: 285130
+mmap: 953112
+mprotect: 399182
+munmap: 183261
+openat: 7841293
+prlimit64: 28513
+read: 3878028
+readlink: 85539
+rename: 28511
+rt_sigaction: 1910371
+rt_sigprocmask: 28513
+set_robust_list: 28513
+set_tid_address: 28513
+stat: 2480671
+sysinfo: 28513
+unlink: 798400
+write: 57147

@@ -1,0 +1,5 @@
+@include ./py.policy
+@frequency ./pyc.frequency
+
+# I/O
+rename: allow

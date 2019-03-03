@@ -1,0 +1,48 @@
+@include ./omegajail.policy
+@frequency ./hs.frequency
+
+# Exit
+{exit, exit_group}: allow
+
+# I/O
+access: allow
+close: allow
+dup: allow
+{fcntl[arch=x86_64], fcntl64[arch=armv7]}: arg1 == F_GETFL || arg1 == F_SETFD || arg1 == F_GETFD
+{fstat[arch=x86_64], fstat64[arch=armv7]}: allow
+{lseek, _llseek[arch=armv7]}: allow
+openat: allow
+read: allow
+socket: return ENETDOWN
+{stat[arch=x86_64], stat64[arch=armv7]}: allow
+write: allow
+
+# Events
+poll: allow
+
+# Time
+clock_gettime: allow
+timer_create: allow
+timer_delete: allow
+timer_settime: allow
+
+# Memory
+{arch_prctl[arch=x86_64], ARM_set_tls[arch=armv7]}: allow
+brk: allow
+{mmap[arch=x86_64], mmap2[arch=armv7]}: allow
+madvise: allow
+mprotect: allow
+mremap: allow
+munmap: allow
+set_tid_address: allow
+set_robust_list: allow
+
+# System
+ioctl: return ENOTTY
+prlimit64: {arg1 == RLIMIT_STACK || arg2 == 0; allow, return EPERM}
+sysinfo: allow
+
+# Signals
+rt_sigreturn: allow
+rt_sigaction: arg0 != SIGSYS
+rt_sigprocmask: allow

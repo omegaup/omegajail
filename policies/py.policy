@@ -1,0 +1,54 @@
+@include ./omegajail.policy
+@frequency ./py.frequency
+
+# Exit
+{exit, exit_group}: allow
+
+# I/O
+access: allow
+close: allow
+{dup, dup2, dup3}: allow
+{fcntl[arch=x86_64], fcntl64[arch=armv7]}: arg1 == F_GETFD || arg1 == F_GETFL || arg1 == F_SETFD || arg1 == F_SETFL || arg1 == F_DUPFD_CLOEXEC
+{fstat[arch=x86_64], fstat64[arch=armv7]}: allow
+getcwd: allow
+{getdents[arch=x86_64], getdents64[arch=armv7l]}: allow
+ioctl: return ENOTTY
+{lseek, _llseek[arch=armv7]}: allow
+{lstat[arch=x86_64], lstat64[arch=armv7]}: allow
+mkdir: allow
+openat: allow
+read: allow
+readlink: allow
+{stat[arch=x86_64], stat64[arch=armv7]}: allow
+unlink: allow
+write: allow
+
+# Memory
+{arch_prctl[arch=x86_64], ARM_set_tls[arch=armv7]}: allow
+brk: allow
+madvise: allow
+{mmap[arch=x86_64], mmap2[arch=armv7]}: allow
+mprotect: allow
+mremap: allow
+munmap: allow
+
+# Environment
+{getegid[arch=x86_64], getegid32[arch=armv7l]}: allow
+{geteuid[arch=x86_64], geteuid32[arch=armv7l]}: allow
+{getgid[arch=x86_64], getgid32[arch=armv7l]}: allow
+{getuid[arch=x86_64], getuid32[arch=armv7l]}: allow
+prlimit64: {arg1 == RLIMIT_STACK || arg2 == 0; allow, return EPERM}
+sysinfo: allow
+getrandom: allow
+
+# Signals
+rt_sigaction: {arg0 != SIGSYS; allow, return EINVAL}
+rt_sigprocmask: allow
+rt_sigreturn: allow
+
+# Threads / processes
+futex: allow
+getpid: allow
+set_robust_list: allow
+set_tid_address: allow
+sigaltstack: allow

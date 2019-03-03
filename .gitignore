@@ -1,5 +1,6 @@
 # artifacts
 *.o
+*.bpf
 omegajail
 sigsys-tracer
 stdio-mux
@@ -14,6 +15,7 @@ smoketest/java/
 smoketest/lua/
 smoketest/pas/
 smoketest/py/
+smoketest/py3/
 smoketest/rb/
 
 # mkroot artifacts

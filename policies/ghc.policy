@@ -1,0 +1,69 @@
+@include ./omegajail.policy
+@frequency ./ghc.frequency
+
+# Exit
+{exit, exit_group}: allow
+
+# I/O
+access: allow
+chmod: allow
+close: allow
+{dup, dup2}: allow
+{fcntl[arch=x86_64], fcntl64[arch=armv7]}: arg1 == F_GETFD || arg1 == F_GETFL || arg1 == F_SETFD || arg1 == F_SETFL
+{fstat[arch=x86_64], fstat64[arch=armv7]}: allow
+{ftruncate[arch=x86_64], ftruncate64[arch=armv7]}: allow
+ioctl: return ENOTTY
+{lseek, _llseek[arch=armv7]}: allow
+{lstat[arch=x86_64], lstat64[arch=armv7]}: allow
+mkdir: allow
+openat: allow
+pipe: allow
+{read, readv, pread64[arch=armv7]}: allow
+rmdir: allow
+readlink: allow
+{stat[arch=x86_64], stat64[arch=armv7]}: allow
+umask: allow
+unlink: allow
+{write, writev}: allow
+
+# Environment
+getcwd: allow
+getrusage: allow
+prlimit64: {arg1 == RLIMIT_STACK || arg2 == 0; allow, return EPERM}
+sysinfo: allow
+
+# Events
+epoll_create: allow
+epoll_ctl: allow
+epoll_wait: allow
+eventfd2: allow
+poll: allow
+
+# Memory
+{arch_prctl[arch=x86_64], ARM_set_tls[arch=armv7]}: allow
+brk: allow
+madvise: allow
+{mmap[arch=x86_64], mmap2[arch=armv7]}: allow
+mprotect: allow
+mremap: allow
+munmap: allow
+
+# Time
+clock_gettime: allow
+timer_create: allow
+timer_delete: allow
+timer_settime: allow
+
+# Processes / threads
+clone: arg0 == CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID
+getpid: allow
+futex: allow
+sched_yield: allow
+restart_syscall: allow
+rt_sigaction: arg0 != SIGSYS
+rt_sigprocmask: allow
+rt_sigreturn: allow
+set_robust_list: allow
+set_tid_address: allow
+vfork: allow
+wait4: allow

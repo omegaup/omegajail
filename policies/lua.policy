@@ -1,0 +1,32 @@
+@include ./omegajail.policy
+@frequency ./lua.frequency
+
+# Exit
+{exit, exit_group}: allow
+
+# I/O
+access: allow
+close: allow
+dup3: allow
+{fstat[arch=x86_64], fstat64[arch=armv7]}: allow
+{lseek, _llseek[arch=armv7]}: allow
+ioctl: return ENOTTY
+openat: allow
+read: allow
+{stat[arch=x86_64], stat64[arch=armv7]}: allow
+write: allow
+
+# Memory
+{arch_prctl[arch=x86_64], ARM_set_tls[arch=armv7]}: allow
+brk: allow
+madvise: allow
+{mmap[arch=x86_64], mmap2[arch=armv7]}: allow
+mprotect: allow
+mremap: allow
+munmap: allow
+
+# Environment
+getpid: allow
+
+# abort()
+rt_sigaction: arg0 != SIGSYS

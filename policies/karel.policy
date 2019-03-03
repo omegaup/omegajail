@@ -1,0 +1,45 @@
+@include ./omegajail.policy
+@frequency ./karel.frequency
+
+# Exit
+{exit, exit_group}: allow
+
+# I/O
+access: allow
+close: allow
+{dup, dup2, dup3}: allow
+{fstat[arch=x86_64], fstat64[arch=armv7]}: allow
+ioctl: return ENOTTY
+{lseek, _llseek[arch=armv7]}: allow
+openat: allow
+read: allow
+readlink: allow
+socket: return ENETDOWN
+{stat[arch=x86_64], stat64[arch=armv7]}: allow
+{write, writev}: allow
+
+# Memory
+{arch_prctl[arch=x86_64], ARM_set_tls[arch=armv7]}: allow
+brk: allow
+madvise: allow
+mlock: allow
+{mmap[arch=x86_64], mmap2[arch=armv7]}: allow
+mprotect: allow
+mremap: allow
+munmap: allow
+
+# Time
+time: allow
+gettimeofday: allow
+
+# Environment
+uname: allow
+getrandom: allow
+
+# abort()
+getpid: allow
+gettid: allow
+rt_sigaction: arg0 != SIGSYS
+rt_sigprocmask: allow
+rt_sigreturn: allow
+tgkill: arg0 == 2
