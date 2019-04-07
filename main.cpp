@@ -454,6 +454,19 @@ int MetaInit(void* raw_payload) {
     sigsys_tracer.Read(&init_exitsyscall);
   }
 
+  if (memory_cgroup) {
+    // When limiting the memory with a cgroup, we need to check if the memory
+    // usage was exceeded at the cgroup level. Otherwise, the max RSS might
+    // have a significantly lower value and the verdict might not be correct.
+    uint64_t failcnt = 0;
+    if (ReadUint64(
+            StringPrintf("%s/memory.failcnt", memory_cgroup->path().c_str()),
+            &failcnt) &&
+        failcnt > 0) {
+      init_usage.ru_maxrss = payload->memory_limit_in_bytes;
+    }
+  }
+
   memory_cgroup.reset();
   pid_cgroup.reset();
 
