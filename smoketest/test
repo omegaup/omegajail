@@ -15,7 +15,8 @@ try:
 except ImportError:
   from pipes import quote
 
-LANGUAGES = ('c', 'cpp', 'hs', 'java', 'pas', 'py', 'py3', 'rb', 'lua', 'cs')
+LANGUAGES = ('c', 'cpp', 'cpp17-gcc', 'cpp17-clang', 'hs', 'java', 'pas', 'py',
+             'py3', 'rb', 'lua', 'cs')
 ROOT = '/var/lib/omegajail'
 
 
@@ -60,7 +61,15 @@ def omegajail_compile(lang: str, strace: bool) -> bool:
   elif lang == 'cpp':
     args.extend([
       '--seccomp-program', os.path.join(ROOT, 'policies/gcc.bpf'),
-      '--', '/usr/bin/g++', '--std=c++11', '-o', 'Main', '-O2'])
+      '--', '/usr/bin/g++', '-x', 'c++', '--std=c++11', '-o', 'Main', '-O2'])
+  elif lang == 'cpp17-gcc':
+    args.extend([
+      '--seccomp-program', os.path.join(ROOT, 'policies/gcc.bpf'),
+      '--', '/usr/bin/g++', '-x', 'c++', '--std=c++17', '-o', 'Main', '-O2'])
+  elif lang == 'cpp17-clang':
+    args.extend([
+      '--seccomp-program', os.path.join(ROOT, 'policies/clang.bpf'),
+      '--', '/usr/bin/clang++', '-x', 'c++', '--std=c++17', '-o', 'Main', '-O3', '-march=native'])
   elif lang == 'hs':
     args.extend([
       '--seccomp-program', os.path.join(ROOT, 'policies/ghc.bpf'),
@@ -126,7 +135,7 @@ def omegajail_run(lang: str, strace: bool) -> bool:
       '-t', '3000',
       '-w', '3000',
       '-O', '1048510']
-  if lang in ('c', 'cpp'):
+  if lang in ('c', 'cpp', 'cpp17-gcc', 'cpp17-clang'):
     args.extend([
       '--seccomp-program', os.path.join(ROOT, 'policies/cpp.bpf'),
       '-m', memory_limit,

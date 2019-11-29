@@ -379,6 +379,7 @@ def _main() -> None:
 
     COMPILER_PACKAGES = ROOT_PACKAGES + [
         'binutils',
+        'clang',
         'fp-compiler',
         'fp-units-fcl-3.0.4',
         'g++',

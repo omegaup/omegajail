@@ -1,0 +1,14 @@
+@include ./gcc.policy
+
+# I/O
+{getdents[arch=x86_64], getdents64[arch=armv7]}: allow
+pread64: allow
+rename: allow
+
+# Threads
+clone: allow
+futex: allow
+rt_sigaction: {arg0 != SIGSYS; allow, return EINVAL}
+set_robust_list: allow
+set_tid_address: allow
+sigaltstack: allow

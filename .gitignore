@@ -9,6 +9,8 @@ stdio-mux
 # test artifacts
 smoketest/c/
 smoketest/cpp/
+smoketest/cpp17-gcc/
+smoketest/cpp17-clang/
 smoketest/cs/
 smoketest/hs/
 smoketest/java/

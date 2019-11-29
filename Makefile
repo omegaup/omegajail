@@ -3,7 +3,7 @@ POLICIES := policies/gcc.bpf policies/cpp.bpf policies/ghc.bpf policies/hs.bpf \
             policies/javac.bpf policies/java.bpf policies/fpc.bpf policies/pas.bpf \
             policies/pyc.bpf policies/py.bpf policies/ruby.bpf policies/lua.bpf \
             policies/csc.bpf policies/cs.bpf policies/js.bpf policies/karel.bpf \
-            policies/cpp-asan.bpf
+            policies/cpp-asan.bpf policies/clang.bpf
 
 MINIJAIL_SOURCE_FILES := $(addprefix minijail/,\
 	$(cd minijail && git ls-tree --name-only HEAD -- *.c *.c))
