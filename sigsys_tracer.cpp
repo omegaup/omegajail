@@ -19,8 +19,8 @@
 #include <memory>
 
 #include "logging.h"
-#include "util.h"
 #include "macros.h"
+#include "util.h"
 
 namespace {
 
@@ -192,13 +192,13 @@ class ClientAsyncHelper : public AsyncHelper {
       return false;
     }
 
-    if (!WriteFile(StringPrintf("%s/tasks", cgroup_.path().c_str()),
+    if (!WriteFile(StringPrintf("%s/tasks", cgroup_.path().data()),
                    StringPrintf("%d", pid_))) {
       PLOG(ERROR) << "Failed to register task in cgroup";
       ignore_result(write(fd_.get(), "NO\n", 3));
       return false;
     }
-    if (!WriteFile(StringPrintf("%s/notify_on_release", cgroup_.path().c_str()),
+    if (!WriteFile(StringPrintf("%s/notify_on_release", cgroup_.path().data()),
                    "1")) {
       PLOG(ERROR) << "Failed to set notify_on_release";
       ignore_result(write(fd_.get(), "NO\n", 3));
@@ -207,7 +207,7 @@ class ClientAsyncHelper : public AsyncHelper {
 
     {
       ScopedFD cgroup_fd(
-          open(cgroup_.path().c_str(), O_RDONLY | O_CLOEXEC | O_DIRECTORY));
+          open(cgroup_.path().data(), O_RDONLY | O_CLOEXEC | O_DIRECTORY));
       if (!cgroup_fd) {
         PLOG(ERROR) << "Failed to get cgroup fd";
         ignore_result(write(fd_.get(), "NO\n", 3));
@@ -314,8 +314,8 @@ class ServerSocketAsyncHelper : public AsyncHelper {
       return true;
     }
 
-    std::unique_ptr<AsyncHelper> client(
-        new ClientAsyncHelper(std::move(client_fd), event_id_, page_size_));
+    std::unique_ptr<AsyncHelper> client = std::make_unique<ClientAsyncHelper>(
+        std::move(client_fd), event_id_, page_size_);
 
     if (!client->Initialize() || !run_loop_->Add(std::move(client))) {
       LOG(ERROR) << "Failed to initialize client";
@@ -408,9 +408,8 @@ int main() {
       return 1;
     }
 
-    if (!run_loop.Add(
-            std::unique_ptr<SignalFdAsyncHelper>(new SignalFdAsyncHelper(
-                std::move(signal_fd), run_loop.running())))) {
+    if (!run_loop.Add(std::make_unique<SignalFdAsyncHelper>(
+            std::move(signal_fd), run_loop.running()))) {
       return 1;
     }
   }
@@ -449,9 +448,8 @@ int main() {
 
     long page_size = sysconf(_SC_PAGESIZE);
 
-    if (!run_loop.Add(std::unique_ptr<ServerSocketAsyncHelper>(
-            new ServerSocketAsyncHelper(std::move(server_socket_fd), event_id,
-                                        page_size, &run_loop)))) {
+    if (!run_loop.Add(std::make_unique<ServerSocketAsyncHelper>(
+            std::move(server_socket_fd), event_id, page_size, &run_loop))) {
       return 1;
     }
   }

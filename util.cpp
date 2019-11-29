@@ -7,8 +7,8 @@
 #include <sys/un.h>
 #include <unistd.h>
 
-#include <utility>
 #include <fstream>
+#include <utility>
 
 #include "logging.h"
 
@@ -45,7 +45,7 @@ void ScopedFD::reset(int fd) {
   close(fd);
 }
 
-ScopedDir::ScopedDir(const std::string& path, mode_t mode) : path_(path) {
+ScopedDir::ScopedDir(std::string_view path, mode_t mode) : path_(path) {
   if (mkdir(path_.c_str(), mode) == -1)
     return;
   valid_ = true;
@@ -58,8 +58,8 @@ ScopedDir::~ScopedDir() {
     PLOG(ERROR) << "Failed to rmdir(" << path_ << ")";
 }
 
-ScopedKprobe::ScopedKprobe(const std::string& path,
-                           const std::string& unregister_string)
+ScopedKprobe::ScopedKprobe(std::string_view path,
+                           std::string_view unregister_string)
     : path_(path), unregister_string_(unregister_string) {}
 
 ScopedKprobe::~ScopedKprobe() {
@@ -69,9 +69,9 @@ ScopedKprobe::~ScopedKprobe() {
 
 // static
 std::unique_ptr<ScopedKprobe> ScopedKprobe::Create(
-    const std::string& path,
-    const std::string& register_string,
-    const std::string& unregister_string) {
+    std::string_view path,
+    std::string_view register_string,
+    std::string_view unregister_string) {
   if (!WriteFile(path, register_string, true)) {
     PLOG(ERROR) << "Failed to register kprobe";
     return std::unique_ptr<ScopedKprobe>();
@@ -103,7 +103,7 @@ void ScopedMmap::reset(void* ptr, size_t size) {
     PLOG(ERROR) << "Failed to unmap memory";
 }
 
-ScopedCgroup::ScopedCgroup(const std::string& subsystem) : path_() {
+ScopedCgroup::ScopedCgroup(std::string_view subsystem) : path_() {
   reset(subsystem);
 }
 
@@ -111,7 +111,7 @@ ScopedCgroup::~ScopedCgroup() {
   reset();
 }
 
-void ScopedCgroup::reset(const std::string& subsystem) {
+void ScopedCgroup::reset(std::string_view subsystem) {
   if (path_.size() > 0) {
     rmdir(path_.c_str());
     release();
@@ -121,7 +121,7 @@ void ScopedCgroup::reset(const std::string& subsystem) {
 
   for (int attempts = 0; attempts <= 1000; ++attempts) {
     std::string path =
-        StringPrintf("%s/omegajail_%d", subsystem.c_str(), attempts);
+        StringPrintf("%s/omegajail_%d", subsystem.data(), attempts);
     if (mkdir(path.c_str(), 0755)) {
       if (errno == EEXIST)
         continue;
@@ -136,17 +136,17 @@ void ScopedCgroup::release() {
   path_ = std::string();
 }
 
-ScopedUnlink::ScopedUnlink(std::string path) : path_(std::move(path)) {}
+ScopedUnlink::ScopedUnlink(std::string_view path) : path_(path) {}
 
 ScopedUnlink::~ScopedUnlink() {
   reset();
 }
 
-void ScopedUnlink::reset(std::string path) {
-  std::swap(path, path_);
+void ScopedUnlink::reset(std::string_view path) {
+  path_ = path;
   if (path.empty())
     return;
-  unlink(path.c_str());
+  unlink(path_.c_str());
 }
 
 void ScopedUnlink::release() {
@@ -236,7 +236,7 @@ std::string StringPrintf(const char* format, ...) {
   return std::string(path, ret);
 }
 
-std::vector<std::string> StringSplit(const std::string& input, char delim) {
+std::vector<std::string> StringSplit(std::string_view input, char delim) {
   std::vector<std::string> result;
   size_t pos = 0;
 
@@ -252,23 +252,21 @@ std::vector<std::string> StringSplit(const std::string& input, char delim) {
   return result;
 }
 
-bool WriteFile(const std::string& path,
-               const std::string& contents,
-               bool append) {
+bool WriteFile(std::string_view path, std::string_view contents, bool append) {
   LOG(DEBUG) << "Writing '" << contents << "' to " << path;
 
-  ScopedFD fd(open(path.c_str(), O_WRONLY | (append ? O_APPEND : O_TRUNC)));
+  ScopedFD fd(open(path.data(), O_WRONLY | (append ? O_APPEND : O_TRUNC)));
   if (!fd)
     return false;
-  if (write(fd.get(), contents.c_str(), contents.size()) !=
+  if (write(fd.get(), contents.data(), contents.size()) !=
       static_cast<ssize_t>(contents.size())) {
     return false;
   }
   return true;
 }
 
-bool ReadUint64(const std::string& path, uint64_t* value) {
-  std::ifstream is(path);
+bool ReadUint64(std::string_view path, uint64_t* value) {
+  std::ifstream is = std::ifstream(std::string(path));
   if (!is || !(is >> *value))
     return false;
   return true;

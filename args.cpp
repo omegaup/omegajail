@@ -7,15 +7,17 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <string_view>
+
 #include <cxxopts.hpp>
 
 #include "logging.h"
-#include "util.h"
 #include "minijail/libminijail.h"
+#include "util.h"
 
 namespace {
 
-std::vector<std::string> Split(const std::string& str, const std::string& sep) {
+std::vector<std::string> Split(std::string_view str, std::string_view sep) {
   std::vector<std::string> result;
   size_t pos = 0, sep_pos;
 
@@ -23,11 +25,11 @@ std::vector<std::string> Split(const std::string& str, const std::string& sep) {
     sep_pos = str.find(sep, pos);
     if (sep_pos == std::string::npos)
       break;
-    result.push_back(str.substr(pos, sep_pos - pos));
+    result.push_back(std::string(str.substr(pos, sep_pos - pos)));
     pos = sep_pos + sep.size();
   }
 
-  result.push_back(str.substr(pos));
+  result.push_back(std::string(str.substr(pos)));
 
   return result;
 }
@@ -40,11 +42,11 @@ std::string GetCWD() {
   return std::string(path);
 }
 
-std::string MakeAbsolute(const std::string& path, const std::string& cwd) {
+std::string MakeAbsolute(std::string_view path, std::string_view cwd) {
   if (path.size() && path[0] == '/')
-    return path;
+    return std::string(path);
 
-  return cwd + "/" + path;
+  return StringPrintf("%s/%s", cwd.data(), path.data());
 }
 
 }  // namespace
@@ -55,46 +57,46 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
 
   // clang-format off
   options.add_options()
-		("comm", "the reported name of the program",
-		 cxxopts::value<std::string>(), "name")
-		("b,bind", "binds a directory",
-		 cxxopts::value<std::vector<std::string>>(), "src,dest[,1]")
-		("d,chdir", "changes directory to |path|",
-		 cxxopts::value<std::string>(), "path")
-		("C,chroot", "sets the root of the chroot",
-		 cxxopts::value<std::string>(), "path")
-		("h,help", "prints this message")
-		("S,seccomp-script",
-		 "the filename of the seccomp script to load",
-		 cxxopts::value<std::string>(), "filename")
-		("seccomp-program",
-		 "the filename of the seccomp BPF program to load",
-		 cxxopts::value<std::string>(), "filename")
-		("0,stdin", "redirects stdin", cxxopts::value<std::string>(),
-		 "filename")
-		("1,stdout", "redirects stdout",
-		 cxxopts::value<std::string>(), "filename")
-		("2,stderr", "redirects stderr",
-		 cxxopts::value<std::string>(), "filename")
-		("M,meta", "writes meta", cxxopts::value<std::string>(),
-		 "filename")
-		("t,time-limit", "sets the time limit",
-		 cxxopts::value<uint64_t>(), "msec")
-		("w,extra-wall-time-limit",
-		 "sets the (additional) wall time limit",
-		 cxxopts::value<uint64_t>()->default_value("1000"), "msec")
-		("k,stack-limit", "sets the stack limit",
-		 cxxopts::value<uint64_t>(), "bytes")
-		("O,output-limit", "sets the output limit",
-		 cxxopts::value<uint64_t>(), "bytes")
-		("m,memory-limit", "sets the memory limit",
-		 cxxopts::value<int64_t>(), "bytes")
-		("cgroup-memory-limit", "sets the memory limit with cgroups",
-		 cxxopts::value<ssize_t>(), "bytes")
-		("sigsys-detector",
-		 "one of 'sigsys_tracer' (default), 'ptrace', 'none'.",
-		 cxxopts::value<std::string>())
-		("program", "", cxxopts::value<std::vector<std::string>>());
+    ("comm", "the reported name of the program",
+     cxxopts::value<std::string>(), "name")
+    ("b,bind", "binds a directory",
+     cxxopts::value<std::vector<std::string>>(), "src,dest[,1]")
+    ("d,chdir", "changes directory to |path|",
+     cxxopts::value<std::string>(), "path")
+    ("C,chroot", "sets the root of the chroot",
+     cxxopts::value<std::string>(), "path")
+    ("h,help", "prints this message")
+    ("S,seccomp-script",
+     "the filename of the seccomp script to load",
+     cxxopts::value<std::string>(), "filename")
+    ("seccomp-program",
+     "the filename of the seccomp BPF program to load",
+     cxxopts::value<std::string>(), "filename")
+    ("0,stdin", "redirects stdin", cxxopts::value<std::string>(),
+     "filename")
+    ("1,stdout", "redirects stdout",
+     cxxopts::value<std::string>(), "filename")
+    ("2,stderr", "redirects stderr",
+     cxxopts::value<std::string>(), "filename")
+    ("M,meta", "writes meta", cxxopts::value<std::string>(),
+     "filename")
+    ("t,time-limit", "sets the time limit",
+     cxxopts::value<uint64_t>(), "msec")
+    ("w,extra-wall-time-limit",
+     "sets the (additional) wall time limit",
+     cxxopts::value<uint64_t>()->default_value("1000"), "msec")
+    ("k,stack-limit", "sets the stack limit",
+     cxxopts::value<uint64_t>(), "bytes")
+    ("O,output-limit", "sets the output limit",
+     cxxopts::value<uint64_t>(), "bytes")
+    ("m,memory-limit", "sets the memory limit",
+     cxxopts::value<int64_t>(), "bytes")
+    ("cgroup-memory-limit", "sets the memory limit with cgroups",
+     cxxopts::value<ssize_t>(), "bytes")
+    ("sigsys-detector",
+     "one of 'sigsys_tracer' (default), 'ptrace', 'none'.",
+     cxxopts::value<std::string>())
+    ("program", "", cxxopts::value<std::vector<std::string>>());
   // clang-format on
 
   try {
@@ -256,7 +258,8 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
   program_args_holder = options["program"].as<std::vector<std::string>>();
   program = program_args_holder.front();
 
-  program_args.reset(new const char*[program_args_holder.size() + 1]);
+  program_args =
+      std::make_unique<const char* []>(program_args_holder.size() + 1);
   for (size_t i = 0; i < program_args_holder.size(); ++i)
     program_args[i] = program_args_holder[i].c_str();
   program_args[program_args_holder.size()] = nullptr;

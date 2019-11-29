@@ -13,7 +13,7 @@ MINIJAIL_CORE_OBJECT_FILES := $(addprefix minijail/,$(patsubst %.o,%.pic.o,\
 
 ARCH ?= $(shell uname -m)
 CFLAGS += -Wall -Werror -O2
-CXXFLAGS += -std=c++14
+CXXFLAGS += -std=c++17
 LDFLAGS += -lcap -fPIE -fstack-protector
 
 .PHONY: all

@@ -20,6 +20,7 @@
 #include <fstream>
 #include <map>
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include "args.h"
@@ -33,7 +34,7 @@ constexpr int kLoggingFd = 3;
 constexpr int kMetaFd = 4;
 constexpr int kSigsysTracerFd = 5;
 
-const std::map<int, std::string> kSignalMap = {
+const std::map<int, std::string_view> kSignalMap = {
 #define ENTRY(x) \
   { x, #x }
     ENTRY(SIGHUP),  ENTRY(SIGINT),    ENTRY(SIGQUIT), ENTRY(SIGILL),
@@ -111,9 +112,8 @@ int Chdir(void* payload) {
   return 0;
 }
 
-ScopedFD OpenFile(const std::string& path, bool writable) {
-  ScopedFD fd(
-      open(path.c_str(), O_NOFOLLOW | (writable ? O_WRONLY : O_RDONLY)));
+ScopedFD OpenFile(std::string_view path, bool writable) {
+  ScopedFD fd(open(path.data(), O_NOFOLLOW | (writable ? O_WRONLY : O_RDONLY)));
   if (fd || errno != ENXIO)
     return fd;
 
@@ -124,7 +124,7 @@ ScopedFD OpenFile(const std::string& path, bool writable) {
 
   struct sockaddr_un addr = {};
   addr.sun_family = AF_UNIX;
-  strncpy(addr.sun_path, path.c_str(), sizeof(addr.sun_path) - 1);
+  strncpy(addr.sun_path, path.data(), sizeof(addr.sun_path) - 1);
   if (connect(fd.get(), reinterpret_cast<const struct sockaddr*>(&addr),
               sizeof(addr)) == -1) {
     return ScopedFD();
@@ -134,7 +134,7 @@ ScopedFD OpenFile(const std::string& path, bool writable) {
   return fd;
 }
 
-int OpenStdio(const std::string& path, int expected_fd, bool writable) {
+int OpenStdio(std::string_view path, int expected_fd, bool writable) {
   ScopedFD fd = OpenFile(path, writable);
   if (!fd) {
     {
@@ -187,19 +187,18 @@ int RedirectStdio(void* payload) {
 }
 
 void InstallStdioRedirectOrDie(struct minijail* j,
-                               const std::string& src,
-                               const std::string& dest,
+                               std::string_view src,
+                               std::string_view dest,
                                bool writeable) {
   ScopedFD fd;
   if (writeable) {
-    fd.reset(
-        open(src.c_str(), O_WRONLY | O_CREAT | O_NOFOLLOW | O_TRUNC, 0644));
+    fd.reset(open(src.data(), O_WRONLY | O_CREAT | O_NOFOLLOW | O_TRUNC, 0644));
   } else {
-    fd.reset(open(src.c_str(), O_RDONLY | O_NOFOLLOW));
+    fd.reset(open(src.data(), O_RDONLY | O_NOFOLLOW));
   }
   if (!fd && errno != ENXIO)
     PLOG(FATAL) << "Failed to open " << src;
-  if (minijail_mount(j, src.c_str(), dest.c_str(), "",
+  if (minijail_mount(j, src.data(), dest.data(), "",
                      MS_BIND | (writeable ? 0 : MS_RDONLY))) {
     LOG(FATAL) << "Failed to bind-mount " << src;
   }
@@ -240,7 +239,8 @@ int MetaInit(void* raw_payload) {
 
   std::unique_ptr<ScopedCgroup> memory_cgroup;
   if (payload->memory_limit_in_bytes >= 0) {
-    memory_cgroup.reset(new ScopedCgroup("/sys/fs/cgroup/memory/omegajail"));
+    memory_cgroup =
+        std::make_unique<ScopedCgroup>("/sys/fs/cgroup/memory/omegajail");
     if (!*memory_cgroup) {
       {
         ScopedErrnoPreserver preserve_errno;
@@ -249,7 +249,7 @@ int MetaInit(void* raw_payload) {
       return -errno;
     }
     std::string memory_limit_path =
-        StringPrintf("%s/memory.limit_in_bytes", memory_cgroup->path().c_str());
+        StringPrintf("%s/memory.limit_in_bytes", memory_cgroup->path().data());
     WriteFile(memory_limit_path,
               StringPrintf("%zd", payload->memory_limit_in_bytes));
     if (chmod(memory_limit_path.c_str(), 0444)) {
@@ -263,7 +263,7 @@ int MetaInit(void* raw_payload) {
 
   std::unique_ptr<ScopedCgroup> pid_cgroup;
   if (!payload->cgroup_path.empty()) {
-    pid_cgroup.reset(new ScopedCgroup(payload->cgroup_path));
+    pid_cgroup = std::make_unique<ScopedCgroup>(payload->cgroup_path);
     if (!*pid_cgroup) {
       {
         ScopedErrnoPreserver preserve_errno;
@@ -303,7 +303,7 @@ int MetaInit(void* raw_payload) {
       auto& cgroup = *cgroup_ptr;
       if (!cgroup)
         continue;
-      std::string tasks_path = StringPrintf("%s/tasks", cgroup->path().c_str());
+      std::string tasks_path = StringPrintf("%s/tasks", cgroup->path().data());
       WriteFile(tasks_path.c_str(), "2\n", true);
       cgroup->release();
       if (chmod(tasks_path.c_str(), 0444)) {
@@ -460,7 +460,7 @@ int MetaInit(void* raw_payload) {
     // have a significantly lower value and the verdict might not be correct.
     uint64_t failcnt = 0;
     if (ReadUint64(
-            StringPrintf("%s/memory.failcnt", memory_cgroup->path().c_str()),
+            StringPrintf("%s/memory.failcnt", memory_cgroup->path().data()),
             &failcnt) &&
         failcnt > 0) {
       init_usage.ru_maxrss = payload->memory_limit_in_bytes;
@@ -492,7 +492,7 @@ int MetaInit(void* raw_payload) {
     if (signal_name == kSignalMap.end())
       fprintf(meta_file, "signal_number:%d\n", init_exitsignal);
     else
-      fprintf(meta_file, "signal:%s\n", signal_name->second.c_str());
+      fprintf(meta_file, "signal:%s\n", signal_name->second.data());
     ret = init_exitsignal;
   } else if (WIFEXITED(init_exitstatus)) {
     fprintf(meta_file, "status:%d\n", WEXITSTATUS(init_exitstatus));
