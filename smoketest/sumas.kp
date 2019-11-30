@@ -1,0 +1,23 @@
+iniciar-programa
+    inicia-ejecucion
+        { toma todos los zumbadores de la celda de la derecha }
+        gira-izquierda;
+        gira-izquierda;
+        gira-izquierda;
+        avanza;
+        gira-izquierda;
+        mientras junto-a-zumbador hacer
+            coge-zumbador;
+
+        { deja todos los zumbadores de la mochila }
+        gira-izquierda;
+        avanza;
+        gira-izquierda;
+        gira-izquierda;
+        gira-izquierda;
+        mientras algun-zumbador-en-la-mochila hacer
+            deja-zumbador;
+
+        apagate;
+    termina-ejecucion
+finalizar-programa

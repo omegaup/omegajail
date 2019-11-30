@@ -54,6 +54,7 @@ struct InitPayload {
   std::string comm;
   std::string cgroup_path;
   ssize_t memory_limit_in_bytes;
+  size_t vm_memory_size_in_bytes;
   struct timespec timeout;
 };
 
@@ -470,12 +471,18 @@ int MetaInit(void* raw_payload) {
   memory_cgroup.reset();
   pid_cgroup.reset();
 
+  size_t max_rss = init_usage.ru_maxrss * 1024;
+  if (max_rss >= payload->vm_memory_size_in_bytes) {
+    max_rss -= payload->vm_memory_size_in_bytes;
+  } else {
+    max_rss = 0;
+  }
+
   FILE* meta_file = fdopen(kMetaFd, "w");
   fprintf(meta_file, "time:%ld\ntime-sys:%ld\ntime-wall:%ld\nmem:%ld\n",
           1000000 * init_usage.ru_utime.tv_sec + init_usage.ru_utime.tv_usec,
           1000000 * init_usage.ru_stime.tv_sec + init_usage.ru_stime.tv_usec,
-          (1000000000L * t1.tv_sec + t1.tv_nsec) / 1000L,
-          init_usage.ru_maxrss * 1024);
+          (1000000000L * t1.tv_sec + t1.tv_nsec) / 1000L, max_rss);
   int ret = 0;
 
   if (init_exitsyscall != -1) {
@@ -646,6 +653,7 @@ int main(int argc, char* argv[]) {
 
   InitPayload payload;
   payload.memory_limit_in_bytes = args.memory_limit_in_bytes;
+  payload.vm_memory_size_in_bytes = args.vm_memory_size_in_bytes;
   payload.comm = args.comm;
   payload.cgroup_path = cgroup_path;
   payload.sigsys_detector = args.sigsys_detector;

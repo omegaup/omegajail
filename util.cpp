@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 #include <fstream>
+#include <sstream>
 #include <utility>
 
 #include "logging.h"
@@ -250,6 +251,115 @@ std::vector<std::string> StringSplit(std::string_view input, char delim) {
   result.emplace_back(input.substr(pos));
 
   return result;
+}
+
+std::string StringJoin(const std::vector<std::string>& input,
+                       std::string_view delim) {
+  std::string result;
+  bool first = true;
+  for (const auto& piece : input) {
+    if (first) {
+      first = false;
+    } else {
+      result.append(delim);
+    }
+    result.append(piece);
+  }
+  return result;
+}
+
+std::string Clean(std::string_view path) {
+  bool rooted = !path.empty() && path.front() == '/';
+  std::string out;
+  size_t r = 0, dotdot = 0;
+  if (rooted) {
+    out.append(1, '/');
+    ++r;
+    ++dotdot;
+  }
+
+  while (r < path.size()) {
+    if (path[r] == '/') {
+      // empty path element
+      ++r;
+      continue;
+    }
+    if (path[r] == '.' && (r + 1 == path.size() || path[r + 1] == '/')) {
+      // . element
+      ++r;
+      continue;
+    }
+    if (path[r] == '.' && path[r + 1] == '.' &&
+        (r + 2 == path.size() || path[r + 2] == '/')) {
+      // .. element
+      r += 2;
+      if (out.size() > dotdot) {
+        std::size_t previous_slash = out.find_last_of('/', out.size() - 1);
+        if (previous_slash == std::string::npos)
+          out.clear();
+        else
+          out.erase(std::max(dotdot, previous_slash));
+      } else if (!rooted) {
+        // cannot backtrack, but not rooted, so append .. element.
+        if (!out.empty())
+          out.append(1, '/');
+        out.append("..");
+        dotdot = out.size();
+      }
+    } else {
+      // real path element.
+      // add slash if needed
+      if ((rooted && out.size() != 1) || (!rooted && out.size() != 0))
+        out.append(1, '/');
+      // copy element
+      for (; r < path.size() && path[r] != '/'; r++)
+        out.append(1, path[r]);
+    }
+  }
+
+  // Turn empty string into "."
+  if (out.empty())
+    return ".";
+
+  return out;
+}
+
+std::string Dirname(std::string_view path, std::size_t levels) {
+  if (path.size() > 1 && path.back() == '/')
+    path.remove_suffix(1);
+
+  for (; levels > 0; --levels) {
+    size_t basename_pos = path.find_last_of('/');
+    if (basename_pos == std::string::npos) {
+      // There are no more slashes in the path. We now need to produce a
+      // relative path.
+      if (levels == 1) {
+        return "./";
+      }
+
+      std::string result("../");
+      for (size_t i = 2; i < levels; ++i) {
+        result.append("../");
+      }
+      return result;
+    }
+    if (basename_pos == 0 && !path.empty() && path.front() == '/')
+      return "/";
+    path = path.substr(0, basename_pos);
+  }
+  return std::string(path);
+}
+
+template <>
+std::string PathJoin(std::string_view path, std::string_view component) {
+  if (path.empty() || (!component.empty() && component.front() == '/'))
+    return std::string(component);
+
+  std::string result(path);
+  if (result.back() != '/')
+    result.append(1, '/');
+  result.append(component.data(), component.size());
+  return Clean(result);
 }
 
 bool WriteFile(std::string_view path, std::string_view contents, bool append) {

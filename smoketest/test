@@ -1,225 +1,189 @@
 #!/usr/bin/python3
+"""Runs omegajail smoke tests"""
 
 import argparse
 import logging
 import os
 import os.path
+import shlex
 import shutil
 import subprocess
 import sys
 
 from typing import List
 
-try:
-  from shlex import quote
-except ImportError:
-  from pipes import quote
-
-LANGUAGES = ('c', 'cpp', 'cpp17-gcc', 'cpp17-clang', 'hs', 'java', 'pas', 'py',
-             'py3', 'rb', 'lua', 'cs')
-ROOT = '/var/lib/omegajail'
-
-
-def check_call(args: List[str]) -> bool:
-  try:
-    subprocess.check_call(list(args))
-    return True
-  except subprocess.CalledProcessError as e:
-    logging.error('Failed to run \'%s\'',
-                  ' '.join(quote(arg) for arg in args))
-  return False
-
-
-def omegajail_compile(lang: str, strace: bool) -> bool:
-  if os.path.isdir(lang):
-    shutil.rmtree(lang, True)
-  os.makedirs(lang)
-  target = 'Main.%s' % lang
-  os.link('sumas.' + lang, os.path.join(lang, target))
-  if strace:
-    args = [
-        'strace', '-f', '-o', os.path.join(lang, 'strace-compiler.txt'),
-        '-s', '512',
-        '../omegajail',
-        '--sigsys-detector=none']
-  else:
-    args = ['../omegajail']
-
-  args += [
-      '-C', os.path.join(ROOT, 'root-compilers'),
-      '-d', '/home',
-      '-b', lang + ',/home,1',
-      '-1', os.path.abspath(os.path.join(lang, 'compile.out')),
-      '-2', os.path.abspath(os.path.join(lang, 'compile.err')),
-      '-M', os.path.abspath(os.path.join(lang, 'compile.meta')),
-      '-t', '3000',
-      '-O', '10485100']
-  if lang == 'c':
-    args.extend([
-      '--seccomp-program', os.path.join(ROOT, 'policies/gcc.bpf'),
-      '--', '/usr/bin/gcc', '-o', 'Main', '-O2'])
-  elif lang == 'cpp':
-    args.extend([
-      '--seccomp-program', os.path.join(ROOT, 'policies/gcc.bpf'),
-      '--', '/usr/bin/g++', '-x', 'c++', '--std=c++11', '-o', 'Main', '-O2'])
-  elif lang == 'cpp17-gcc':
-    args.extend([
-      '--seccomp-program', os.path.join(ROOT, 'policies/gcc.bpf'),
-      '--', '/usr/bin/g++', '-x', 'c++', '--std=c++17', '-o', 'Main', '-O2'])
-  elif lang == 'cpp17-clang':
-    args.extend([
-      '--seccomp-program', os.path.join(ROOT, 'policies/clang.bpf'),
-      '--', '/usr/bin/clang++', '-x', 'c++', '--std=c++17', '-o', 'Main', '-O3', '-march=native'])
-  elif lang == 'hs':
-    args.extend([
-      '--seccomp-program', os.path.join(ROOT, 'policies/ghc.bpf'),
-      '-b', os.path.join(ROOT, 'root-hs') + ',/usr/lib/ghc',
-      '--', '/usr/lib/ghc/bin/ghc', '-B/usr/lib/ghc', '-O2', '-o', 'Main'])
-  elif lang == 'java':
-    args.extend([
-      '--seccomp-program', os.path.join(ROOT, 'policies/javac.bpf'),
-      '-b', os.path.join(ROOT, 'root-openjdk') + ',/usr/lib/jvm',
-      '--', '/usr/bin/javac', '-J-Xmx512M'])
-  elif lang == 'pas':
-    args.extend([
-      '--seccomp-program', os.path.join(ROOT, 'policies/fpc.bpf'),
-      '--', '/usr/bin/fpc', '-Tlinux', '-O2'])
-  elif lang == 'py':
-    args.extend([
-      '--seccomp-program', os.path.join(ROOT, 'policies/pyc.bpf'),
-      '-b', os.path.join(ROOT, 'root-python') + ',/usr/lib/python2.7',
-      '--', '/usr/bin/python', '-m', 'py_compile'])
-  elif lang == 'py3':
-    args.extend([
-      '--seccomp-program', os.path.join(ROOT, 'policies/pyc.bpf'),
-      '-b', os.path.join(ROOT, 'root-python3') + ',/usr/lib/python3.6',
-      '--', '/usr/bin/python3', '-m', 'py_compile'])
-  elif lang == 'rb':
-    args.extend([
-      '--seccomp-program', os.path.join(ROOT, 'policies/ruby.bpf'),
-      '-b', os.path.join(ROOT, 'root-ruby') + ',/usr/lib/ruby',
-      '--', '/usr/bin/ruby', '-wc'])
-  elif lang == 'lua':
-    args.extend([
-      '--seccomp-program', os.path.join(ROOT, 'policies/lua.bpf'),
-      '--', '/usr/bin/luac', '-o', 'Main'])
-  elif lang == 'cs':
-    args.extend([
-      '--seccomp-program', os.path.join(ROOT, 'policies/csc.bpf'),
-      '-b', os.path.join(ROOT, 'root-dotnet') + ',/usr/share/dotnet',
-      '--', '/usr/share/dotnet/dotnet',
-      '/usr/share/dotnet/sdk/2.2.203/Roslyn/bincore/csc.dll', '-noconfig',
-      '@/usr/share/dotnet/Release.rsp', '-out:Main.dll', '-target:exe'])
-  return check_call(args + [target])
+_LANGUAGES = [
+    'c',
+    'cpp',
+    'cpp17-gcc',
+    'cpp17-clang',
+    'hs',
+    'java',
+    'pas',
+    'py',
+    'py3',
+    'rb',
+    'lua',
+    'cs',
+    'kj',
+    'kp',
+]
+_KAREL_LANGUAGES = set(['kj', 'kp'])
+_ROOT = '/var/lib/omegajail'
+_PWD = os.path.abspath(os.path.dirname(__file__))
 
 
-def omegajail_run(lang: str, strace: bool) -> bool:
-  if strace:
-    args = [
-        'strace', '-f', '-o', os.path.join(lang, 'strace-main.txt'),
-        '-s', '512',
-        '../omegajail',
-        '--sigsys-detector=none']
-  else:
-    args = ['../omegajail']
-
-  memory_limit = str(256 * 1024 * 1024)
-  args += [
-      '-C', os.path.join(ROOT, 'root'),
-      '-d', '/home',
-      '-b', os.path.abspath(lang) + ',/home',
-      '-0', os.path.abspath('input'),
-      '-1', os.path.abspath(os.path.join(lang, 'run.out')),
-      '-2', os.path.abspath(os.path.join(lang, 'run.err')),
-      '-M', os.path.abspath(os.path.join(lang, 'run.meta')),
-      '-t', '3000',
-      '-w', '3000',
-      '-O', '1048510']
-  if lang in ('c', 'cpp', 'cpp17-gcc', 'cpp17-clang'):
-    args.extend([
-      '--seccomp-program', os.path.join(ROOT, 'policies/cpp.bpf'),
-      '-m', memory_limit,
-      '--', './Main'])
-  elif lang == 'hs':
-    args.extend([
-      '--seccomp-program', os.path.join(ROOT, 'policies/hs.bpf'),
-      '-b', os.path.join(ROOT, 'root-hs') + ',/usr/lib/ghc',
-      '-m', memory_limit,
-      '--', './Main'])
-  elif lang == 'java':
-    args.extend([
-      '--seccomp-program', os.path.join(ROOT, 'policies/java.bpf'),
-      '-b', os.path.join(ROOT, 'root-openjdk') + ',/usr/lib/jvm',
-      '--', '/usr/bin/java', '-Xmx268435456', 'Main'])
-  elif lang == 'pas':
-    args.extend([
-      '--seccomp-program', os.path.join(ROOT, 'policies/pas.bpf'),
-      '-m', memory_limit,
-      '--', './Main'])
-  elif lang == 'py':
-    args.extend([
-      '--seccomp-program', os.path.join(ROOT, 'policies/py.bpf'),
-      '-b', os.path.join(ROOT, 'root-python') + ',/usr/lib/python2.7',
-      '-m', memory_limit,
-      '--', '/usr/bin/python', 'Main.py'])
-  elif lang == 'py3':
-    args.extend([
-      '--seccomp-program', os.path.join(ROOT, 'policies/py.bpf'),
-      '-b', os.path.join(ROOT, 'root-python3') + ',/usr/lib/python3.6',
-      '-m', memory_limit,
-      '--', '/usr/bin/python3', 'Main.py3'])
-  elif lang == 'rb':
-    args.extend([
-      '--seccomp-program', os.path.join(ROOT, 'policies/ruby.bpf'),
-      '-b', os.path.join(ROOT, 'root-ruby') + ',/usr/lib/ruby',
-      '-m', memory_limit,
-      '--', '/usr/bin/ruby', 'Main.rb'])
-  elif lang == 'lua':
-    args.extend([
-      '--seccomp-program', os.path.join(ROOT, 'policies/lua.bpf'),
-      '-m', memory_limit,
-      '--', '/usr/bin/lua', 'Main'])
-  elif lang == 'cs':
-    os.symlink('/usr/share/dotnet/Main.runtimeconfig.json',
-               os.path.join(os.path.abspath(lang), 'Main.runtimeconfig.json'))
-    args.extend([
-      '--seccomp-program', os.path.join(ROOT, 'policies/cs.bpf'),
-      '-b', os.path.join(ROOT, 'root-dotnet') + ',/usr/share/dotnet',
-      '--cgroup-memory-limit', memory_limit,
-      '--', '/usr/share/dotnet/dotnet', 'Main.dll'])
-  if not check_call(args):
-    return False
-  with open(os.path.join(lang, 'run.out'), 'r') as f:
-    got = f.read().strip()
-  with open('output', 'r') as f:
-    expected = f.read().strip()
-  return got == expected
+def _check_call(args: List[str]) -> bool:
+    try:
+        logging.debug('calling \'%s\'', ' '.join(
+            shlex.quote(arg) for arg in args))
+        subprocess.check_call(args, cwd=_PWD)
+        return True
+    except subprocess.CalledProcessError:
+        logging.error('Failed to run \'%s\'', ' '.join(
+            shlex.quote(arg) for arg in args))
+        return False
 
 
-def main():
-  parser = argparse.ArgumentParser()
-  parser.add_argument('--languages', type=str)
-  parser.add_argument('--strace', action='store_true')
-  args = parser.parse_args()
-
-  languages = LANGUAGES
-  if args.languages:
-      languages = args.languages.split(',')
-
-  for lang in languages:
-    print('%-20s' % lang, end='')
-    if not omegajail_compile(lang, args.strace):
-      print('ERROR (COMPILE)')
-      continue
-    if omegajail_run(lang, args.strace):
-      print('OK')
+def _omegajail_compile(lang: str, strace: bool) -> bool:
+    lang_dir = os.path.join(_PWD, 'run', lang)
+    if os.path.isdir(lang_dir):
+        shutil.rmtree(lang_dir, True)
+    os.makedirs(lang_dir)
+    target = 'Main'
+    if lang in ('cpp17-gcc', 'cpp17-clang'):
+        source = '{}.cpp'.format(target)
     else:
-      print('ERROR')
-  return 0
+        source = '{}.{}'.format(target, lang)
+    os.link(
+        os.path.join(_PWD, 'sumas.{}'.format(lang)),
+        os.path.join(lang_dir, source))
+    if strace:
+        args = [
+            'strace', '-f', '-o',
+            os.path.join(lang_dir, 'strace-compiler.txt'), '-s', '512',
+            '../omegajail', '--sigsys-detector=none'
+        ]
+    else:
+        args = ['../omegajail']
+
+    args += [
+        '-d',
+        '/home',
+        '-b',
+        '{},/home,1'.format(lang_dir),
+        '-1',
+        os.path.join(lang_dir, 'compile.out'),
+        '-2',
+        os.path.join(lang_dir, 'compile.err'),
+        '-M',
+        os.path.join(lang_dir, 'compile.meta'),
+        '-t',
+        '3000',
+        '-O',
+        '10485100',
+        '--root',
+        _ROOT,
+        '--compile',
+        lang,
+        '--compile-source',
+        source,
+        '--compile-target',
+        target,
+    ]
+    if lang == 'cs':
+        os.symlink('/usr/share/dotnet/Main.runtimeconfig.json',
+                   os.path.join(lang_dir, 'Main.runtimeconfig.json'))
+    return _check_call(args)
+
+
+def _omegajail_run(lang: str, strace: bool, input_file: str,
+                   output_file: str) -> bool:
+    lang_dir = os.path.join(_PWD, 'run', lang)
+    if strace:
+        args = [
+            'strace', '-f', '-o',
+            os.path.join(lang_dir, 'strace-main.txt'), '-s', '512',
+            '../omegajail', '--sigsys-detector=none'
+        ]
+    else:
+        args = ['../omegajail']
+
+    args += [
+        '-d',
+        '/home',
+        '-b',
+        '{},/home'.format(lang_dir),
+        '-0',
+        os.path.join(_PWD, input_file),
+        '-1',
+        os.path.join(lang_dir, 'run.out'),
+        '-2',
+        os.path.join(lang_dir, 'run.err'),
+        '-M',
+        os.path.join(lang_dir, 'run.meta'),
+        '-t',
+        '3000',
+        '-w',
+        '3000',
+        '-O',
+        '1048510',
+        '-m',
+        str(256 * 1024 * 1024),
+        '--root',
+        _ROOT,
+        '--run',
+        lang,
+        '--run-target',
+        'Main',
+    ]
+    if not _check_call(args):
+        return False
+    with open(os.path.join(lang_dir, 'run.out'), 'r') as run_out:
+        got = run_out.read().strip()
+    with open(os.path.join(_PWD, output_file), 'r') as output:
+        expected = output.read().strip()
+    if got != expected:
+        logging.error('Wrong answer when running \'%s\'. got %r, expected %r',
+                      lang, got, expected)
+    return got == expected
+
+
+def _main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--languages', type=str)
+    parser.add_argument('--strace', action='store_true')
+    parser.add_argument('--verbose', action='store_true')
+    args = parser.parse_args()
+
+    languages = _LANGUAGES
+    if args.languages:
+        languages = args.languages.split(',')
+
+    if args.verbose:
+        logging.getLogger().setLevel('DEBUG')
+
+    passed = True
+
+    for lang in languages:
+        print('%-20s' % lang, end='')
+        if not _omegajail_compile(lang, args.strace):
+            print('ERROR (COMPILE)')
+            passed = False
+            continue
+        if lang in _KAREL_LANGUAGES:
+            input_path, output_path = 'input-karel', 'output-karel'
+        else:
+            input_path, output_path = 'input', 'output'
+        if _omegajail_run(lang, args.strace, input_path, output_path):
+            print('OK')
+        else:
+            print('ERROR')
+            passed = False
+
+    if not passed:
+        sys.exit(1)
 
 
 if __name__ == '__main__':
-  sys.exit(main())
-
-
-# vim: set expandtab:ts=2:sw=2
+    _main()

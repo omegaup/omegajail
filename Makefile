@@ -68,6 +68,7 @@ clean:
 .PHONY: test
 test: util_test ${BINARIES} ${POLICIES}
 	./util_test
+	./smoketest/test
 
 util_test.o: util_test.cpp util.h logging.h
 	$(CXX) $(TEST_CFLAGS) $(TEST_CXXFLAGS) -fno-exceptions $< -c -o $@
