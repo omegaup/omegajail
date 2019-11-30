@@ -12,9 +12,14 @@ MINIJAIL_CORE_OBJECT_FILES := $(addprefix minijail/,$(patsubst %.o,%.pic.o,\
 	syscall_wrapper.o libconstants.gen.o libsyscalls.gen.o))
 
 ARCH ?= $(shell uname -m)
+CXX ?= g++
 CFLAGS += -Wall -Werror -O2
 CXXFLAGS += -std=c++17
 LDFLAGS += -lcap -fPIE -fstack-protector
+
+TEST_CFLAGS += $(CFLAGS)
+TEST_CXXFLAGS += $(CXXFLAGS) -isystem googletest/googletest/include
+TEST_LDFLAGS += $(LDFLAGS) -pthread
 
 .PHONY: all
 all: ${BINARIES} ${POLICIES}
@@ -26,22 +31,22 @@ minijail/constants.json:
 	$(MAKE) OUT=${PWD}/minijail -C minijail constants.json
 
 util.o: util.cpp util.h logging.h macros.h
-	g++ $(CFLAGS) $(CXXFLAGS) -fno-exceptions $< -c -o $@
+	$(CXX) $(CFLAGS) $(CXXFLAGS) -fno-exceptions $< -c -o $@
 
 logging.o: logging.cpp logging.h util.h
-	g++ $(CFLAGS) $(CXXFLAGS) -fno-exceptions $< -c -o $@
+	$(CXX) $(CFLAGS) $(CXXFLAGS) -fno-exceptions $< -c -o $@
 
 args.o: args.cpp args.h logging.h
-	g++ $(CFLAGS) $(CXXFLAGS) -fexceptions -I cxxopts/include $< -c -o $@
+	$(CXX) $(CFLAGS) $(CXXFLAGS) -fexceptions -I cxxopts/include $< -c -o $@
 
 omegajail: main.cpp ${MINIJAIL_CORE_OBJECT_FILES} args.o util.o logging.o
-	g++ $(CFLAGS) $(CXXFLAGS) -fno-exceptions $^ $(LDFLAGS) -o $@
+	$(CXX) $(CFLAGS) $(CXXFLAGS) -fno-exceptions $^ $(LDFLAGS) -o $@
 
 sigsys-tracer: sigsys_tracer.cpp ${MINIJAIL_CORE_OBJECT_FILES} util.o logging.o
-	g++ $(CFLAGS) $(CXXFLAGS) -fno-exceptions $^ $(LDFLAGS) -o $@
+	$(CXX) $(CFLAGS) $(CXXFLAGS) -fno-exceptions $^ $(LDFLAGS) -o $@
 
 stdio-mux: stdio_mux.cpp util.o logging.o
-	g++ $(CFLAGS) $(CXXFLAGS) -fno-exceptions $^ -o $@
+	$(CXX) $(CFLAGS) $(CXXFLAGS) -fno-exceptions $^ -o $@
 
 policies/%.bpf: policies/%.policy | minijail/constants.json
 	./minijail/tools/compile_seccomp_policy.py \
@@ -59,6 +64,22 @@ install: ${BINARIES} ${POLICIES}
 clean:
 	rm -f ${BINARIES} ${POLICIES} *.o
 	$(MAKE) OUT=${PWD}/minijail -C minijail clean
+
+.PHONY: test
+test: util_test ${BINARIES} ${POLICIES}
+	./util_test
+
+util_test.o: util_test.cpp util.h logging.h
+	$(CXX) $(TEST_CFLAGS) $(TEST_CXXFLAGS) -fno-exceptions $< -c -o $@
+
+util_test: util_test.o util.o logging.o gtest-all.o gtest_main.o
+	$(CXX) $(TEST_CFLAGS) $(TEST_CXXFLAGS) -fno-exceptions $^ $(TEST_LDFLAGS) -o $@
+
+gtest-all.o : googletest/googletest/src/gtest-all.cc
+	$(CXX) $(TEST_CFLAGS) $(TEST_CXXFLAGS) -Igoogletest/googletest -fno-exceptions $< -c -o $@
+
+gtest_main.o : googletest/googletest/src/gtest_main.cc
+	$(CXX) $(TEST_CFLAGS) $(TEST_CXXFLAGS) -Igoogletest/googletest -fno-exceptions $< -c -o $@
 
 .PHONY: mkroot
 mkroot: ${BINARIES} ${POLICIES}

@@ -19,6 +19,7 @@ smoketest/pas/
 smoketest/py/
 smoketest/py3/
 smoketest/rb/
+util_test
 
 # mkroot artifacts
 tools/.remote-file-cache/
