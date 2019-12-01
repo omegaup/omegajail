@@ -1,4 +1,4 @@
-BINARIES := omegajail sigsys-tracer stdio-mux
+BINARIES := omegajail sigsys-tracer stdio-mux java-compile
 POLICIES := policies/gcc.bpf policies/cpp.bpf policies/ghc.bpf policies/hs.bpf \
             policies/javac.bpf policies/java.bpf policies/fpc.bpf policies/pas.bpf \
             policies/pyc.bpf policies/py.bpf policies/ruby.bpf policies/lua.bpf \
@@ -48,6 +48,9 @@ sigsys-tracer: sigsys_tracer.cpp ${MINIJAIL_CORE_OBJECT_FILES} util.o logging.o
 stdio-mux: stdio_mux.cpp util.o logging.o
 	$(CXX) $(CFLAGS) $(CXXFLAGS) -fno-exceptions $^ -o $@
 
+java-compile: java_compile.cpp util.o logging.o
+	$(CXX) $(CFLAGS) $(CXXFLAGS) -Os -fno-exceptions $^ $(LDFLAGS) -static -o $@
+
 policies/%.bpf: policies/%.policy | minijail/constants.json
 	./minijail/tools/compile_seccomp_policy.py \
 		--use-kill-process --arch-json=minijail/constants.json \
@@ -57,6 +60,7 @@ policies/%.bpf: policies/%.policy | minijail/constants.json
 install: ${BINARIES} ${POLICIES}
 	install -d $(DESTDIR)/var/lib/omegajail/bin
 	install -t $(DESTDIR)/var/lib/omegajail/bin ${BINARIES} omegajail-setup
+	install -s -T java-compile $(DESTDIR)/var/lib/omegajail/root-openjdk/compile
 	install -d $(DESTDIR)/var/lib/omegajail/policies
 	install -t $(DESTDIR)/var/lib/omegajail/policies -m 0644 ${POLICIES}
 
@@ -92,6 +96,8 @@ mkroot: ${BINARIES} ${POLICIES}
 package:
 	tar cJf omegajail-bionic-distrib-x86_64.tar.xz \
 		$(DESTDIR)/var/lib/omegajail/bin \
-		$(DESTDIR)/var/lib/omegajail/policies
+		$(DESTDIR)/var/lib/omegajail/policies \
+		$(DESTDIR)/var/lib/omegajail/root-openjdk/compile
 	tar cJf omegajail-bionic-rootfs-x86_64.tar.xz \
+		--exclude=$(DESTDIR)/var/lib/omegajail/root-openjdk/compile \
 		$(DESTDIR)/var/lib/omegajail/root*

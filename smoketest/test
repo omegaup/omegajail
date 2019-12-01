@@ -79,7 +79,7 @@ def _omegajail_compile(lang: str, strace: bool) -> bool:
         '-M',
         os.path.join(lang_dir, 'compile.meta'),
         '-t',
-        '3000',
+        '5000',
         '-O',
         '10485100',
         '--root',

@@ -7,6 +7,7 @@
 # I/O
 access: allow
 close: allow
+dup: allow
 dup2: allow
 fchdir: allow
 {fcntl[arch=x86_64], fcntl64[arch=armv7]}: arg1 == F_GETFD || arg1 == F_GETFL || arg1 == F_SETFD || arg1 == F_SETFL
@@ -55,6 +56,7 @@ sched_yield: allow
 prctl: arg0 == PR_SET_NAME
 set_robust_list: allow
 set_tid_address: allow
+tgkill: allow
 
 # Time
 clock_getres: allow

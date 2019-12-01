@@ -6,6 +6,7 @@
 
 # I/O
 access: allow
+chmod: allow
 close: allow
 {dup, dup2}: allow
 fchdir: allow
@@ -14,15 +15,18 @@ fchdir: allow
 ftruncate: allow
 getcwd: allow
 {getdents[arch=x86_64], getdents64[arch=armv7]}: allow
+ioctl: arg1 == FIONREAD
 {lseek, _llseek[arch=armv7]}: allow
 {lstat[arch=x86_64], lstat64[arch=armv7]}: allow
 mkdir: allow
 openat: allow
+pipe: allow
 {read, pread64}: allow
 readlink: allow
 socket: return ENETDOWN
 socketpair: allow
 {stat[arch=x86_64], stat64[arch=armv7]}: allow
+umask: allow
 unlink: allow
 write: allow
 
@@ -41,6 +45,7 @@ getpid: allow
 gettid: allow
 {getuid[arch=x86_64], getuid32[arch=armv7]}: allow
 prlimit64: {arg1 == RLIMIT_STACK || arg2 == 0; allow, return EPERM}
+getrusage: allow
 sysinfo: allow
 uname: allow
 
@@ -56,7 +61,11 @@ sched_yield: allow
 prctl: arg0 == PR_SET_NAME
 set_robust_list: allow
 set_tid_address: allow
+tgkill: allow  # This is needed by the compilation wrapper.
+vfork: allow  # This is needed by the compilation wrapper.
+wait4: allow  # This is needed by the compilation wrapper.
 
 # Time
 clock_getres: allow
 clock_gettime: allow
+gettimeofday: allow  # This is needed by the compilation wrapper.

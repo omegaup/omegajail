@@ -422,7 +422,7 @@ bool Args::SetCompileFlags(std::string_view root,
         UseSeccompProgram(PathJoin(root, "policies/javac.bpf"), j);
     if (!BindReadOnly(PathJoin(root, "root-openjdk"), "/usr/lib/jvm", j))
       return false;
-    program_args_holder = {"/usr/bin/javac", "-J-Xmx512M", "-d", "."};
+    program_args_holder = {"/usr/lib/jvm/compile", std::string(target)};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
     return true;
@@ -536,7 +536,12 @@ bool Args::SetRunFlags(std::string_view root,
     vm_memory_size_in_bytes = kJavaVmMemorySizeInBytes;
     if (!BindReadOnly(PathJoin(root, "root-openjdk"), "/usr/lib/jvm", j))
       return false;
-    program_args_holder = {"/usr/bin/java"};
+    program_args_holder = {
+        "/usr/bin/java",
+        "-Xshare:on",
+        StringPrintf("-XX:AOTLibrary=/usr/lib/jvm/java.base.so,./%s.so",
+                     target.data()),
+    };
     if (memory_limit_bytes > 0) {
       program_args_holder.push_back(StringPrintf(
           "-Xmx%" PRId64, memory_limit_bytes + kJavaMinHeapSizeInBytes));

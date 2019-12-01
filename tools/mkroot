@@ -520,6 +520,8 @@ def _main() -> None:
             root.copyfromhost('/usr/bin/ppcx64')
         root.symlink('/usr/bin/javac',
                      [x for x in JAVA_FILES if x.endswith('bin/javac')][0])
+        root.symlink('/usr/bin/jaotc',
+                     [x for x in JAVA_FILES if x.endswith('bin/jaotc')][0])
         for f in HASKELL_FILES:
             if f.startswith(HASKELL_ROOT):
                 continue
@@ -535,6 +537,46 @@ def _main() -> None:
             link=args.link) as root:
         for filename in JAVA_FILES:
             root.copyfromhost(filename)
+        root.install(
+            os.path.join(JAVA_ROOT, 'compile'),
+            os.path.realpath(os.path.join(_CURRENT_DIR, '../java-compile')))
+        logging.info('Generating the Java Class Data Sharing bundle.')
+        subprocess.check_call([
+            os.path.join(os.path.dirname(_CURRENT_DIR), 'omegajail'),
+            '-d',
+            '/',
+            '-C',
+            '/var/lib/omegajail/root-compilers',
+            '-b',
+            '/var/lib/omegajail/root-openjdk,/usr/lib/jvm,1',
+            '--',
+            '/usr/bin/java',
+            '-Xshare:dump',
+        ],
+                              env={'PATH': '/'})
+        logging.info('Precompiling critical methods from java.base.')
+        subprocess.check_call([
+            os.path.join(os.path.dirname(_CURRENT_DIR), 'omegajail'),
+            '-d',
+            '/home',
+            '-b',
+            '{},/home'.format(_CURRENT_DIR),
+            '-C',
+            '/var/lib/omegajail/root-compilers',
+            '-b',
+            '/var/lib/omegajail/root-openjdk,/usr/lib/jvm,1',
+            '--',
+            '/usr/bin/jaotc',
+            '-J-Xshare:on',
+            '--compile-commands',
+            '/home/java.base.aotcfg',
+            '--module',
+            'java.base',
+            '--output',
+            '/usr/lib/jvm/java.base.so',
+        ],
+                              env={'PATH': '/'})
+        logging.info('Done.')
 
     with Chroot(
             os.path.join(args.target, 'root-python'), PYTHON_ROOT,
