@@ -3,6 +3,7 @@
 omegajail
 sigsys-tracer
 stdio-mux
+.mypy_cache/
 
 # test artifacts
 smoketest/c/
@@ -17,3 +18,4 @@ smoketest/rb/
 
 # mkroot artifacts
 tools/.remote-file-cache/
+*.tar.xz

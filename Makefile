@@ -50,3 +50,17 @@ install: omegajail omegajail-setup sigsys-tracer stdio-mux
 clean:
 	rm -f omegajail sigsys-tracer stdio-mux *.o
 	$(MAKE) OUT=${PWD}/minijail -C minijail clean
+
+.PHONY: mkroot
+mkroot: omegajail omegajail-setup sigsys-tracer stdio-mux
+	sudo rm -rf $(DESTDIR)/var/lib/omegajail
+	sudo ./tools/mkroot --target=$(DESTDIR)/var/lib/omegajail
+	sudo $(MAKE) install
+
+.PHONY: package
+package:
+	tar cJf omegajail-xenial-distrib-x86_64.tar.xz \
+		$(DESTDIR)/var/lib/omegajail/bin \
+		$(DESTDIR)/var/lib/omegajail/scripts
+	tar cJf omegajail-xenial-rootfs-x86_64.tar.xz \
+		$(DESTDIR)/var/lib/omegajail/root*
