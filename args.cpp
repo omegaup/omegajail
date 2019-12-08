@@ -348,10 +348,20 @@ bool Args::SetCompileFlags(std::string_view root,
   // Force-redirect stdin to an empty file.
   stdin_redirect = PathJoin(root, "root-compilers/dev/null");
 
-  if (language == "c") {
+  if (language == "c" || language == "c11-gcc") {
     script_basename = UseSeccompProgram(PathJoin(root, "policies/gcc.bpf"), j);
     program_args_holder = {"/usr/bin/gcc", "-o", std::string(target),
                            "--std=c11", "-O2"};
+    program_args_holder.insert(program_args_holder.end(), sources.begin(),
+                               sources.end());
+    program_args_holder.emplace_back("-lm");
+    return true;
+  }
+  if (language == "c11-clang") {
+    script_basename =
+        UseSeccompProgram(PathJoin(root, "policies/clang.bpf"), j);
+    program_args_holder = {"/usr/bin/clang", "-o",  std::string(target),
+                           "--std=c11",      "-O3", "-march=native"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
     program_args_holder.emplace_back("-lm");
@@ -427,7 +437,7 @@ bool Args::SetCompileFlags(std::string_view root,
                                sources.end());
     return true;
   }
-  if (language == "py") {
+  if (language == "py" || language == "py2") {
     script_basename = UseSeccompProgram(PathJoin(root, "policies/pyc.bpf"), j);
     if (!BindReadOnly(PathJoin(root, "root-python"), "/usr/lib/python2.7", j))
       return false;
@@ -500,8 +510,9 @@ bool Args::SetRunFlags(std::string_view root,
   if (!EnterPivotRoot(PathJoin(root, "root"), j))
     return false;
 
-  if (language == "c" || language == "cpp" || language == "cpp11" ||
-      language == "cpp17-gcc" || language == "cpp17-clang") {
+  if (language == "c" || language == "c11-gcc" || language == "c11-clang" ||
+      language == "cpp" || language == "cpp11" || language == "cpp17-gcc" ||
+      language == "cpp17-clang") {
     if (!SetMemoryLimit(memory_limit_bytes + kExtraMemorySizeInBytes, j))
       return false;
     script_basename = UseSeccompProgram(PathJoin(root, "policies/cpp.bpf"), j);
@@ -549,7 +560,7 @@ bool Args::SetRunFlags(std::string_view root,
     program_args_holder.emplace_back(target);
     return true;
   }
-  if (language == "py") {
+  if (language == "py" || language == "py2") {
     if (!SetMemoryLimit(memory_limit_bytes + kExtraMemorySizeInBytes, j))
       return false;
     script_basename = UseSeccompProgram(PathJoin(root, "policies/py.bpf"), j);
@@ -566,7 +577,7 @@ bool Args::SetRunFlags(std::string_view root,
     if (!BindReadOnly(PathJoin(root, "root-python3"), "/usr/lib/python3.6", j))
       return false;
     program_args_holder = {"/usr/bin/python3",
-                           StringPrintf("%s.py3", target.data())};
+                           StringPrintf("%s.py", target.data())};
     return true;
   }
   if (language == "rb") {

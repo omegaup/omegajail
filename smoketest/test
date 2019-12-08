@@ -14,13 +14,17 @@ from typing import List
 
 _LANGUAGES = [
     'c',
+    'c11-gcc',
+    'c11-clang',
     'cpp',
+    'cpp11',
     'cpp17-gcc',
     'cpp17-clang',
     'hs',
     'java',
     'pas',
     'py',
+    'py2',
     'py3',
     'rb',
     'lua',
@@ -28,6 +32,15 @@ _LANGUAGES = [
     'kj',
     'kp',
 ]
+_EXTENSIONS = {
+    'c11-gcc': 'c',
+    'c11-clang': 'c',
+    'cpp11': 'cpp',
+    'cpp17-gcc': 'cpp',
+    'cpp17-clang': 'cpp',
+    'py2': 'py',
+    'py3': 'py',
+}
 _KAREL_LANGUAGES = set(['kj', 'kp'])
 _ROOT = '/var/lib/omegajail'
 _PWD = os.path.abspath(os.path.dirname(__file__))
@@ -51,10 +64,7 @@ def _omegajail_compile(lang: str, strace: bool) -> bool:
         shutil.rmtree(lang_dir, True)
     os.makedirs(lang_dir)
     target = 'Main'
-    if lang in ('cpp17-gcc', 'cpp17-clang'):
-        source = '{}.cpp'.format(target)
-    else:
-        source = '{}.{}'.format(target, lang)
+    source = '{}.{}'.format(target, _EXTENSIONS.get(lang, lang))
     os.link(
         os.path.join(_PWD, 'sumas.{}'.format(lang)),
         os.path.join(lang_dir, source))
