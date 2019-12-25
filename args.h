@@ -1,6 +1,8 @@
 #ifndef ARGS_H_
 #define ARGS_H_
 
+#include <sys/resource.h>
+
 #include <limits>
 #include <memory>
 #include <string>
@@ -13,6 +15,11 @@ enum class SigsysDetector {
   SIGSYS_TRACER,
   PTRACE,
   NONE,
+};
+
+struct ResourceLimit {
+  __rlimit_resource resource;
+  struct rlimit rlim;
 };
 
 struct Args {
@@ -31,6 +38,8 @@ struct Args {
   size_t vm_memory_size_in_bytes = 0;
   uint64_t wall_time_limit_msec = kMaxWallTimeLimitMsec;
   SigsysDetector sigsys_detector = SigsysDetector::PTRACE;
+  std::vector<ResourceLimit> rlimits{
+      ResourceLimit{RLIMIT_STACK, {RLIM_INFINITY, RLIM_INFINITY}}};
   std::unique_ptr<const char* []> program_args;
 
   bool Parse(int argc, char* argv[], struct minijail* j) throw();
@@ -47,6 +56,8 @@ struct Args {
                    std::string_view target,
                    int64_t memory_limit_bytes,
                    struct minijail* j);
+
+  void SetMemoryLimit(int64_t limit_bytes);
 
   std::vector<std::string> program_args_holder;
 };

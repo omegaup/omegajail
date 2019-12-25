@@ -102,18 +102,6 @@ bool BindReadOnly(std::string_view source,
   return true;
 }
 
-bool SetMemoryLimit(int64_t limit_bytes, struct minijail* j) {
-  if (limit_bytes < 0)
-    return true;
-  int ret = minijail_rlimit(j, RLIMIT_AS, limit_bytes, limit_bytes);
-  if (ret) {
-    std::cerr << "setting memory limit to " << limit_bytes
-              << " failed: " << strerror(-ret) << std::endl;
-    return false;
-  }
-  return true;
-}
-
 }  // namespace
 
 bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
@@ -268,26 +256,17 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
   if (options.count("time-limit")) {
     uint64_t raw_limit_msec = options["time-limit"].as<uint64_t>();
     uint32_t limit_sec = static_cast<uint32_t>((999 + raw_limit_msec) / 1000);
-    minijail_rlimit(j, RLIMIT_CPU, limit_sec, limit_sec + 1);
+    rlimits.emplace_back(ResourceLimit{RLIMIT_CPU, {limit_sec, limit_sec + 1}});
     wall_time_limit_msec =
         raw_limit_msec + options["extra-wall-time-limit"].as<uint64_t>();
   }
   if (options.count("output-limit")) {
     uint64_t limit_bytes = options["output-limit"].as<uint64_t>();
-    int ret = minijail_rlimit(j, RLIMIT_FSIZE, limit_bytes, limit_bytes);
-    if (ret) {
-      std::cerr << "setting output limit failed: " << strerror(-ret)
-                << std::endl;
-      return false;
-    }
+    rlimits.emplace_back(
+        ResourceLimit{RLIMIT_FSIZE, {limit_bytes, limit_bytes}});
 
     // Also disable core dumping when setting an output limit.
-    ret = minijail_rlimit(j, RLIMIT_CORE, 0, 0);
-    if (ret) {
-      std::cerr << "setting output limit failed: " << strerror(-ret)
-                << std::endl;
-      return false;
-    }
+    rlimits.emplace_back(ResourceLimit{RLIMIT_CORE, {0, 0}});
   }
 
   if (options.count("run")) {
@@ -298,8 +277,7 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
       return false;
     }
   } else {
-    if (!SetMemoryLimit(options["memory-limit"].as<int64_t>(), j))
-      return false;
+    SetMemoryLimit(options["memory-limit"].as<int64_t>());
     if (options.count("cgroup-memory-limit"))
       memory_limit_in_bytes = options["cgroup-memory-limit"].as<ssize_t>();
 
@@ -524,29 +502,25 @@ bool Args::SetRunFlags(std::string_view root,
       language == "cpp" || language == "cpp11" || language == "cpp11-gcc" ||
       language == "cpp11-clang" || language == "cpp17-gcc" ||
       language == "cpp17-clang") {
-    if (!SetMemoryLimit(memory_limit_bytes + kExtraMemorySizeInBytes, j))
-      return false;
+    SetMemoryLimit(memory_limit_bytes + kExtraMemorySizeInBytes);
     script_basename = UseSeccompProgram(PathJoin(root, "policies/cpp.bpf"), j);
     program_args_holder = {StringPrintf("./%s", target.data())};
     return true;
   }
   if (language == "pas") {
-    if (!SetMemoryLimit(memory_limit_bytes + kExtraMemorySizeInBytes, j))
-      return false;
+    SetMemoryLimit(memory_limit_bytes + kExtraMemorySizeInBytes);
     script_basename = UseSeccompProgram(PathJoin(root, "policies/pas.bpf"), j);
     program_args_holder = {StringPrintf("./%s", target.data())};
     return true;
   }
   if (language == "lua") {
-    if (!SetMemoryLimit(memory_limit_bytes + kExtraMemorySizeInBytes, j))
-      return false;
+    SetMemoryLimit(memory_limit_bytes + kExtraMemorySizeInBytes);
     script_basename = UseSeccompProgram(PathJoin(root, "policies/lua.bpf"), j);
     program_args_holder = {"/usr/bin/lua", StringPrintf("./%s", target.data())};
     return true;
   }
   if (language == "hs") {
-    if (!SetMemoryLimit(memory_limit_bytes + kExtraMemorySizeInBytes, j))
-      return false;
+    SetMemoryLimit(memory_limit_bytes + kExtraMemorySizeInBytes);
     script_basename = UseSeccompProgram(PathJoin(root, "policies/hs.bpf"), j);
     if (!BindReadOnly(PathJoin(root, "root-hs"), "/usr/lib/ghc", j))
       return false;
@@ -572,8 +546,7 @@ bool Args::SetRunFlags(std::string_view root,
     return true;
   }
   if (language == "py" || language == "py2") {
-    if (!SetMemoryLimit(memory_limit_bytes + kExtraMemorySizeInBytes, j))
-      return false;
+    SetMemoryLimit(memory_limit_bytes + kExtraMemorySizeInBytes);
     script_basename = UseSeccompProgram(PathJoin(root, "policies/py.bpf"), j);
     if (!BindReadOnly(PathJoin(root, "root-python"), "/usr/lib/python2.7", j))
       return false;
@@ -582,8 +555,7 @@ bool Args::SetRunFlags(std::string_view root,
     return true;
   }
   if (language == "py3") {
-    if (!SetMemoryLimit(memory_limit_bytes + kExtraMemorySizeInBytes, j))
-      return false;
+    SetMemoryLimit(memory_limit_bytes + kExtraMemorySizeInBytes);
     script_basename = UseSeccompProgram(PathJoin(root, "policies/py.bpf"), j);
     if (!BindReadOnly(PathJoin(root, "root-python3"), "/usr/lib/python3.6", j))
       return false;
@@ -592,8 +564,7 @@ bool Args::SetRunFlags(std::string_view root,
     return true;
   }
   if (language == "rb") {
-    if (!SetMemoryLimit(memory_limit_bytes + kExtraMemorySizeInBytes, j))
-      return false;
+    SetMemoryLimit(memory_limit_bytes + kExtraMemorySizeInBytes);
     script_basename = UseSeccompProgram(PathJoin(root, "policies/ruby.bpf"), j);
     if (!BindReadOnly(PathJoin(root, "root-ruby"), "/usr/lib/ruby", j))
       return false;
@@ -613,8 +584,7 @@ bool Args::SetRunFlags(std::string_view root,
     return true;
   }
   if (language == "kp" || language == "kj") {
-    if (!SetMemoryLimit(memory_limit_bytes + kExtraMemorySizeInBytes, j))
-      return false;
+    SetMemoryLimit(memory_limit_bytes + kExtraMemorySizeInBytes);
     script_basename =
         UseSeccompProgram(PathJoin(root, "policies/karel.bpf"), j);
     if (!BindReadOnly(PathJoin(root, "root-js"), "/opt/nodejs", j))
@@ -626,4 +596,12 @@ bool Args::SetRunFlags(std::string_view root,
 
   std::cerr << "Unknown run language \"" << language << "\"" << std::endl;
   return false;
+}
+
+void Args::SetMemoryLimit(int64_t limit_bytes) {
+  if (limit_bytes < 0)
+    return;
+  rlimits.emplace_back(ResourceLimit{
+      RLIMIT_AS,
+      {static_cast<rlim_t>(limit_bytes), static_cast<rlim_t>(limit_bytes)}});
 }

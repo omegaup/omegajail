@@ -55,11 +55,29 @@ struct InitPayload {
   std::string cgroup_path;
   ssize_t memory_limit_in_bytes;
   size_t vm_memory_size_in_bytes;
+  std::vector<ResourceLimit> rlimits;
   struct timespec timeout;
 };
 
 // from minijail/util.h
 extern "C" const char* lookup_syscall_name(int nr);
+
+int SetResourceLimits(const std::vector<ResourceLimit>& rlimits) {
+  for (const ResourceLimit& rlimit : rlimits) {
+    if (prlimit(0, rlimit.resource, &rlimit.rlim, nullptr)) {
+      {
+        ScopedErrnoPreserver preserve_errno;
+        PLOG(ERROR) << "Failed to set resource limits";
+      }
+      return -errno;
+    }
+  }
+  return 0;
+}
+
+int SetResourceLimits(void* payload) {
+  return SetResourceLimits(reinterpret_cast<Args*>(payload)->rlimits);
+}
 
 int CloseLoggingFd(void* payload) {
   if (close(kLoggingFd)) {
@@ -353,7 +371,7 @@ int MetaInit(void* raw_payload) {
       }
       return -errno;
     }
-    return 0;
+    return SetResourceLimits(payload->rlimits);
   }
 
   // From here on, returns mean nothing. We should try as hard as possible to
@@ -593,7 +611,6 @@ int main(int argc, char* argv[]) {
   minijail_use_caps(j.get(), 0);
   minijail_reset_signal_mask(j.get());
   minijail_run_as_init(j.get());
-  minijail_rlimit(j.get(), RLIMIT_STACK, RLIM_INFINITY, RLIM_INFINITY);
   if (minijail_mount(j.get(), "proc", "/proc", "proc",
                      MS_RDONLY | MS_NOEXEC | MS_NODEV | MS_NOSUID)) {
     LOG(ERROR) << "Failed to mount /proc";
@@ -654,6 +671,7 @@ int main(int argc, char* argv[]) {
   InitPayload payload;
   payload.memory_limit_in_bytes = args.memory_limit_in_bytes;
   payload.vm_memory_size_in_bytes = args.vm_memory_size_in_bytes;
+  payload.rlimits = args.rlimits;
   payload.comm = args.comm;
   payload.cgroup_path = cgroup_path;
   payload.sigsys_detector = args.sigsys_detector;
@@ -707,6 +725,9 @@ int main(int argc, char* argv[]) {
       return 1;
     }
     minijail_run_as_init(j.get());
+  } else {
+    minijail_add_hook(j.get(), SetResourceLimits, &args,
+                      MINIJAIL_HOOK_EVENT_PRE_DROP_CAPS);
   }
 
   // This must be the last pre-drop caps hook to be run.
