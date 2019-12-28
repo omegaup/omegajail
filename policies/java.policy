@@ -40,6 +40,7 @@ munmap: allow
 getpid: allow
 gettid: allow
 {getuid[arch=x86_64], getuid32[arch=armv7]}: allow
+getrusage: allow
 prlimit64: {arg1 == RLIMIT_STACK || arg2 == 0; allow, return EPERM}
 sysinfo: allow
 uname: allow
