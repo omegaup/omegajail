@@ -30,23 +30,27 @@ ${MINIJAIL_CORE_OBJECT_FILES}: ${MINIJAIL_SOURCE_FILES}
 minijail/constants.json:
 	$(MAKE) OUT=${PWD}/minijail -C minijail constants.json
 
+version.o: version.cpp version.h
+	$(CXX) "-DOMEGAJAIL_VERSION=\"$(shell git describe --tags)\"" \
+		$(CFLAGS) $(CXXFLAGS) -fno-exceptions $< -c -o $@
+
 util.o: util.cpp util.h logging.h macros.h
 	$(CXX) $(CFLAGS) $(CXXFLAGS) -fno-exceptions $< -c -o $@
 
 logging.o: logging.cpp logging.h util.h
 	$(CXX) $(CFLAGS) $(CXXFLAGS) -fno-exceptions $< -c -o $@
 
-args.o: args.cpp args.h logging.h
+args.o: args.cpp args.h logging.h version.h
 	$(CXX) $(CFLAGS) $(CXXFLAGS) -fexceptions -I cxxopts/include $< -c -o $@
 
-omegajail: main.cpp ${MINIJAIL_CORE_OBJECT_FILES} args.o util.o logging.o
+omegajail: main.cpp ${MINIJAIL_CORE_OBJECT_FILES} args.o util.o logging.o version.o
 	$(CXX) $(CFLAGS) $(CXXFLAGS) -fno-exceptions $^ $(LDFLAGS) -o $@
 
 sigsys-tracer: sigsys_tracer.cpp ${MINIJAIL_CORE_OBJECT_FILES} util.o logging.o
 	$(CXX) $(CFLAGS) $(CXXFLAGS) -fno-exceptions $^ $(LDFLAGS) -o $@
 
 stdio-mux: stdio_mux.cpp util.o logging.o
-	$(CXX) $(CFLAGS) $(CXXFLAGS) -fno-exceptions $^ -o $@
+	$(CXX) $(CFLAGS) $(CXXFLAGS) -fno-exceptions $^ $(LDFLAGS) -o $@
 
 java-compile: java_compile.cpp util.o logging.o
 	$(CXX) $(CFLAGS) $(CXXFLAGS) -Os -fno-exceptions $^ $(LDFLAGS) -static -o $@

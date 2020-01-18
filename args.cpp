@@ -13,6 +13,7 @@
 #include "logging.h"
 #include "minijail/libminijail.h"
 #include "util.h"
+#include "version.h"
 
 namespace {
 
@@ -134,6 +135,7 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
     ("C,chroot", "sets the root of the chroot",
      cxxopts::value<std::string>(), "path")
     ("h,help", "prints this message")
+    ("v,version", "displays the version and exits")
     ("S,seccomp-script", "the filename of the seccomp script to load",
      cxxopts::value<std::string>(), "filename")
     ("seccomp-program", "the filename of the seccomp BPF program to load",
@@ -174,6 +176,10 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
 
   if (options.count("help")) {
     std::cerr << options.help({""}) << std::endl;
+    return false;
+  }
+  if (options.count("version")) {
+    std::cout << "omegajail " << kVersion << std::endl;
     return false;
   }
 
