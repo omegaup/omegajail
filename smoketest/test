@@ -17,6 +17,8 @@ _LANGUAGES = [
     'c11-gcc',
     'c11-clang',
     'cpp',
+    'cpp03-gcc',
+    'cpp03-clang',
     'cpp11',
     'cpp11-gcc',
     'cpp11-clang',
@@ -37,6 +39,8 @@ _LANGUAGES = [
 _EXTENSIONS = {
     'c11-gcc': 'c',
     'c11-clang': 'c',
+    'cpp03-gcc': 'cpp',
+    'cpp03-clang': 'cpp',
     'cpp11': 'cpp',
     'cpp11-gcc': 'cpp',
     'cpp11-clang': 'cpp',

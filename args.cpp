@@ -345,6 +345,24 @@ bool Args::SetCompileFlags(std::string_view root,
     program_args_holder.emplace_back("-lm");
     return true;
   }
+  if (language == "cpp03-gcc") {
+    script_basename = UseSeccompProgram(PathJoin(root, "policies/gcc.bpf"), j);
+    program_args_holder = {"/usr/bin/g++", "--std=c++03", "-o",
+                           std::string(target), "-O2"};
+    program_args_holder.insert(program_args_holder.end(), sources.begin(),
+                               sources.end());
+    program_args_holder.emplace_back("-lm");
+    return true;
+  }
+  if (language == "cpp03-clang") {
+    script_basename = UseSeccompProgram(PathJoin(root, "policies/clang.bpf"), j);
+    program_args_holder = {"/usr/bin/clang++", "--std=c++03", "-o",
+                           std::string(target), "-O2"};
+    program_args_holder.insert(program_args_holder.end(), sources.begin(),
+                               sources.end());
+    program_args_holder.emplace_back("-lm");
+    return true;
+  }
   if (language == "cpp" || language == "cpp11" || language == "cpp11-gcc") {
     script_basename = UseSeccompProgram(PathJoin(root, "policies/gcc.bpf"), j);
     program_args_holder = {"/usr/bin/g++", "--std=c++11", "-o",
@@ -499,9 +517,10 @@ bool Args::SetRunFlags(std::string_view root,
     return false;
 
   if (language == "c" || language == "c11-gcc" || language == "c11-clang" ||
-      language == "cpp" || language == "cpp11" || language == "cpp11-gcc" ||
-      language == "cpp11-clang" || language == "cpp17-gcc" ||
-      language == "cpp17-clang") {
+      language == "cpp" || language == "cpp03-gcc" ||
+      language == "cpp03-clang" || language == "cpp11" ||
+      language == "cpp11-gcc" || language == "cpp11-clang" ||
+      language == "cpp17-gcc" || language == "cpp17-clang") {
     SetMemoryLimit(memory_limit_bytes + kExtraMemorySizeInBytes);
     script_basename = UseSeccompProgram(PathJoin(root, "policies/cpp.bpf"), j);
     program_args_holder = {StringPrintf("./%s", target.data())};
