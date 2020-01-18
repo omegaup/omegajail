@@ -93,11 +93,15 @@ mkroot: ${BINARIES} ${POLICIES}
 	sudo $(MAKE) install
 
 .PHONY: package
-package:
-	tar cJf omegajail-bionic-distrib-x86_64.tar.xz \
+package: omegajail-bionic-distrib-x86_64.tar.xz omegajail-bionic-rootfs-x86_64.tar.xz
+
+omegajail-bionic-distrib-x86_64.tar.xz:
+	tar cJf $@ \
 		$(DESTDIR)/var/lib/omegajail/bin \
 		$(DESTDIR)/var/lib/omegajail/policies \
 		$(DESTDIR)/var/lib/omegajail/root-openjdk/compile
-	tar cJf omegajail-bionic-rootfs-x86_64.tar.xz \
+
+omegajail-bionic-rootfs-x86_64.tar.xz:
+	tar cJf $@ \
 		--exclude=$(DESTDIR)/var/lib/omegajail/root-openjdk/compile \
 		$(DESTDIR)/var/lib/omegajail/root*
