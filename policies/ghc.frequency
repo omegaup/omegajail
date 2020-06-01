@@ -29,9 +29,11 @@ mprotect: 190268
 munmap: 11293
 openat: 1806574
 pipe: 24418
+pipe2: 24418
 poll: 6973
 prlimit64: 16273
 read: 22535276
+pread64: 22535276
 readlink: 25417
 rmdir: 1016
 rt_sigaction: 120194
@@ -40,9 +42,8 @@ set_robust_list: 4132
 set_tid_address: 1033
 stat: 960927
 sysinfo: 5193
-timer_create: 1033
-timer_delete: 1033
-timer_settime: 14258
+timerfd_create: 1033
+timerfd_settime: 14258
 umask: 2032
 unlink: 23368
 wait4: 27203775

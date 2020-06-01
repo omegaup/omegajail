@@ -16,6 +16,8 @@ ioctl: return ENOTTY
 {lseek, _llseek[arch=armv7]}: allow
 {lstat[arch=x86_64], lstat64[arch=armv7]}: allow
 openat: allow
+pipe2: allow
+pread64: allow
 read: allow
 readlink: allow
 {stat[arch=x86_64], stat64[arch=armv7]}: allow

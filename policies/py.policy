@@ -11,13 +11,14 @@ close: allow
 {fcntl[arch=x86_64], fcntl64[arch=armv7]}: arg1 == F_GETFD || arg1 == F_GETFL || arg1 == F_SETFD || arg1 == F_SETFL || arg1 == F_DUPFD_CLOEXEC
 {fstat[arch=x86_64], fstat64[arch=armv7]}: allow
 getcwd: allow
-{getdents[arch=x86_64], getdents64[arch=armv7l]}: allow
+getdents64: allow
 ioctl: return ENOTTY
 {lseek, _llseek[arch=armv7]}: allow
 {lstat[arch=x86_64], lstat64[arch=armv7]}: allow
 mkdir: allow
 openat: allow
 read: allow
+pread64: allow
 readlink: allow
 {stat[arch=x86_64], stat64[arch=armv7]}: allow
 unlink: allow
@@ -50,6 +51,7 @@ rt_sigreturn: allow
 # Threads / processes
 futex: allow
 getpid: allow
+gettid: allow
 set_robust_list: allow
 set_tid_address: allow
 sigaltstack: allow

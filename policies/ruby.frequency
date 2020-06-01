@@ -11,7 +11,7 @@ fcntl: 220704
 fstat: 1020526
 futex: 4598
 getcwd: 4228
-getdents: 27588
+getdents64: 27588
 getrandom: 9196
 lseek: 629326
 lstat: 1010820
@@ -26,6 +26,7 @@ poll: 4598
 prctl: 4598
 prlimit64: 13794
 read: 3891131
+pread64: 3891131
 readlink: 4598
 rt_sigaction: 82614
 rt_sigprocmask: 13794

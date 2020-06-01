@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <linux/capability.h>
 #include <pwd.h>
+#include <sched.h>
 #include <stdlib.h>
 #include <sys/mount.h>
 #include <sys/prctl.h>
@@ -563,6 +564,17 @@ int main(int argc, char* argv[]) {
   setenv("LANG", "en_US.UTF-8", 1);
   setenv("PATH", "/usr/bin", 1);
   setenv("DOTNET_CLI_TELEMETRY_OPTOUT", "1", 1);
+
+  // Set the processor affinity mask to the first CPU only. This is effectively
+  // a no-op on the runner machines since they are single-core, but this helps
+  // avoid some amount of noise on multi-core machines.
+  cpu_set_t cpu_set;
+  CPU_ZERO(&cpu_set);
+  CPU_SET(0, &cpu_set);
+  if (sched_setaffinity(getpid(), sizeof(cpu_set), &cpu_set) == -1) {
+    PLOG(ERROR) << "Failed to setup the processor affinity";
+    return 1;
+  }
 
   ScopedMinijail j(minijail_new());
 

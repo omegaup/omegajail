@@ -13,7 +13,7 @@ fstat: 1446006
 ftruncate: 60260
 futex: 161745414
 getcwd: 60260
-getdents: 120058
+getdents64: 120058
 lseek: 692987
 lstat: 873778
 madvise: 355754
@@ -21,7 +21,7 @@ mkdir: 30130
 mmap: 5140522
 mprotect: 25061859
 munmap: 591637
-nanosleep: 35172
+clock_nanosleep: 35172
 openat: 3707888
 prctl: 301300
 pread64: 29266861

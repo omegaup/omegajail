@@ -14,7 +14,8 @@ fchdir: allow
 ftruncate: allow
 {fstat[arch=x86_64], fstat64[arch=armv7]}: allow
 getcwd: allow
-{getdents[arch=x86_64], getdents64[arch=armv7]}: allow
+getdents64: allow
+ioctl: return ENOTTY
 {lseek, _llseek[arch=armv7]}: allow
 {lstat[arch=x86_64], lstat64[arch=armv7]}: allow
 mkdir: allow
@@ -48,7 +49,7 @@ uname: allow
 # Processes / threads
 clone: arg0 == CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID
 futex: allow
-nanosleep: allow
+clock_nanosleep: allow
 rt_sigaction: arg0 != SIGSYS
 rt_sigprocmask: allow
 rt_sigreturn: allow
