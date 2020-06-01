@@ -44,7 +44,7 @@ class RemoteFile:
                 'Downloading...', url, sha1sum, m.hexdigest())
             self._download(url)
 
-    def _download(self, url: str) -> None
+    def _download(self, url: str) -> None:
         os.makedirs(os.path.dirname(self._path), exist_ok=True)
         urllib.request.urlretrieve(url, self._path)
 
@@ -135,8 +135,11 @@ class FileResolver:
         if recursive and pkg.installed:
             for or_dep in pkg.installed.get_dependencies('Depends'):
                 for dep in or_dep:
+                    dep_name = dep.name.split(':')[0]
+                    if dep_name in exclude_packages:
+                        continue
                     self.files[name].update(
-                        self.__files_for(dep.name, exclude_packages, recursive,
+                        self.__files_for(dep_name, exclude_packages, recursive,
                                          identation + 1))
                     break
         return self.files[name]
@@ -181,7 +184,7 @@ class Chroot:
                 self.__chroot_path(path, relative_to), self.chroot))
         if os.path.isdir(path):
             return
-        os.makedirs(path)
+        os.makedirs(path, exist_ok=True)
 
     def touch(self, path: str, relative_to: Optional[str] = None) -> None:
         """Ensures that a file exists in the chroot."""
@@ -260,7 +263,14 @@ class Chroot:
             if os.path.isdir(source):
                 self.mkdir(path, relative_to)
             elif self.__link:
-                os.link(source, self.__chroot_path(path, relative_to))
+                target = self.__chroot_path(path, relative_to)
+                if os.path.isfile(target):
+                    return
+                if os.path.islink(target):
+                    if os.path.readlink(target) != source:
+                        raise ValueError('Target file %r points to %r, but it was expected to point to %r' % (target, os.path.readlink(target), source))
+                    return
+                os.link(source, target)
             else:
                 shutil.copy(source, self.__chroot_path(path, relative_to))
             if mode is not None:
@@ -272,8 +282,15 @@ class Chroot:
     def symlink(self, path: str, destination: str) -> None:
         """Creates a symlink in the chroot."""
         self.mkdir(os.path.dirname(path))
+        target = self.__chroot_path(path)
+        if os.path.islink(target):
+            if os.path.readlink(target) != destination:
+                raise ValueError('Target file %r points to %r, but it was expected to point to %r' % (target, os.path.readlink(target), destination))
+            return
+        if os.path.isfile(target):
+            return
         try:
-            os.symlink(destination, self.__chroot_path(path))
+            os.symlink(destination, target)
         except Exception:
             logging.exception('failed to create the symlink %s pointing to %s',
                               path, destination)
@@ -283,7 +300,7 @@ class Chroot:
         """Creates a node file in the chroot."""
         self.mkdir(os.path.dirname(path))
         try:
-	    os.mknod(self.__chroot_path(path), mode=mode, device=device)
+            os.mknod(self.__chroot_path(path), mode=mode, device=device)
             os.chmod(self.__chroot_path(path), mode & 0o777)
         except Exception:
             logging.exception('failed to mknod(%s, mode=%o, device=%d)', path,
@@ -507,6 +524,8 @@ def _main() -> None:
         install_common(root)
 
         for f in resolver.files_for(COMPILER_PACKAGES):
+            if f in ('/lib', '/lib32', '/lib64', '/sbin', '/bin'):
+                continue
             if os.path.islink(f):
                 root.symlink(f, os.readlink(f))
             else:
@@ -536,6 +555,8 @@ def _main() -> None:
             os.path.join(args.target, 'root-openjdk'), JAVA_ROOT,
             link=args.link) as root:
         for filename in JAVA_FILES:
+            if not filename.startswith(JAVA_ROOT):
+                continue
             root.copyfromhost(filename)
         root.install(
             os.path.join(JAVA_ROOT, 'compile'),
@@ -579,11 +600,11 @@ def _main() -> None:
         logging.info('Done.')
 
     with Chroot(
-            os.path.join(args.target, 'root-python'), PYTHON_ROOT,
+            os.path.join(args.target, 'root-python'), PYTHON2_ROOT,
             link=args.link) as root:
-        root.install(os.path.join(PYTHON_ROOT, 'python'), '/usr/bin/python2.7')
-        for filename in PYTHON_FILES:
-            if filename.startswith(PYTHON_ROOT):
+        root.install(os.path.join(PYTHON2_ROOT, 'python'), '/usr/bin/python2.7')
+        for filename in PYTHON2_FILES:
+            if filename.startswith(PYTHON2_ROOT):
                 root.copyfromhost(filename)
 
         with RemoteFile(

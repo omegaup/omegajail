@@ -168,7 +168,7 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
   try {
     options.parse_positional("program");
     options.parse(argc, argv);
-  } catch (cxxopts::option_not_exists_exception e) {
+  } catch (const cxxopts::option_not_exists_exception& e) {
     std::cerr << "Invalid option: " << e.what() << std::endl;
     std::cerr << options.help({""}) << std::endl;
     return false;
