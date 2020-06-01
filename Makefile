@@ -102,15 +102,15 @@ mkroot: ${BINARIES} ${POLICIES}
 	sudo $(MAKE) install
 
 .PHONY: package
-package: omegajail-bionic-distrib-x86_64.tar.xz omegajail-bionic-rootfs-x86_64.tar.xz
+package: omegajail-focal-distrib-x86_64.tar.xz omegajail-focal-rootfs-x86_64.tar.xz
 
-omegajail-bionic-distrib-x86_64.tar.xz:
+omegajail-focal-distrib-x86_64.tar.xz:
 	tar cJf $@ \
 		$(DESTDIR)/var/lib/omegajail/bin \
 		$(DESTDIR)/var/lib/omegajail/policies \
 		$(DESTDIR)/var/lib/omegajail/root-openjdk/compile
 
-omegajail-bionic-rootfs-x86_64.tar.xz:
+omegajail-focal-rootfs-x86_64.tar.xz:
 	tar cJf $@ \
 		--exclude=$(DESTDIR)/var/lib/omegajail/root-openjdk/compile \
 		$(DESTDIR)/var/lib/omegajail/root*

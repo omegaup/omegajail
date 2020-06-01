@@ -18,9 +18,27 @@
 namespace {
 
 constexpr size_t kExtraMemorySizeInBytes = 16 * 1024 * 1024;
-constexpr size_t kClrVmMemorySizeInBytes = 26 * 1024 * 1024;
-constexpr size_t kJavaVmMemorySizeInBytes = 43 * 1024 * 1024;
-constexpr size_t kJavaMinHeapSizeInBytes = 29 * 1024 * 1024;
+constexpr size_t kRubyExtraMemorySizeInBytes = 56 * 1024 * 1024;
+
+
+// These are obtained by running an "empty" and measuring
+// its memory consumption, as reported by omegajail.
+constexpr size_t kJavaVmMemorySizeInBytes = 47 * 1024 * 1024;
+constexpr size_t kClrVmMemorySizeInBytes = 20 * 1024 * 1024;
+constexpr size_t kRubyVmMemorySizeInBytes = 12 * 1024 * 1024;
+
+// This is the result of executing the following Java code:
+//
+// public class Main {
+//   public static void main(String[] args) {
+//     System.out.println(
+//         16 * 1024 * 1024 +
+//         Runtime.getRuntime().totalMemory() -
+//         Runtime.getRuntime().freeMemory()
+//     );
+//   }
+// }
+constexpr size_t kJavaMinHeapSizeInBytes = 18 * 1024 * 1024;
 
 std::vector<std::string> Split(std::string_view str, std::string_view sep) {
   std::vector<std::string> result;
@@ -344,7 +362,7 @@ bool Args::SetCompileFlags(std::string_view root,
   if (language == "c11-clang") {
     script_basename =
         UseSeccompProgram(PathJoin(root, "policies/clang.bpf"), j);
-    program_args_holder = {"/usr/bin/clang", "-o",  std::string(target),
+    program_args_holder = {"/usr/bin/clang-10", "-o",  std::string(target),
                            "--std=c11",      "-O3", "-march=native"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
@@ -362,7 +380,7 @@ bool Args::SetCompileFlags(std::string_view root,
   }
   if (language == "cpp03-clang") {
     script_basename = UseSeccompProgram(PathJoin(root, "policies/clang.bpf"), j);
-    program_args_holder = {"/usr/bin/clang++", "--std=c++03", "-o",
+    program_args_holder = {"/usr/bin/clang++-10", "--std=c++03", "-o",
                            std::string(target), "-O2"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
@@ -381,7 +399,7 @@ bool Args::SetCompileFlags(std::string_view root,
   if (language == "cpp11-clang") {
     script_basename =
         UseSeccompProgram(PathJoin(root, "policies/clang.bpf"), j);
-    program_args_holder = {"/usr/bin/clang++",  "--std=c++11", "-o",
+    program_args_holder = {"/usr/bin/clang++-10",  "--std=c++11", "-o",
                            std::string(target), "-O3",         "-march=native"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
@@ -400,7 +418,7 @@ bool Args::SetCompileFlags(std::string_view root,
   if (language == "cpp17-clang") {
     script_basename =
         UseSeccompProgram(PathJoin(root, "policies/clang.bpf"), j);
-    program_args_holder = {"/usr/bin/clang++",  "--std=c++17", "-o",
+    program_args_holder = {"/usr/bin/clang++-10",  "--std=c++17", "-o",
                            std::string(target), "-O3",         "-march=native"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
@@ -424,7 +442,7 @@ bool Args::SetCompileFlags(std::string_view root,
   }
   if (language == "lua") {
     script_basename = UseSeccompProgram(PathJoin(root, "policies/lua.bpf"), j);
-    program_args_holder = {"/usr/bin/luac", "-o", std::string(target)};
+    program_args_holder = {"/usr/bin/luac5.3", "-o", std::string(target)};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
     return true;
@@ -451,16 +469,16 @@ bool Args::SetCompileFlags(std::string_view root,
   }
   if (language == "py2") {
     script_basename = UseSeccompProgram(PathJoin(root, "policies/pyc.bpf"), j);
-    if (!BindReadOnly(PathJoin(root, "root-python"), "/usr/lib/python2.7", j))
+    if (!BindReadOnly(PathJoin(root, "root-python2"), "/usr/lib/python2.7", j))
       return false;
-    program_args_holder = {"/usr/bin/python", "-m", "py_compile"};
+    program_args_holder = {"/usr/bin/python2.7", "-m", "py_compile"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
     return true;
   }
   if (language == "py" || language == "py3") {
     script_basename = UseSeccompProgram(PathJoin(root, "policies/pyc.bpf"), j);
-    if (!BindReadOnly(PathJoin(root, "root-python3"), "/usr/lib/python3.6", j))
+    if (!BindReadOnly(PathJoin(root, "root-python3"), "/usr/lib/python3.8", j))
       return false;
     program_args_holder = {"/usr/bin/python3", "-m", "py_compile"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
@@ -482,7 +500,7 @@ bool Args::SetCompileFlags(std::string_view root,
       return false;
     program_args_holder = {
         "/usr/share/dotnet/dotnet",
-        "/usr/share/dotnet/sdk/2.2.402/Roslyn/bincore/csc.dll",
+        "/usr/share/dotnet/sdk/3.1.301/Roslyn/bincore/csc.dll",
         "-noconfig",
         "@/usr/share/dotnet/Release.rsp",
         StringPrintf("-out:%s.dll",
@@ -541,7 +559,7 @@ bool Args::SetRunFlags(std::string_view root,
   if (language == "lua") {
     SetMemoryLimit(memory_limit_bytes + kExtraMemorySizeInBytes);
     script_basename = UseSeccompProgram(PathJoin(root, "policies/lua.bpf"), j);
-    program_args_holder = {"/usr/bin/lua", StringPrintf("./%s", target.data())};
+    program_args_holder = {"/usr/bin/lua5.3", StringPrintf("./%s", target.data())};
     return true;
   }
   if (language == "hs") {
@@ -560,6 +578,8 @@ bool Args::SetRunFlags(std::string_view root,
     program_args_holder = {
         "/usr/bin/java",
         "-Xshare:on",
+        "-XX:+UnlockExperimentalVMOptions",
+        "-XX:+UseSerialGC",
         StringPrintf("-XX:AOTLibrary=/usr/lib/jvm/java.base.so,./%s.so",
                      target.data()),
     };
@@ -573,23 +593,24 @@ bool Args::SetRunFlags(std::string_view root,
   if (language == "py2") {
     SetMemoryLimit(memory_limit_bytes + kExtraMemorySizeInBytes);
     script_basename = UseSeccompProgram(PathJoin(root, "policies/py.bpf"), j);
-    if (!BindReadOnly(PathJoin(root, "root-python"), "/usr/lib/python2.7", j))
+    if (!BindReadOnly(PathJoin(root, "root-python2"), "/usr/lib/python2.7", j))
       return false;
-    program_args_holder = {"/usr/bin/python",
+    program_args_holder = {"/usr/bin/python2.7",
                            StringPrintf("%s.py", target.data())};
     return true;
   }
   if (language == "py" || language == "py3") {
     SetMemoryLimit(memory_limit_bytes + kExtraMemorySizeInBytes);
     script_basename = UseSeccompProgram(PathJoin(root, "policies/py.bpf"), j);
-    if (!BindReadOnly(PathJoin(root, "root-python3"), "/usr/lib/python3.6", j))
+    if (!BindReadOnly(PathJoin(root, "root-python3"), "/usr/lib/python3.8", j))
       return false;
     program_args_holder = {"/usr/bin/python3",
                            StringPrintf("%s.py", target.data())};
     return true;
   }
   if (language == "rb") {
-    SetMemoryLimit(memory_limit_bytes + kExtraMemorySizeInBytes);
+    SetMemoryLimit(memory_limit_bytes + kRubyExtraMemorySizeInBytes);
+    vm_memory_size_in_bytes = kRubyVmMemorySizeInBytes;
     script_basename = UseSeccompProgram(PathJoin(root, "policies/ruby.bpf"), j);
     if (!BindReadOnly(PathJoin(root, "root-ruby"), "/usr/lib/ruby", j))
       return false;

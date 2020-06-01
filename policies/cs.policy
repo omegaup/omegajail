@@ -7,9 +7,10 @@
 # I/O
 access: allow
 close: allow
+dup: allow
 {fcntl[arch=x86_64], fcntl64[arch=armv7]}: arg1 == F_GETFD || arg1 == F_GETFL || arg1 == F_SETFD || arg1 == F_SETFL || arg1 == F_DUPFD_CLOEXEC
 {fstat[arch=x86_64], fstat64[arch=armv7]}: allow
-{getdents[arch=x86_64], getdents64[arch=armv7]}: allow
+getdents64: allow
 flock: allow
 getcwd: allow
 ioctl: return ENOTTY
@@ -18,12 +19,14 @@ ioctl: return ENOTTY
 mknod: arg1 == S_IFIFO|0o700
 openat: allow
 pipe2: allow
+pread64: allow
 read: allow
 readlink: allow
 {stat[arch=x86_64], stat64[arch=armv7]}: allow
 statfs: return ENOSYS
+socket: return ENETDOWN
 unlink: allow
-write: allow
+{write, writev}: allow
 
 # Events
 poll: allow
@@ -31,7 +34,9 @@ poll: allow
 # Memory
 {arch_prctl[arch=x86_64], ARM_set_tls[arch=armv7]}: allow
 brk: allow
+get_mempolicy: allow
 madvise: allow
+membarrier: allow
 mlock: allow
 {mmap[arch=x86_64], mmap2[arch=armv7]}: allow
 mprotect: allow
@@ -39,6 +44,7 @@ mremap: allow
 munmap: allow
 
 # Environment
+getrusage: allow
 prlimit64: {arg1 == RLIMIT_STACK || arg2 == 0; allow, return EPERM}
 sysinfo: return ENOSYS
 

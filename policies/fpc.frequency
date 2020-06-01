@@ -21,6 +21,7 @@ open: 97743
 openat: 177202
 prlimit64: 4203
 read: 14222150
+pread64: 14222150
 readlink: 8524
 rt_sigaction: 38358
 stat: 1257057

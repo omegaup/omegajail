@@ -20,6 +20,7 @@ munmap: 248074
 openat: 25147869
 prlimit64: 218216
 read: 16856103
+pread64: 16856103
 readlink: 109196
 rt_sigaction: 871984
 stat: 6040933

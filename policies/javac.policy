@@ -14,7 +14,7 @@ fchdir: allow
 {fstat[arch=x86_64], fstat64[arch=armv7]}: allow
 ftruncate: allow
 getcwd: allow
-{getdents[arch=x86_64], getdents64[arch=armv7]}: allow
+getdents64: allow
 ioctl: arg1 == FIONREAD
 {lseek, _llseek[arch=armv7]}: allow
 {lstat[arch=x86_64], lstat64[arch=armv7]}: allow
@@ -50,10 +50,10 @@ sysinfo: allow
 uname: allow
 
 # Processes / threads
-clone: arg0 == CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID
+clone: arg0 == CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID || arg0 == CLONE_VM|CLONE_VFORK|SIGCHLD
 futex: allow
-nanosleep: allow
-rt_sigaction: arg0 != SIGSYS
+clock_nanosleep: allow
+rt_sigaction: {arg0 != SIGSYS; allow, return EPERM}
 rt_sigprocmask: allow
 rt_sigreturn: allow
 sched_getaffinity: allow

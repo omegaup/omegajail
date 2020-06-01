@@ -6,7 +6,7 @@ exit_group: 252710
 fstat: 18506811
 futex: 1317
 getcwd: 259200
-getdents: 518400
+getdents64: 518400
 lseek: 802902
 lstat: 2073600
 mmap: 9086748
@@ -16,6 +16,7 @@ munmap: 1953210
 openat: 63856146
 prlimit64: 259230
 read: 42060865
+pread64: 42060865
 readlink: 1036800
 rt_sigaction: 17359958
 rt_sigprocmask: 259200

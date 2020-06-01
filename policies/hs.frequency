@@ -13,6 +13,7 @@ openat: 271150
 poll: 107814
 prlimit64: 10846
 read: 164280
+pread64: 164280
 rt_sigaction: 149896
 rt_sigprocmask: 2643370
 set_robust_list: 10846
@@ -23,3 +24,4 @@ timer_create: 10846
 timer_delete: 10359
 timer_settime: 21285
 write: 23189
+writev: 23189

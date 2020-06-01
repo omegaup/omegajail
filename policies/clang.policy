@@ -1,8 +1,7 @@
 @include ./gcc.policy
 
 # I/O
-{getdents[arch=x86_64], getdents64[arch=armv7]}: allow
-pread64: allow
+getdents64: allow
 rename: allow
 
 # Threads

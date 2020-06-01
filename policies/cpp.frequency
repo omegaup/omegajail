@@ -12,6 +12,7 @@ mremap: 48
 munmap: 22529
 openat: 6202691
 read: 381141423
+pread64: 381141423
 rt_sigprocmask: 6519
 stat: 4664318
 sysinfo: 371

@@ -7,12 +7,15 @@
 # I/O
 access: allow
 close: allow
+fadvise64: allow
+fchmod: allow
 {fcntl[arch=x86_64], fcntl64[arch=armv7]}: arg1 == F_GETFD || arg1 == F_GETFL || arg1 == F_SETFD || arg1 == F_SETFL || arg1 == F_DUPFD_CLOEXEC
 flock: allow
 {fstat[arch=x86_64], fstat64[arch=armv7]}: allow
 ftruncate: allow
 getcwd: allow
-{getdents[arch=x86_64], getdents64[arch=armv7]}: allow
+getdents64: allow
+getrandom: allow
 ioctl: return ENOTTY
 {lstat[arch=x86_64], lstat64[arch=armv7]}: allow
 {lseek, _llseek[arch=armv7]}: allow
@@ -20,19 +23,21 @@ mkdir: allow
 mknod: arg1 == S_IFIFO|0o700
 openat: allow
 pipe2: allow
+pread64: allow
 read: allow
 readlink: allow
 {stat[arch=x86_64], stat64[arch=armv7]}: allow
 socket: return ENETDOWN
 statfs: return ENOSYS
 unlink: allow
-write: allow
+{write, writev}: allow
 
 # Events
 poll: allow
 
 # Environment
 {getuid[arch=x86_64], getuid32[arch=armv7]}: allow
+{geteuid[arch=x86_64], geteuid32[arch=armv7]}: allow
 getrusage: allow
 prlimit64: {arg1 == RLIMIT_STACK || arg2 == 0; allow, return EPERM}
 sysinfo: return ENOSYS
@@ -43,6 +48,7 @@ brk: allow
 madvise: allow
 mlock: allow
 {mmap[arch=x86_64], mmap2[arch=armv7]}: allow
+membarrier: allow
 mprotect: allow
 mremap: allow
 munmap: allow
@@ -67,3 +73,4 @@ sched_yield: allow
 set_robust_list: allow
 set_tid_address: allow
 sigaltstack: allow
+tgkill: arg0 == 2

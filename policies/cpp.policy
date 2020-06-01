@@ -13,6 +13,7 @@ ioctl: return ENOTTY
 {lseek, _llseek[arch=armv7]}: allow
 openat: allow
 read: allow
+pread64: allow
 socket: return ENETDOWN
 {stat[arch=x86_64], stat64[arch=armv7]}: allow
 {write, writev}: allow
@@ -25,6 +26,7 @@ madvise: allow
 mremap: allow
 munmap: allow
 mprotect: allow
+prlimit64: {arg1 == RLIMIT_STACK || arg2 == 0; allow, return EPERM}
 
 # Threads
 clone: arg0 == CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID

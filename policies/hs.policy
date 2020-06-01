@@ -12,10 +12,12 @@ dup: allow
 {fstat[arch=x86_64], fstat64[arch=armv7]}: allow
 {lseek, _llseek[arch=armv7]}: allow
 openat: allow
+pread64: allow
 read: allow
 socket: return ENETDOWN
 {stat[arch=x86_64], stat64[arch=armv7]}: allow
 write: allow
+writev: allow
 
 # Events
 poll: allow

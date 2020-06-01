@@ -71,6 +71,7 @@ int main(int argc, char* argv[]) {
   std::vector<std::string> jaotc_args = {
       "/usr/bin/jaotc",
       "-J-Xmx512M",
+      "-J-XX:+UseSerialGC",
       "-J-Xshare:on",
       "--output",
       StringPrintf("%s.so", target),

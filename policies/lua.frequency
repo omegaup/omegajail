@@ -10,6 +10,7 @@ mmap: 5978
 mprotect: 5124
 openat: 6477
 read: 3535
+pread64: 3535
 rt_sigaction: 838
 stat: 3045
 write: 944

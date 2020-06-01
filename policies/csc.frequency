@@ -10,7 +10,7 @@ fstat: 2404774
 ftruncate: 7234
 futex: 1263532
 getcwd: 7242
-getdents: 28968
+getdents64: 28968
 getrusage: 7245
 getsid: 14484
 lseek: 1586452
@@ -23,6 +23,7 @@ munmap: 9891907
 openat: 1837215
 pipe2: 50694
 poll: 21726
+pread64: 1946080
 prlimit64: 43452
 read: 1946080
 readlink: 14484
@@ -40,3 +41,4 @@ sigaltstack: 130356
 stat: 2708735
 unlink: 28968
 write: 49567
+writev: 49567

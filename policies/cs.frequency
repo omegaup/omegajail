@@ -9,7 +9,7 @@ flock: 52060
 fstat: 2999234
 futex: 3121413
 getcwd: 113144
-getdents: 339432
+getdents64: 339432
 getsid: 113144
 lseek: 1076471
 lstat: 73779705
@@ -23,6 +23,7 @@ openat: 8165144
 pipe2: 241788
 poll: 168274
 prlimit64: 383053
+pread64: 61926284
 read: 61926284
 readlink: 113222
 rt_sigaction: 848580
@@ -39,3 +40,4 @@ stat: 13899960
 tgkill: 14000
 unlink: 224846
 write: 128009363
+writev: 128009363

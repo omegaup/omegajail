@@ -11,13 +11,14 @@ dup: allow
 {fcntl[arch=x86_64], fcntl64[arch=armv7]}: arg1 == F_GETFL || arg1 == F_SETFL || arg1 == F_SETFD || arg1 == F_GETFD
 {fstat[arch=x86_64], fstat64[arch=armv7]}: allow
 getcwd: allow
-{getdents[arch=x86_64], getdents64[arch=armv7]}: allow
+getdents64: allow
 ioctl: return ENOTTY
 {lseek, _llseek[arch=armv7]}: allow
 {lstat[arch=x86_64], lstat64[arch=armv7]}: allow
 openat: allow
 {pipe, pipe2}: allow
 read: allow
+pread64: allow
 readlink: allow
 {stat[arch=x86_64], stat64[arch=armv7]}: allow
 {write, writev}: allow
@@ -52,12 +53,15 @@ sigaltstack: allow
 
 # Threads / processes
 clone: arg0 == CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID
+eventfd2: allow
 futex: allow
 getpid: allow
-prctl: arg0 == PR_SET_NAME
+prctl: arg0 == PR_SET_NAME || arg0 == PR_SET_THP_DISABLE
 sched_getaffinity: allow
 set_robust_list: allow
 set_tid_address: allow
 
 # Time
 clock_gettime: allow
+timer_create: allow
+timer_delete: allow
