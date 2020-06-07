@@ -362,10 +362,14 @@ std::string PathJoin(std::string_view path, std::string_view component) {
   return Clean(result);
 }
 
-bool WriteFile(std::string_view path, std::string_view contents, bool append) {
+bool WriteFile(std::string_view path,
+               const std::string_view contents,
+               bool append,
+               mode_t mode) {
   LOG(DEBUG) << "Writing '" << contents << "' to " << path;
 
-  ScopedFD fd(open(path.data(), O_WRONLY | (append ? O_APPEND : O_TRUNC)));
+  ScopedFD fd(open(path.data(),
+                   O_WRONLY | O_CREAT | (append ? O_APPEND : O_TRUNC), mode));
   if (!fd)
     return false;
   if (write(fd.get(), contents.data(), contents.size()) !=

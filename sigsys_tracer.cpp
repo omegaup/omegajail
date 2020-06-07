@@ -40,15 +40,12 @@ extern "C" struct __attribute__((__packed__)) sigsys_tracer_sample {
 
   uintptr_t __probe_ip;
   int64_t syscall;
-  int64_t data;
 };
 
 static_assert(offsetof(sigsys_tracer_sample, __probe_ip) == 20,
               "Misaligned __probe_ip offset");
 static_assert(offsetof(sigsys_tracer_sample, syscall) == 28,
               "Misaligned syscall offset");
-static_assert(offsetof(sigsys_tracer_sample, data) == 36,
-              "Misaligned syscall data");
 
 extern "C" int perf_event_open(struct perf_event_attr* attr,
                                pid_t pid,
@@ -266,8 +263,7 @@ class ClientAsyncHelper : public AsyncHelper {
               reinterpret_cast<struct sigsys_tracer_sample*>(header);
           std::string syscall_str = StringPrintf("%d\n", sample->syscall);
           LOG(WARN) << "SIGSYS{pid=" << sample->common_pid
-                    << ",syscall=" << sample->syscall
-                    << ",data=" << sample->data << "}";
+                    << ",syscall=" << sample->syscall << "}";
           ignore_result(
               write(fd_.get(), syscall_str.c_str(), syscall_str.size()));
 
@@ -335,7 +331,8 @@ class ServerSocketAsyncHelper : public AsyncHelper {
 bool EnsureReleaseAgentInstalled() {
   if (access(kReleaseAgentPath, X_OK | R_OK) != 0 &&
       !WriteFile(kReleaseAgentPath,
-                 "#!/bin/sh\nrmdir /sys/fs/cgroup/perf_event/$1\n")) {
+                 "#!/bin/sh\nrmdir /sys/fs/cgroup/perf_event/$1\n", false,
+                 0775)) {
     LOG(ERROR) << "Could not create release agent";
     return false;
   }
@@ -352,10 +349,8 @@ uint64_t GetEventId() {
   if (ReadUint64(kEventIdPath, &event_id)) {
     return event_id;
   }
-  if (!WriteFile(
-          "/sys/kernel/debug/tracing/kprobe_events",
-          "p:sigsys_tracer seccomp_send_sigsys syscall=%di:s64 data=%si:s64",
-          true)) {
+  if (!WriteFile("/sys/kernel/debug/tracing/kprobe_events",
+                 "p:sigsys_tracer audit_seccomp syscall=%di:u64", true)) {
     PLOG(ERROR) << "Error registering syscall_catcher kprobe";
     return event_id;
   }
@@ -372,6 +367,10 @@ int main() {
   if (!EnsureReleaseAgentInstalled()) {
     return 1;
   }
+
+  // Ignore the SIGPIPE signal. This can happen if for some reason the client
+  // processes die in the middle of the setup process.
+  signal(SIGPIPE, SIG_IGN);
 
   uint64_t event_id = GetEventId();
   if (!event_id) {

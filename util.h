@@ -183,7 +183,8 @@ bool ReadUint64(std::string_view path, uint64_t* value);
 
 bool WriteFile(std::string_view path,
                std::string_view contents,
-               bool append = false);
+               bool append = false,
+               mode_t mode = 0664);
 
 template <typename T>
 inline void ignore_result(T /* unused result */) {}
