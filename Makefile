@@ -11,6 +11,7 @@ MINIJAIL_CORE_OBJECT_FILES := $(addprefix minijail/,$(patsubst %.o,%.pic.o,\
 	libminijail.o syscall_filter.o signal_handler.o bpf.o util.o system.o \
 	syscall_wrapper.o libconstants.gen.o libsyscalls.gen.o))
 OMEGAJAIL_RELEASE ?= $(shell git describe --tags)
+DESTDIR ?= /var/lib/omegajail
 
 ARCH ?= $(shell uname -m)
 CXX ?= g++
@@ -63,16 +64,15 @@ policies/%.bpf: policies/%.policy | minijail/constants.json
 
 .PHONY: install
 install: ${BINARIES} ${POLICIES}
-	install -d $(DESTDIR)/var/lib/omegajail/bin
-	install -t $(DESTDIR)/var/lib/omegajail/bin ${BINARIES} omegajail-setup
-	install -d $(DESTDIR)/var/lib/omegajail/root-openjdk
-	install -s -T java-compile $(DESTDIR)/var/lib/omegajail/root-openjdk/compile
-	install -d $(DESTDIR)/var/lib/omegajail/policies
-	install -t $(DESTDIR)/var/lib/omegajail/policies -m 0644 ${POLICIES}
+	install -d $(DESTDIR)/bin
+	install -t $(DESTDIR)/bin ${BINARIES} omegajail-setup
+	install -d $(DESTDIR)/policies
+	install -t $(DESTDIR)/policies -m 0644 ${POLICIES}
 
 .PHONY: clean
 clean:
 	rm -f ${BINARIES} ${POLICIES} *.o
+	sudo rm -rf rootfs
 	$(MAKE) OUT=${PWD}/minijail -C minijail clean
 
 .PHONY: test
@@ -80,8 +80,8 @@ test: util_test
 	./util_test
 
 .PHONY: smoketest
-smoketest: ${BINARIES} ${POLICIES}
-	./smoketest/test
+smoketest: ${BINARIES} ${POLICIES} rootfs
+	./smoketest/test --root=./rootfs
 
 util_test.o: util_test.cpp util.h logging.h
 	$(CXX) $(TEST_CFLAGS) $(TEST_CXXFLAGS) -fno-exceptions $< -c -o $@
@@ -95,22 +95,37 @@ gtest-all.o : googletest/googletest/src/gtest-all.cc
 gtest_main.o : googletest/googletest/src/gtest_main.cc
 	$(CXX) $(TEST_CFLAGS) $(TEST_CXXFLAGS) -Igoogletest/googletest -fno-exceptions $< -c -o $@
 
-.PHONY: mkroot
-mkroot: ${BINARIES} ${POLICIES}
-	sudo rm -rf $(DESTDIR)/var/lib/omegajail
-	sudo ./tools/mkroot --target=$(DESTDIR)/var/lib/omegajail
-	sudo $(MAKE) install
+rootfs: Dockerfile.rootfs tools/mkroot tools/java.base.aotcfg ${BINARIES} ${POLICIES}
+	sudo rm -rf rootfs
+	$(MAKE) DESTDIR=rootfs install
+	docker build \
+		-t omegaup/omegajail-builder-rootfs-setup \
+		--file Dockerfile.rootfs \
+		--target setup \
+		.
+	docker run \
+		--rm \
+		--mount "type=bind,source=${PWD}/rootfs,target=/var/lib/omegajail" \
+		omegaup/omegajail-builder-rootfs-setup ./tools/mkroot --no-link
 
-.PHONY: package
-package: omegajail-focal-distrib-x86_64.tar.xz omegajail-focal-rootfs-x86_64.tar.xz
+omegajail-focal-rootfs-x86_64.tar.xz: Dockerfile.rootfs tools/mkroot tools/java.base.aotcfg
+	rm -f omegajail-focal-rootfs-x86_64.tar.xz
+	docker build \
+		-t omegaup/omegajail-builder-rootfs-package \
+		--file Dockerfile.rootfs \
+		--target package \
+		.
+	id=$$(docker create omegaup/omegajail-builder-rootfs-package) && \
+	docker cp $${id}:/src/omegajail-focal-rootfs-x86_64.tar.xz omegajail-focal-rootfs-x86_64.tar.xz && \
+	docker rm $${id}
 
-omegajail-focal-distrib-x86_64.tar.xz:
-	tar cJf $@ \
-		$(DESTDIR)/var/lib/omegajail/bin \
-		$(DESTDIR)/var/lib/omegajail/policies \
-		$(DESTDIR)/var/lib/omegajail/root-openjdk/compile
-
-omegajail-focal-rootfs-x86_64.tar.xz:
-	tar cJf $@ \
-		--exclude=$(DESTDIR)/var/lib/omegajail/root-openjdk/compile \
-		$(DESTDIR)/var/lib/omegajail/root*
+omegajail-focal-distrib-x86_64.tar.xz: Dockerfile.distrib Makefile $(wildcard *.h *.cpp omegajail-setup policies/*.frequency policies/*.policy)
+	rm -f omegajail-focal-distrib-x86_64.tar.xz
+	docker build \
+		--build-arg OMEGAJAIL_RELEASE=$(OMEGAJAIL_RELEASE) \
+		-t omegaup/omegajail-builder-distrib \
+		--file Dockerfile.distrib \
+		.
+	id=$$(docker create omegaup/omegajail-builder-distrib) && \
+	docker cp $${id}:/src/omegajail-focal-distrib-x86_64.tar.xz omegajail-focal-distrib-x86_64.tar.xz && \
+	docker rm $${id}

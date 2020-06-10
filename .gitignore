@@ -14,3 +14,4 @@ util_test
 # mkroot artifacts
 tools/.remote-file-cache/
 *.tar.xz
+rootfs/

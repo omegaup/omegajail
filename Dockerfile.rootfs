@@ -1,0 +1,54 @@
+FROM ubuntu:focal AS setup
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update -y && \
+    apt-get install --no-install-recommends -y \
+      ca-certificates \
+      wget && \
+    apt-get autoremove -y && \
+    apt-get clean
+
+RUN wget https://packages.microsoft.com/config/ubuntu/20.04/packages-microsoft-prod.deb \
+      -O packages-microsoft-prod.deb
+RUN dpkg -i packages-microsoft-prod.deb
+RUN rm packages-microsoft-prod.deb
+
+RUN apt-get update -y && \
+    apt-get install --no-install-recommends -y \
+      clang-10 \
+      dotnet-sdk-3.1 \
+      fp-compiler-3.0.4 \
+      fp-units-fcl-3.0.4 \
+      g++ \
+      gcc \
+      ghc \
+      git \
+      libc6-dev \
+      libcap-dev \
+      libcap2 \
+      locales \
+      lua5.3 \
+      make \
+      openjdk-14-jdk \
+      openjdk-14-jdk-headless \
+      openjdk-14-jre \
+      openjdk-14-jre-headless \
+      python2.7 \
+      python3-apt \
+      python3.8 \
+      ruby2.7 \
+      xz-utils && \
+    apt-get autoremove -y && \
+    apt-get clean
+
+RUN mkdir /src
+WORKDIR /src
+
+COPY ./tools/mkroot ./tools/java.base.aotcfg ./tools/
+
+FROM setup AS build
+RUN ./tools/mkroot
+
+FROM build AS package
+RUN XZ_DEFAULTS="-T 0" tar cJf omegajail-focal-rootfs-x86_64.tar.xz \
+    /var/lib/omegajail/root*

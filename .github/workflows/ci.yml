@@ -15,6 +15,7 @@ jobs:
       - uses: actions/checkout@v2
         with:
           submodules: recursive
+          fetch-depth: 0
 
       - name: Install dependencies
         run: sudo apt-get install -y libcap-dev
@@ -24,3 +25,13 @@ jobs:
 
       - name: Test
         run: make test
+
+      - name: Build rootfs
+        run: make OMEGAJAIL_RELEASE=${{ github.sha }} rootfs
+
+      - name: Smoketest
+        run: |
+          sudo mkdir -p -m 0775 /sys/fs/cgroup/memory/omegajail
+          sudo chown $(whoami) /sys/fs/cgroup/memory/omegajail
+          sudo chgrp $(whoami) /sys/fs/cgroup/memory/omegajail
+          make smoketest

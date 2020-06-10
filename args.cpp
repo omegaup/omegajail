@@ -462,7 +462,9 @@ bool Args::SetCompileFlags(std::string_view root,
         UseSeccompProgram(PathJoin(root, "policies/javac.bpf"), j);
     if (!BindReadOnly(PathJoin(root, "root-openjdk"), "/usr/lib/jvm", j))
       return false;
-    program_args_holder = {"/usr/lib/jvm/compile", std::string(target)};
+    if (!BindReadOnly(PathJoin(root, "bin"), "/var/lib/omegajail/bin", j))
+      return false;
+    program_args_holder = {"/var/lib/omegajail/bin/java-compile", std::string(target)};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
     return true;
