@@ -1,0 +1,31 @@
+FROM ubuntu:focal
+
+RUN apt-get update -y && \
+    apt-get install --no-install-recommends -y \
+      g++ \
+      git \
+      python3 \
+      libcap-dev \
+      libcap2 \
+      make \
+      xz-utils && \
+    apt-get autoremove -y && \
+    apt-get clean
+
+RUN mkdir /src
+WORKDIR /src
+
+COPY ./cxxopts/include/ ./cxxopts/include/
+COPY ./minijail/ ./minijail/
+COPY .git ./.git/
+COPY Makefile *.h *.cpp omegajail-setup ./
+COPY ./policies/*.policy ./policies/
+COPY ./policies/*.frequency ./policies/
+
+ARG OMEGAJAIL_RELEASE
+
+RUN make OMEGAJAIL_RELEASE=$OMEGAJAIL_RELEASE
+RUN make install
+RUN XZ_DEFAULTS="-T 0" tar cJf omegajail-focal-distrib-x86_64.tar.xz \
+    /var/lib/omegajail/bin \
+    /var/lib/omegajail/policies

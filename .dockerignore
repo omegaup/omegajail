@@ -1,0 +1,29 @@
+# artifacts
+**/*.o
+**/*.so
+**/*.d
+**/*.depends
+**/*.gen.c
+**/*.a
+**/*.bpf
+**/*.pyc
+java-compile
+omegajail
+sigsys-tracer
+stdio-mux
+.mypy_cache/**
+
+# minijail .gitignore
+minijail/tools/__pycache__/
+minijail/dump_constants
+minijail/minijail0
+minijail/constants.json
+
+# test artifacts
+smoketest/run/**
+util_test
+
+# mkroot artifacts
+tools/.remote-file-cache/**
+*.tar.xz
+rootfs/**

@@ -50,7 +50,6 @@ _EXTENSIONS = {
     'py3': 'py',
 }
 _KAREL_LANGUAGES = set(['kj', 'kp'])
-_ROOT = '/var/lib/omegajail'
 _PWD = os.path.abspath(os.path.dirname(__file__))
 
 
@@ -66,7 +65,7 @@ def _check_call(args: List[str]) -> bool:
         return False
 
 
-def _omegajail_compile(lang: str, strace: bool) -> bool:
+def _omegajail_compile(root: str, lang: str, strace: bool) -> bool:
     lang_dir = os.path.join(_PWD, 'run', lang)
     if os.path.isdir(lang_dir):
         shutil.rmtree(lang_dir, True)
@@ -101,7 +100,7 @@ def _omegajail_compile(lang: str, strace: bool) -> bool:
         '-O',
         '10485100',
         '--root',
-        _ROOT,
+        root,
         '--compile',
         lang,
         '--compile-source',
@@ -115,7 +114,7 @@ def _omegajail_compile(lang: str, strace: bool) -> bool:
     return _check_call(args)
 
 
-def _omegajail_run(lang: str, strace: bool, input_file: str,
+def _omegajail_run(root: str, lang: str, strace: bool, input_file: str,
                    output_file: str) -> bool:
     lang_dir = os.path.join(_PWD, 'run', lang)
     if strace:
@@ -149,7 +148,7 @@ def _omegajail_run(lang: str, strace: bool, input_file: str,
         '-m',
         str(256 * 1024 * 1024),
         '--root',
-        _ROOT,
+        root,
         '--run',
         lang,
         '--run-target',
@@ -172,7 +171,10 @@ def _main() -> None:
     parser.add_argument('--languages', type=str)
     parser.add_argument('--strace', action='store_true')
     parser.add_argument('--verbose', action='store_true')
+    parser.add_argument('--root', default='/var/lib/omegajail', type=str)
     args = parser.parse_args()
+
+    args.root = os.path.abspath(args.root)
 
     languages = _LANGUAGES
     if args.languages:
@@ -185,7 +187,7 @@ def _main() -> None:
 
     for lang in languages:
         print('%-20s' % lang, end='')
-        if not _omegajail_compile(lang, args.strace):
+        if not _omegajail_compile(args.root, lang, args.strace):
             print('ERROR (COMPILE)')
             passed = False
             continue
@@ -193,7 +195,7 @@ def _main() -> None:
             input_path, output_path = 'input-karel', 'output-karel'
         else:
             input_path, output_path = 'input', 'output'
-        if _omegajail_run(lang, args.strace, input_path, output_path):
+        if _omegajail_run(args.root, lang, args.strace, input_path, output_path):
             print('OK')
         else:
             print('ERROR')

@@ -12,6 +12,7 @@ import stat
 import subprocess
 import sys
 import tarfile
+import tempfile
 import textwrap
 import urllib.request
 from typing import Any, Dict, List, Optional, Sequence, Set, Union
@@ -161,6 +162,10 @@ class Chroot:
         if os.path.exists(path):
             shutil.rmtree(path, True)
         os.makedirs(path)
+
+    @property
+    def path(self) -> str:
+        return self.chroot
 
     def __chroot_path(self, path: str,
                       relative_to: Optional[str] = None) -> str:
@@ -400,7 +405,6 @@ def _main() -> None:
     ]
 
     COMPILER_PACKAGES = ROOT_PACKAGES + [
-        'binutils',
         'clang-10',
         'fp-compiler-3.0.4',
         'fp-units-fcl-3.0.4',
@@ -554,6 +558,7 @@ def _main() -> None:
                 continue
             root.symlink(f, os.path.join(HASKELL_ROOT, f.replace('/', '_')))
         root.mkdir('/tmp/')
+        root.mkdir('/var/lib/omegajail/bin')
 
         root.symlink('/usr/bin/luac', 'luac5.3')
 
@@ -564,46 +569,25 @@ def _main() -> None:
             if not filename.startswith(JAVA_ROOT):
                 continue
             root.copyfromhost(filename)
-        root.install(
-            os.path.join(JAVA_ROOT, 'compile'),
-            os.path.realpath(os.path.join(_CURRENT_DIR, '../java-compile')))
         logging.info('Generating the Java Class Data Sharing bundle.')
         subprocess.check_call([
-            os.path.join(os.path.dirname(_CURRENT_DIR), 'omegajail'),
-            '-d',
-            '/',
-            '-C',
-            '/var/lib/omegajail/root-compilers',
-            '-b',
-            '/var/lib/omegajail/root-openjdk,/usr/lib/jvm,1',
-            '--',
             '/usr/bin/java',
             '-Xshare:dump',
-        ],
-                              env={'PATH': '/'})
+            f'-XX:SharedArchiveFile={root.path}/java-14-openjdk-amd64/lib/server/classes.jsa',
+        ])
         logging.info('Precompiling critical methods from java.base.')
         subprocess.check_call([
-            os.path.join(os.path.dirname(_CURRENT_DIR), 'omegajail'),
-            '-d',
-            '/home',
-            '-b',
-            '{},/home'.format(_CURRENT_DIR),
-            '-C',
-            '/var/lib/omegajail/root-compilers',
-            '-b',
-            '/var/lib/omegajail/root-openjdk,/usr/lib/jvm,1',
-            '--',
             '/usr/bin/jaotc',
             '-J-Xshare:on',
             '-J-XX:+UseSerialGC',
+            f'-J-XX:SharedArchiveFile={root.path}/java-14-openjdk-amd64/lib/server/classes.jsa',
             '--compile-commands',
-            '/home/java.base.aotcfg',
+            f'{_CURRENT_DIR}/java.base.aotcfg',
             '--module',
             'java.base',
             '--output',
-            '/usr/lib/jvm/java.base.so',
-        ],
-                              env={'PATH': '/'})
+            f'{root.path}/java.base.so',
+        ])
         logging.info('Done.')
 
     with Chroot(
@@ -778,7 +762,8 @@ def _main() -> None:
             ''').encode('utf-8')
         )
 
-    with Chroot(os.path.join(args.target, 'root-js'), JS_ROOT) as root:
+    with Chroot(os.path.join(args.target, 'root-js'), JS_ROOT,
+                link=args.link) as root:
         root.extract(
             'https://nodejs.org/dist/v12.17.0/node-v12.17.0-linux-x64.tar.xz',
             '1b1c3dc8dea5c2bb40464149eeee87f407b1cfec',
