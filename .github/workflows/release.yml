@@ -51,12 +51,12 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Upload omegaup-bionic-distrib-x86_64.tar.xz Release Asset
+      - name: Upload omegajail-bionic-distrib-x86_64.tar.xz Release Asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create-release.outputs.upload_url }}
-          asset_path: ./omegaup-bionic-distrib-x86_64.tar.xz
-          asset_name: omegaup-bionic-distrib-x86_64.tar.xz
+          asset_path: ./omegajail-bionic-distrib-x86_64.tar.xz
+          asset_name: omegajail-bionic-distrib-x86_64.tar.xz
           asset_content_type: application/octet-stream
