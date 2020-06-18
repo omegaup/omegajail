@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  pull_request: {}
+  push:
+    branches:
+      - master
+
+jobs:
+
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: sudo apt-get install -y libcap-dev
+
+      - name: Build
+        run: make OMEGAJAIL_RELEASE=${{ github.sha }} all util_test
+
+      - name: Test
+        run: make test

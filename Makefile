@@ -10,6 +10,7 @@ MINIJAIL_SOURCE_FILES := $(addprefix minijail/,\
 MINIJAIL_CORE_OBJECT_FILES := $(addprefix minijail/,$(patsubst %.o,%.pic.o,\
 	libminijail.o syscall_filter.o signal_handler.o bpf.o util.o system.o \
 	syscall_wrapper.o libconstants.gen.o libsyscalls.gen.o))
+OMEGAJAIL_RELEASE ?= $(shell git describe --tags)
 
 ARCH ?= $(shell uname -m)
 CXX ?= g++
@@ -31,7 +32,7 @@ minijail/constants.json:
 	$(MAKE) OUT=${PWD}/minijail -C minijail constants.json
 
 version.o: version.cpp version.h
-	$(CXX) "-DOMEGAJAIL_VERSION=\"$(shell git describe --tags)\"" \
+	$(CXX) "-DOMEGAJAIL_VERSION=\"$(OMEGAJAIL_RELEASE)\"" \
 		$(CFLAGS) $(CXXFLAGS) -fno-exceptions $< -c -o $@
 
 util.o: util.cpp util.h logging.h macros.h
@@ -74,8 +75,11 @@ clean:
 	$(MAKE) OUT=${PWD}/minijail -C minijail clean
 
 .PHONY: test
-test: util_test ${BINARIES} ${POLICIES}
+test: util_test
 	./util_test
+
+.PHONY: smoketest
+smoketest: ${BINARIES} ${POLICIES}
 	./smoketest/test
 
 util_test.o: util_test.cpp util.h logging.h
