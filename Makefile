@@ -65,6 +65,7 @@ policies/%.bpf: policies/%.policy | minijail/constants.json
 install: ${BINARIES} ${POLICIES}
 	install -d $(DESTDIR)/var/lib/omegajail/bin
 	install -t $(DESTDIR)/var/lib/omegajail/bin ${BINARIES} omegajail-setup
+	install -d $(DESTDIR)/var/lib/omegajail/root-openjdk
 	install -s -T java-compile $(DESTDIR)/var/lib/omegajail/root-openjdk/compile
 	install -d $(DESTDIR)/var/lib/omegajail/policies
 	install -t $(DESTDIR)/var/lib/omegajail/policies -m 0644 ${POLICIES}
