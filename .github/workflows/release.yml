@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - v*
+
+jobs:
+
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: sudo apt-get install -y libcap-dev
+
+      - name: Bump version and push tag
+        id: bump-version
+        uses: anothrNick/github-tag-action@c170e78287f338a4af0dc49e033e50e5a072d82b
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WITH_V: true
+          DEFAULT_BUMP: patch
+          INITIAL_VERSION: 1.0.0
+
+      - name: Build
+        run: |
+          make OMEGAJAIL_RELEASE=${{ steps.bump-version.outputs.tag }} all
+
+          mkdir artifacts
+          make DESTDIR=artifacts/ install
+
+      - name: Package
+        run: |
+          tar -cJf omegajail-bionic-distrib-x86_64.tar.xz --owner=root:0 --group=root:0 -C artifacts/ .
+
+      - name: Create Release
+        id: create-release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.bump-version.outputs.tag }}
+          release_name: ${{ steps.bump-version.outputs.tag }}
+          draft: false
+          prerelease: false
+
+      - name: Upload omegaup-bionic-distrib-x86_64.tar.xz Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create-release.outputs.upload_url }}
+          asset_path: ./omegaup-bionic-distrib-x86_64.tar.xz
+          asset_name: omegaup-bionic-distrib-x86_64.tar.xz
+          asset_content_type: application/octet-stream
