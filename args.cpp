@@ -133,8 +133,6 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
      cxxopts::value<std::vector<std::string>>(), "src:dest[:1]")
     ("d,chdir", "changes directory to |path|. Ignored if --homedir is passed.",
      cxxopts::value<std::string>(), "path")
-    ("C,chroot", "sets the root of the chroot",
-     cxxopts::value<std::string>(), "path")
     ("homedir", "specifies |path| to be mounted as /home and chdir'ed to.",
      cxxopts::value<std::string>(), "path")
     ("homedir-writable", "specifies that /home will be mounted read-write",
@@ -212,16 +210,6 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
     }
   } else if (options.count("chdir")) {
     chdir = options["chdir"].as<std::string>();
-  }
-
-  if (options.count("chroot")) {
-    int ret = minijail_enter_pivot_root(
-        j, options["chroot"].as<std::string>().c_str());
-    if (ret) {
-      std::cerr << "chroot to \"" << options["chroot"].as<std::string>()
-                << "\" failed: " << strerror(-ret) << std::endl;
-      return false;
-    }
   }
 
   for (const auto& bind_description :
