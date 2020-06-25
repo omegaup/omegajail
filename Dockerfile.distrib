@@ -17,15 +17,11 @@ WORKDIR /src
 
 COPY ./cxxopts/include/ ./cxxopts/include/
 COPY ./minijail/ ./minijail/
-COPY .git ./.git/
-COPY Makefile *.h *.cpp omegajail-setup ./
-COPY ./policies/*.policy ./policies/
-COPY ./policies/*.frequency ./policies/
+COPY Makefile *.h *.cpp ./
+COPY tools/omegajail-setup ./tools/
+COPY ./policies/*.policy ./policies/*.frequency ./policies/
 
 ARG OMEGAJAIL_RELEASE
 
 RUN make OMEGAJAIL_RELEASE=$OMEGAJAIL_RELEASE
 RUN make install
-RUN XZ_DEFAULTS="-T 0" tar cJf omegajail-focal-distrib-x86_64.tar.xz \
-    /var/lib/omegajail/bin \
-    /var/lib/omegajail/policies

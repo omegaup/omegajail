@@ -34,4 +34,11 @@ jobs:
           sudo mkdir -p -m 0775 /sys/fs/cgroup/memory/omegajail
           sudo chown $(whoami) /sys/fs/cgroup/memory/omegajail
           sudo chgrp $(whoami) /sys/fs/cgroup/memory/omegajail
-          make smoketest
+          ./smoketest/test --root=./rootfs --strace
+
+      - name: Upload artifacts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: test-logs
+          path: smoketest/run/

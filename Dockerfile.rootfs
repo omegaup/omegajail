@@ -44,11 +44,8 @@ RUN apt-get update -y && \
 RUN mkdir /src
 WORKDIR /src
 
-COPY ./tools/mkroot ./tools/java.base.aotcfg ./tools/Main.runtimeconfig.json ./tools/Release.rsp ./tools/
+COPY ./tools/mkroot ./tools/java.base.aotcfg ./tools/Main.runtimeconfig.json ./tools/Release.rsp /src/
 
 FROM setup AS build
-RUN ./tools/mkroot
-
-FROM build AS package
-RUN XZ_DEFAULTS="-T 0" tar cJf omegajail-focal-rootfs-x86_64.tar.xz \
-    /var/lib/omegajail/root*
+RUN /src/mkroot
+RUN rm -rf /src/ && mkdir /src

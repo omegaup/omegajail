@@ -1,6 +1,7 @@
 # artifacts
 *.o
 *.bpf
+*.stamp
 java-compile
 omegajail
 sigsys-tracer
