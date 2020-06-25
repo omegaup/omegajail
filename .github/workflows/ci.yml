@@ -42,3 +42,27 @@ jobs:
         with:
           name: test-logs
           path: smoketest/run/
+
+  smoketest-docker:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Build container
+        run: |
+          make OMEGAJAIL_RELEASE=${{ github.sha }} .omegajail-builder-rootfs-runtime.stamp
+
+      - name: Smoketest (Docker)
+        run: |
+          make OMEGAJAIL_RELEASE=${{ github.sha }} smoketest-docker
+
+      - name: Upload artifacts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: test-logs-docker
+          path: smoketest/run/

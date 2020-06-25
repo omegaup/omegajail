@@ -35,6 +35,10 @@ jobs:
         if: ${{ steps.bump-version.outputs.part == 'major' || steps.bump-version.outputs.part == 'minor' }}
         run: make omegajail-focal-rootfs-x86_64.tar.xz
 
+      - name: Build omegaup/omegajail-builder-rootfs-runtime container
+        if: ${{ steps.bump-version.outputs.part == 'major' || steps.bump-version.outputs.part == 'minor' }}
+        run: make OMEGAJAIL_RELEASE=${{ steps.bump-version.outputs.tag }} .omegajail-builder-rootfs-runtime.stamp
+
       - name: Create Release
         id: create-release
         if: ${{ steps.bump-version.outputs.part != '' }}
@@ -68,3 +72,12 @@ jobs:
           asset_path: ./omegajail-focal-rootfs-x86_64.tar.xz
           asset_name: omegajail-focal-rootfs-x86_64.tar.xz
           asset_content_type: application/octet-stream
+
+      - name: Publish omegaup/omegajail-builder-rootfs-runtime container package
+        if: ${{ steps.bump-version.outputs.part == 'major' || steps.bump-version.outputs.part == 'minor' }}
+        run: |
+          echo "${{ github.token }}" | \
+              docker login https://docker.pkg.github.com "--username=${{ github.actor }}" --password-stdin
+          container_name=docker.pkg.github.com/${{ github.repository }}/omegajail-builder-rootfs-runtime:${{ steps.bump-version.outputs.tag }}
+          docker tag omegaup/omegajail-builder-rootfs-runtime "${container_name}"
+          docker push "${container_name}"

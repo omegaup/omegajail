@@ -50,6 +50,7 @@ const std::map<int, std::string_view> kSignalMap = {
 };
 
 struct InitPayload {
+  bool disable_sandboxing = false;
   ScopedMinijail jail;
   SigsysDetector sigsys_detector = SigsysDetector::SIGSYS_TRACER;
   std::string comm;
@@ -179,6 +180,28 @@ int OpenStdio(std::string_view path, int expected_fd, bool writable) {
 
 int RedirectStdio(void* payload) {
   Args* args = reinterpret_cast<Args*>(payload);
+  if (args->disable_sandboxing) {
+    if (!args->stdin_redirect.empty()) {
+      int ret = OpenStdio(args->stdin_redirect, STDIN_FILENO, false);
+      if (ret)
+        return ret;
+    }
+    if (!args->stdout_redirect.empty()) {
+      int ret = OpenStdio(args->stdout_redirect, STDOUT_FILENO, true);
+      if (ret)
+        return ret;
+    }
+    if (!args->stderr_redirect.empty()) {
+      int ret = OpenStdio(args->stderr_redirect, STDERR_FILENO, true);
+      if (ret)
+        return ret;
+      const char* message = "WARNING: Running with --disable-sandboxing\n";
+      // This logging is performed in a best-effort basis.
+      ignore_result(write(STDERR_FILENO, message, strlen(message)));
+    }
+    return 0;
+  }
+
   if (!args->stdin_redirect.empty()) {
     int ret = OpenStdio("/mnt/stdio/stdin", STDIN_FILENO, false);
     if (ret)
@@ -258,7 +281,15 @@ int MetaInit(void* raw_payload) {
   InitPayload* payload = reinterpret_cast<InitPayload*>(raw_payload);
 
   std::unique_ptr<ScopedCgroup> memory_cgroup;
-  if (payload->memory_limit_in_bytes >= 0) {
+  if (payload->disable_sandboxing) {
+    if (prctl(PR_SET_CHILD_SUBREAPER, 1) == -1) {
+      {
+        ScopedErrnoPreserver preserve_errno;
+        PLOG(ERROR) << "Failed to create an omegajail memory cgroup";
+      }
+      return -errno;
+    }
+  } else if (payload->memory_limit_in_bytes >= 0) {
     memory_cgroup =
         std::make_unique<ScopedCgroup>("/sys/fs/cgroup/memory/omegajail");
     if (!*memory_cgroup) {
@@ -317,6 +348,13 @@ int MetaInit(void* raw_payload) {
   if (child_pid < 0) {
     _exit(child_pid);
   } else if (child_pid == 0) {
+    if (payload->disable_sandboxing && setsid() == -1) {
+      {
+        ScopedErrnoPreserver preserve_errno;
+        PLOG(ERROR) << "Failed to create a new process group";
+      }
+      return -errno;
+    }
     if (!payload->comm.empty())
       prctl(PR_SET_NAME, payload->comm.c_str());
     for (auto* cgroup_ptr : {&memory_cgroup, &pid_cgroup}) {
@@ -457,7 +495,7 @@ int MetaInit(void* raw_payload) {
   if (TimespecCmp(&t, &deadline) >= 0)
     init_exitsignal = SIGXCPU;
 
-  kill(-1, SIGKILL);
+  kill(payload->disable_sandboxing ? -child_pid : -1, SIGKILL);
   while ((pid = wait3(&status, 0, &usage)) > 0) {
     if (init_exited || pid != child_pid)
       continue;
@@ -591,80 +629,96 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  if (from_sudo) {
-    // Change credentials to the original user so this never runs as root.
-    minijail_change_uid(j.get(), uid);
-    minijail_change_gid(j.get(), gid);
-  } else {
-    // Enter a user namespace. The current user will be user 1000.
-    minijail_namespace_user(j.get());
-    minijail_namespace_user_disable_setgroups(j.get());
-    constexpr uid_t kTargetUid = 1000;
-    constexpr gid_t kTargetGid = 1000;
-    minijail_change_uid(j.get(), kTargetUid);
-    minijail_change_gid(j.get(), kTargetGid);
-    minijail_uidmap(j.get(), StringPrintf("%d %d 1", kTargetUid, uid).c_str());
-    minijail_gidmap(j.get(), StringPrintf("%d %d 1", kTargetGid, gid).c_str());
-  }
-
-  // Perform some basic setup to tighten security as much as possible by
-  // default.
-  minijail_close_open_fds(j.get());
-  minijail_mount_tmp(j.get());
-  minijail_namespace_cgroups(j.get());
-  minijail_namespace_ipc(j.get());
-  minijail_namespace_net(j.get());
-  minijail_namespace_pids(j.get());
-  minijail_namespace_uts(j.get());
-  minijail_namespace_set_hostname(j.get(), "omegajail");
-  minijail_namespace_vfs(j.get());
-  minijail_no_new_privs(j.get());
-  minijail_set_ambient_caps(j.get());
-  minijail_use_caps(j.get(), 0);
-  minijail_reset_signal_mask(j.get());
-  minijail_run_as_init(j.get());
-  if (minijail_mount(j.get(), "proc", "/proc", "proc",
-                     MS_RDONLY | MS_NOEXEC | MS_NODEV | MS_NOSUID)) {
-    LOG(ERROR) << "Failed to mount /proc";
-    return 1;
-  }
-  if (minijail_mount_with_data(j.get(), "none", "/mnt/stdio", "tmpfs",
-                               MS_NOEXEC | MS_NODEV | MS_NOSUID,
-                               "size=4096,mode=555")) {
-    LOG(ERROR) << "Failed to mount /mnt/stdio";
-    return 1;
-  }
-  if (minijail_add_hook(j.get(), RemountRootReadOnly, nullptr,
-                        MINIJAIL_HOOK_EVENT_PRE_DROP_CAPS)) {
-    PLOG(ERROR) << "Failed to add a hook to remount / read-only";
-    return 1;
-  }
-
   Args args;
   if (!args.Parse(argc, argv, j.get()))
     return 1;
 
+  minijail_close_open_fds(j.get());
+  if (!args.disable_sandboxing) {
+    if (from_sudo) {
+      // Change credentials to the original user so this never runs as root.
+      minijail_change_uid(j.get(), uid);
+      minijail_change_gid(j.get(), gid);
+    } else {
+      // Enter a user namespace. The current user will be user 1000.
+      minijail_namespace_user(j.get());
+      minijail_namespace_user_disable_setgroups(j.get());
+      constexpr uid_t kTargetUid = 1000;
+      constexpr gid_t kTargetGid = 1000;
+      minijail_change_uid(j.get(), kTargetUid);
+      minijail_change_gid(j.get(), kTargetGid);
+      minijail_uidmap(j.get(),
+                      StringPrintf("%d %d 1", kTargetUid, uid).c_str());
+      minijail_gidmap(j.get(),
+                      StringPrintf("%d %d 1", kTargetGid, gid).c_str());
+    }
+
+    // Perform some basic setup to tighten security as much as possible by
+    // default.
+    minijail_mount_tmp(j.get());
+    minijail_namespace_cgroups(j.get());
+    minijail_namespace_ipc(j.get());
+    minijail_namespace_net(j.get());
+    minijail_namespace_pids(j.get());
+    minijail_namespace_uts(j.get());
+    minijail_namespace_set_hostname(j.get(), "omegajail");
+    minijail_namespace_vfs(j.get());
+    minijail_no_new_privs(j.get());
+    minijail_set_ambient_caps(j.get());
+    minijail_use_caps(j.get(), 0);
+    minijail_reset_signal_mask(j.get());
+    minijail_run_as_init(j.get());
+    if (minijail_mount(j.get(), "proc", "/proc", "proc",
+                       MS_RDONLY | MS_NOEXEC | MS_NODEV | MS_NOSUID)) {
+      LOG(ERROR) << "Failed to mount /proc";
+      return 1;
+    }
+    if (minijail_mount_with_data(j.get(), "none", "/mnt/stdio", "tmpfs",
+                                 MS_NOEXEC | MS_NODEV | MS_NOSUID,
+                                 "size=4096,mode=555")) {
+      LOG(ERROR) << "Failed to mount /mnt/stdio";
+      return 1;
+    }
+    if (minijail_add_hook(j.get(), RemountRootReadOnly, nullptr,
+                          MINIJAIL_HOOK_EVENT_PRE_DROP_CAPS)) {
+      PLOG(ERROR) << "Failed to add a hook to remount / read-only";
+      return 1;
+    }
+
+    if (!args.stdin_redirect.empty()) {
+      InstallStdioRedirectOrDie(j.get(), args.stdin_redirect,
+                                "/mnt/stdio/stdin", false);
+    }
+    if (!args.stdout_redirect.empty()) {
+      InstallStdioRedirectOrDie(j.get(), args.stdout_redirect,
+                                "/mnt/stdio/stdout", true);
+    }
+    if (!args.stderr_redirect.empty()) {
+      InstallStdioRedirectOrDie(j.get(), args.stderr_redirect,
+                                "/mnt/stdio/stderr", true);
+    }
+
+    if (args.memory_limit_in_bytes >= 0 &&
+        minijail_mount(j.get(), "/sys/fs/cgroup/memory/omegajail",
+                       "/sys/fs/cgroup/memory/omegajail", "", MS_BIND)) {
+      LOG(ERROR) << "Failed to mount /sys/fs/cgroup/memory";
+      return 1;
+    }
+  } else {
+    LOG(WARN) << "Running with --disable-sandboxing";
+    if (!args.stdout_redirect.empty()) {
+      ScopedFD fd(open(args.stdout_redirect.data(),
+                       O_WRONLY | O_CREAT | O_NOFOLLOW | O_TRUNC, 0644));
+    }
+    if (!args.stderr_redirect.empty()) {
+      ScopedFD fd(open(args.stderr_redirect.data(),
+                       O_WRONLY | O_CREAT | O_NOFOLLOW | O_TRUNC, 0644));
+    }
+  }
+
   if (!args.chdir.empty()) {
     minijail_add_hook(j.get(), Chdir, const_cast<char*>(args.chdir.c_str()),
                       MINIJAIL_HOOK_EVENT_PRE_DROP_CAPS);
-  }
-  if (!args.stdin_redirect.empty()) {
-    InstallStdioRedirectOrDie(j.get(), args.stdin_redirect, "/mnt/stdio/stdin",
-                              false);
-  }
-  if (!args.stdout_redirect.empty()) {
-    InstallStdioRedirectOrDie(j.get(), args.stdout_redirect,
-                              "/mnt/stdio/stdout", true);
-  }
-  if (!args.stderr_redirect.empty()) {
-    InstallStdioRedirectOrDie(j.get(), args.stderr_redirect,
-                              "/mnt/stdio/stderr", true);
-  }
-  if (args.memory_limit_in_bytes >= 0 &&
-      minijail_mount(j.get(), "/sys/fs/cgroup/memory/omegajail",
-                     "/sys/fs/cgroup/memory/omegajail", "", MS_BIND)) {
-    LOG(ERROR) << "Failed to mount /sys/fs/cgroup/memory";
-    return 1;
   }
 
   std::string cgroup_path;
@@ -673,7 +727,8 @@ int main(int argc, char* argv[]) {
                                args.script_basename.c_str());
     if (access(cgroup_path.c_str(), W_OK) != 0) {
       cgroup_path.clear();
-    } else if (minijail_mount(j.get(), "/sys/fs/cgroup/pids/omegajail",
+    } else if (!args.disable_sandboxing &&
+               minijail_mount(j.get(), "/sys/fs/cgroup/pids/omegajail",
                               "/sys/fs/cgroup/pids/omegajail", "", MS_BIND)) {
       LOG(ERROR) << "Failed to mount /sys/fs/cgroup/pids";
       return 1;
@@ -681,6 +736,7 @@ int main(int argc, char* argv[]) {
   }
 
   InitPayload payload;
+  payload.disable_sandboxing = args.disable_sandboxing;
   payload.memory_limit_in_bytes = args.memory_limit_in_bytes;
   payload.vm_memory_size_in_bytes = args.vm_memory_size_in_bytes;
   payload.rlimits = args.rlimits;
@@ -722,12 +778,14 @@ int main(int argc, char* argv[]) {
       minijail_change_uid(payload.jail.get(), uid);
       minijail_change_gid(payload.jail.get(), gid);
     }
-    minijail_no_new_privs(payload.jail.get());
-    minijail_set_ambient_caps(payload.jail.get());
-    minijail_use_caps(payload.jail.get(),
-                      (payload.sigsys_detector == SigsysDetector::PTRACE)
-                          ? (1 << CAP_SYS_PTRACE)
-                          : 0);
+    if (!args.disable_sandboxing) {
+      minijail_no_new_privs(payload.jail.get());
+      minijail_set_ambient_caps(payload.jail.get());
+      minijail_use_caps(payload.jail.get(),
+                        (payload.sigsys_detector == SigsysDetector::PTRACE)
+                            ? (1 << CAP_SYS_PTRACE)
+                            : 0);
+    }
 
     // Run MetaInit() as the container's init.
     ret = minijail_add_hook(j.get(), MetaInit, &payload,

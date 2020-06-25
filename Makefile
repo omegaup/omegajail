@@ -85,6 +85,23 @@ test: util_test
 smoketest: rootfs
 	./smoketest/test --root=./rootfs
 
+.omegajail-builder-rootfs-runtime.stamp: .omegajail-builder-rootfs-setup.stamp .omegajail-builder-distrib.stamp
+	docker build \
+		-t omegaup/omegajail-builder-rootfs-runtime \
+		--target=runtime \
+		--file=Dockerfile.rootfs \
+		.
+	touch $@
+
+.PHONY: smoketest-docker
+smoketest-docker: .omegajail-builder-rootfs-runtime.stamp
+	docker run \
+		--rm \
+		--mount "type=bind,source=${PWD}/smoketest,target=/src" \
+		--user "$(shell id -u):$(shell id -g)" \
+		omegaup/omegajail-builder-rootfs-runtime \
+		/usr/bin/python3 /src/test
+
 util_test.o: util_test.cpp util.h logging.h
 	$(CXX) $(TEST_CFLAGS) $(TEST_CXXFLAGS) -fno-exceptions $< -c -o $@
 
