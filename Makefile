@@ -7,6 +7,8 @@ POLICIES := policies/gcc.bpf policies/cpp.bpf policies/ghc.bpf policies/hs.bpf \
 
 MINIJAIL_SOURCE_FILES := $(addprefix minijail/,\
 	$(cd minijail && git ls-tree --name-only HEAD -- *.c *.c))
+MKROOT_SOURCE_FILES := Dockerfile.rootfs tools/mkroot tools/java.base.aotcfg \
+                       tools/Main.runtimeconfig.json tools/Release.rsp
 MINIJAIL_CORE_OBJECT_FILES := $(addprefix minijail/,$(patsubst %.o,%.pic.o,\
 	libminijail.o syscall_filter.o signal_handler.o bpf.o util.o system.o \
 	syscall_wrapper.o libconstants.gen.o libsyscalls.gen.o))
@@ -95,7 +97,7 @@ gtest-all.o : googletest/googletest/src/gtest-all.cc
 gtest_main.o : googletest/googletest/src/gtest_main.cc
 	$(CXX) $(TEST_CFLAGS) $(TEST_CXXFLAGS) -Igoogletest/googletest -fno-exceptions $< -c -o $@
 
-rootfs: Dockerfile.rootfs tools/mkroot tools/java.base.aotcfg ${BINARIES} ${POLICIES}
+rootfs: ${MKROOT_SOURCE_FILES} ${BINARIES} ${POLICIES}
 	sudo rm -rf rootfs
 	$(MAKE) DESTDIR=rootfs install
 	docker build \
@@ -108,7 +110,7 @@ rootfs: Dockerfile.rootfs tools/mkroot tools/java.base.aotcfg ${BINARIES} ${POLI
 		--mount "type=bind,source=${PWD}/rootfs,target=/var/lib/omegajail" \
 		omegaup/omegajail-builder-rootfs-setup ./tools/mkroot --no-link
 
-omegajail-focal-rootfs-x86_64.tar.xz: Dockerfile.rootfs tools/mkroot tools/java.base.aotcfg
+omegajail-focal-rootfs-x86_64.tar.xz: ${MKROOT_SOURCE_FILES}
 	rm -f omegajail-focal-rootfs-x86_64.tar.xz
 	docker build \
 		-t omegaup/omegajail-builder-rootfs-package \

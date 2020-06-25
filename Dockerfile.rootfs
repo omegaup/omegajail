@@ -44,7 +44,7 @@ RUN apt-get update -y && \
 RUN mkdir /src
 WORKDIR /src
 
-COPY ./tools/mkroot ./tools/java.base.aotcfg ./tools/
+COPY ./tools/mkroot ./tools/java.base.aotcfg ./tools/Main.runtimeconfig.json ./tools/Release.rsp ./tools/
 
 FROM setup AS build
 RUN ./tools/mkroot
