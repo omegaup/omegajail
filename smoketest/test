@@ -85,10 +85,9 @@ def _omegajail_compile(root: str, lang: str, strace: bool) -> bool:
         args = [os.path.join(root, 'bin/omegajail')]
 
     args += [
-        '-d',
-        '/home',
-        '-b',
-        '{},/home,1'.format(lang_dir),
+        '--homedir',
+        lang_dir,
+        '--homedir-writable',
         '-1',
         os.path.join(lang_dir, 'compile.out'),
         '-2',
@@ -127,10 +126,8 @@ def _omegajail_run(root: str, lang: str, strace: bool, input_file: str,
         args = [os.path.join(root, 'bin/omegajail')]
 
     args += [
-        '-d',
-        '/home',
-        '-b',
-        '{},/home'.format(lang_dir),
+        '--homedir',
+        lang_dir,
         '-0',
         os.path.join(_PWD, input_file),
         '-1',
