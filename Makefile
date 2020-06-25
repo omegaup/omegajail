@@ -65,9 +65,9 @@ policies/%.bpf: policies/%.policy | minijail/constants.json
 		$^ $@
 
 .PHONY: install
-install: ${BINARIES} ${POLICIES}
+install: ${BINARIES} tools/omegajail-setup ${POLICIES}
 	install -d $(DESTDIR)/bin
-	install -t $(DESTDIR)/bin ${BINARIES} omegajail-setup
+	install -t $(DESTDIR)/bin ${BINARIES} tools/omegajail-setup
 	install -d $(DESTDIR)/policies
 	install -t $(DESTDIR)/policies -m 0644 ${POLICIES}
 
@@ -82,7 +82,7 @@ test: util_test
 	./util_test
 
 .PHONY: smoketest
-smoketest: ${BINARIES} ${POLICIES} rootfs
+smoketest: rootfs
 	./smoketest/test --root=./rootfs
 
 util_test.o: util_test.cpp util.h logging.h
@@ -97,37 +97,63 @@ gtest-all.o : googletest/googletest/src/gtest-all.cc
 gtest_main.o : googletest/googletest/src/gtest_main.cc
 	$(CXX) $(TEST_CFLAGS) $(TEST_CXXFLAGS) -Igoogletest/googletest -fno-exceptions $< -c -o $@
 
-rootfs: ${MKROOT_SOURCE_FILES} ${BINARIES} ${POLICIES}
-	sudo rm -rf rootfs
-	$(MAKE) DESTDIR=rootfs install
+.omegajail-builder-rootfs-setup.stamp: ${MKROOT_SOURCE_FILES}
 	docker build \
 		-t omegaup/omegajail-builder-rootfs-setup \
 		--file Dockerfile.rootfs \
 		--target setup \
 		.
+	touch $@
+
+rootfs: .omegajail-builder-rootfs-setup.stamp ${BINARIES} tools/omegajail-setup ${POLICIES}
+	sudo rm -rf $@
+	mkdir ".$@.tmp"
+	$(MAKE) DESTDIR=".$@.tmp" install || rm -rf ".$@.tmp"
 	docker run \
 		--rm \
-		--mount "type=bind,source=${PWD}/rootfs,target=/var/lib/omegajail" \
-		omegaup/omegajail-builder-rootfs-setup ./tools/mkroot --no-link
+		--mount "type=bind,source=${PWD}/.$@.tmp,target=/var/lib/omegajail" \
+		omegaup/omegajail-builder-rootfs-setup /src/mkroot --no-link && \
+	mv ".$@.tmp" "$@" || rm -rf ".$@.tmp"
 
-omegajail-focal-rootfs-x86_64.tar.xz: ${MKROOT_SOURCE_FILES}
-	rm -f omegajail-focal-rootfs-x86_64.tar.xz
+.omegajail-builder-rootfs-build.stamp: ${MKROOT_SOURCE_FILES}
 	docker build \
-		-t omegaup/omegajail-builder-rootfs-package \
+		-t omegaup/omegajail-builder-rootfs-build \
 		--file Dockerfile.rootfs \
-		--target package \
+		--target build \
 		.
-	id=$$(docker create omegaup/omegajail-builder-rootfs-package) && \
-	docker cp $${id}:/src/omegajail-focal-rootfs-x86_64.tar.xz omegajail-focal-rootfs-x86_64.tar.xz && \
-	docker rm $${id}
+	touch $@
 
-omegajail-focal-distrib-x86_64.tar.xz: Dockerfile.distrib Makefile $(wildcard *.h *.cpp omegajail-setup policies/*.frequency policies/*.policy)
-	rm -f omegajail-focal-distrib-x86_64.tar.xz
+omegajail-focal-rootfs-x86_64.tar.xz: .omegajail-builder-rootfs-build.stamp
+	rm -f $@
+	touch ".$@.tmp"
+	docker run \
+		--rm \
+		--mount "type=bind,source=${PWD}/.$@.tmp,target=/src/$@" \
+		--env "XZ_DEFAULTS=-T 0" \
+		omegaup/omegajail-builder-rootfs-build \
+		/bin/tar cJf "/src/$@" \
+		--exclude /var/lib/omegajail/bin \
+		--exclude /var/lib/omegajail/policies \
+		/var/lib/omegajail/ && \
+	mv ".$@.tmp" "$@" || rm ".$@.tmp"
+
+.omegajail-builder-distrib.stamp: Dockerfile.distrib Makefile $(wildcard *.h *.cpp tools/omegajail-setup policies/*.frequency policies/*.policy)
 	docker build \
 		--build-arg OMEGAJAIL_RELEASE=$(OMEGAJAIL_RELEASE) \
 		-t omegaup/omegajail-builder-distrib \
 		--file Dockerfile.distrib \
 		.
-	id=$$(docker create omegaup/omegajail-builder-distrib) && \
-	docker cp $${id}:/src/omegajail-focal-distrib-x86_64.tar.xz omegajail-focal-distrib-x86_64.tar.xz && \
-	docker rm $${id}
+	touch $@
+
+omegajail-focal-distrib-x86_64.tar.xz: .omegajail-builder-distrib.stamp
+	rm -f $@
+	touch ".$@.tmp"
+	docker run \
+		--rm \
+		--mount "type=bind,source=${PWD}/.$@.tmp,target=/src/$@" \
+		--env "XZ_DEFAULTS=-T 0" \
+		omegaup/omegajail-builder-distrib \
+		/bin/tar cJf "/src/$@" \
+		/var/lib/omegajail/bin \
+		/var/lib/omegajail/policies && \
+	mv ".$@.tmp" "$@" || rm ".$@.tmp"
