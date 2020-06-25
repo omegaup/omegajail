@@ -582,7 +582,7 @@ def _main() -> None:
             '-J-XX:+UseSerialGC',
             f'-J-XX:SharedArchiveFile={root.path}/java-14-openjdk-amd64/lib/server/classes.jsa',
             '--compile-commands',
-            f'{_CURRENT_DIR}/java.base.aotcfg',
+            os.path.join(_CURRENT_DIR, 'java.base.aotcfg'),
             '--module',
             'java.base',
             '--output',
@@ -656,111 +656,12 @@ def _main() -> None:
             '/usr/share/dotnet/packs',
             relative_to=DOTNET_ROOT,
             recurse=True)
-        root.write(
+        root.install(
             os.path.join(DOTNET_ROOT, 'Main.runtimeconfig.json'),
-            textwrap.dedent('''\
-            {
-                "runtimeOptions": {
-                    "tfm": "netcoreapp3.1",
-                    "framework": {
-                        "name": "Microsoft.NETCore.App",
-                        "version": "3.1.0"
-                    }
-                }
-            }
-            ''').encode('utf-8')
-        )
-        root.write(
+            os.path.join(_CURRENT_DIR, 'Main.runtimeconfig.json'))
+        root.install(
             os.path.join(DOTNET_ROOT, 'Release.rsp'),
-            textwrap.dedent('''\
-            -unsafe-
-            -checked-
-            -nowarn:1701,1702,1705
-            -errorreport:none
-            -warn:4
-            -define:TRACE;RELEASE
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/Microsoft.CSharp.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/Microsoft.Win32.Primitives.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.AppContext.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Buffers.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Collections.Concurrent.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Collections.Immutable.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Collections.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.ComponentModel.Annotations.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.ComponentModel.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Console.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Diagnostics.Debug.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Diagnostics.DiagnosticSource.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Diagnostics.Process.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Diagnostics.Tools.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Diagnostics.Tracing.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Dynamic.Runtime.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Globalization.Calendars.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Globalization.Extensions.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Globalization.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.IO.Compression.ZipFile.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.IO.Compression.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.IO.FileSystem.Primitives.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.IO.FileSystem.Watcher.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.IO.FileSystem.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.IO.MemoryMappedFiles.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.IO.UnmanagedMemoryStream.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.IO.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Linq.Expressions.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Linq.Parallel.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Linq.Queryable.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Linq.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Net.Http.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Net.NameResolution.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Net.Primitives.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Net.Requests.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Net.Security.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Net.Sockets.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Net.WebHeaderCollection.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Numerics.Vectors.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.ObjectModel.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Reflection.DispatchProxy.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Reflection.Extensions.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Reflection.Metadata.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Reflection.Primitives.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Reflection.TypeExtensions.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Reflection.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Resources.Reader.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Resources.ResourceManager.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Runtime.Extensions.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Runtime.Handles.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Runtime.InteropServices.RuntimeInformation.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Runtime.InteropServices.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Runtime.Numerics.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Runtime.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Security.Cryptography.Algorithms.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Security.Cryptography.Encoding.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Security.Cryptography.Primitives.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Security.Cryptography.X509Certificates.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Security.Principal.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Text.Encoding.Extensions.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Text.Encoding.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Text.RegularExpressions.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Threading.Tasks.Dataflow.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Threading.Tasks.Extensions.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Threading.Tasks.Parallel.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Threading.Tasks.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Threading.Thread.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Threading.ThreadPool.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Threading.Timer.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Threading.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Xml.ReaderWriter.dll
-            -reference:/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/System.Xml.XDocument.dll
-            -debug-
-            -debug:embedded
-            -filealign:512
-            -nologo
-            -optimize+
-            -warnaserror-
-            -utf8output
-            -deterministic+
-            ''').encode('utf-8')
-        )
+            os.path.join(_CURRENT_DIR, 'Release.rsp'))
 
     with Chroot(os.path.join(args.target, 'root-js'), JS_ROOT,
                 link=args.link) as root:
