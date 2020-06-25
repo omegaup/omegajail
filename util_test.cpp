@@ -13,9 +13,14 @@ TEST(UtilTest, StringPrintf) {
   EXPECT_EQ(StringPrintf("%d %d", 0, 1), "0 1");
 }
 
-TEST(UtilTest, StringSplit) {
+TEST(UtilTest, StringSplitByChar) {
   EXPECT_EQ(StringSplit("hello:world", ':'),
             (std::vector<std::string>{"hello", "world"}));
+}
+
+TEST(UtilTest, StringSplitByAnyChar) {
+  EXPECT_EQ(StringSplit("hey,hello:world", ByAnyChar(",:")),
+            (std::vector<std::string>{"hey", "hello", "world"}));
 }
 
 TEST(UtilTest, StringJoin) {

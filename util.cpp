@@ -237,12 +237,37 @@ std::string StringPrintf(const char* format, ...) {
   return std::string(path, ret);
 }
 
-std::vector<std::string> StringSplit(std::string_view input, char delim) {
+std::vector<std::string> StringSplit(const std::string_view input,
+                                     ByChar delim) {
   std::vector<std::string> result;
   size_t pos = 0;
 
   while (true) {
-    size_t next = input.find(delim, pos);
+    const size_t next = input.find(delim.delim, pos);
+    if (next == std::string::npos)
+      break;
+    result.emplace_back(input.substr(pos, next - pos));
+    pos = next + 1;
+  }
+  result.emplace_back(input.substr(pos));
+
+  return result;
+}
+
+std::vector<std::string> StringSplit(const std::string_view input,
+                                     ByAnyChar delim) {
+  std::vector<std::string> result;
+  size_t pos = 0;
+
+  while (true) {
+    size_t next = std::string::npos;
+    for (const char sep : delim.delims) {
+      const size_t candidate_pos = input.find(sep, pos);
+      if (candidate_pos == std::string::npos)
+        continue;
+      if (next == std::string::npos || next > candidate_pos)
+        next = candidate_pos;
+    }
     if (next == std::string::npos)
       break;
     result.emplace_back(input.substr(pos, next - pos));

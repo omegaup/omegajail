@@ -137,7 +137,17 @@ class ScopedErrnoPreserver {
 
 std::string StringPrintf(const char* format, ...);
 
-std::vector<std::string> StringSplit(std::string_view input, char delim);
+struct ByChar {
+  ByChar(char delim) : delim(delim) {}
+  const char delim;
+};
+std::vector<std::string> StringSplit(std::string_view input, ByChar delim);
+
+struct ByAnyChar {
+  explicit ByAnyChar(std::string_view delims) : delims(delims) {}
+  const std::string_view delims;
+};
+std::vector<std::string> StringSplit(std::string_view input, ByAnyChar delim);
 
 std::string StringJoin(const std::vector<std::string>& input,
                        std::string_view delim);
