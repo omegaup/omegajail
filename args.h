@@ -38,6 +38,7 @@ struct Args {
   size_t vm_memory_size_in_bytes = 0;
   uint64_t wall_time_limit_msec = kMaxWallTimeLimitMsec;
   SigsysDetector sigsys_detector = SigsysDetector::PTRACE;
+  bool disable_sandboxing = false;
   std::vector<ResourceLimit> rlimits{
       ResourceLimit{RLIMIT_STACK, {RLIM_INFINITY, RLIM_INFINITY}}};
   std::unique_ptr<const char* []> program_args;
@@ -58,6 +59,15 @@ struct Args {
                    struct minijail* j);
 
   void SetMemoryLimit(int64_t limit_bytes);
+
+  std::string UseSeccompProgram(std::string_view seccomp_program_path,
+                                struct minijail* j) const;
+
+  bool EnterPivotRoot(std::string_view root, struct minijail* j) const;
+
+  bool BindReadOnly(std::string_view source,
+                    std::string_view target,
+                    struct minijail* j) const;
 
   std::vector<std::string> program_args_holder;
 };

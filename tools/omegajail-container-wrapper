@@ -1,0 +1,59 @@
+#!/bin/bash
+
+# Wraps the original omegajail binary when run in a container.
+
+set -e
+
+homedir=""
+args=("${@}")
+filtered_args=()
+bind_flags=()
+
+for ((i=0; i<"${#args[@]}"; ++i)); do
+  case "${args[i]}" in
+    --bind=*)
+      bind_flags+=("${args[i]#--bind=}")
+      ;;
+    --bind | -b)
+      i=$((i+1))
+      bind_flags+=("${args[i]%}")
+      ;;
+    --homedir=*)
+      homedir="${args[i]#--homedir=}"
+      filtered_args+=("${args[i]}")
+      ;;
+    --homedir)
+      homedir="${args[i+1]}"
+      filtered_args+=("${args[i]}")
+      ;;
+    *)
+      filtered_args+=("${args[i]}")
+      ;;
+  esac
+done
+
+if [[ "${#bind_flags[*]}" -gt 0 && "${homedir}" == "" ]]; then
+    echo "--bind flags cannot be provided without --homedir" >&2
+    exit 1
+fi
+
+for bind_flag in "${bind_flags[@]}"; do
+  IFS=":," read -a bind_fields <<< "${bind_flag}"
+  if [[ "${#bind_fields[*]}" < 2 || "${#bind_fields[*]}" > 3 ]]; then
+    echo "--bind flag '${bind_flag}' does not have two or three components" >&2
+    exit 1
+  fi
+  bind_source="${bind_fields[0]}"
+  bind_target="${bind_fields[1]}"
+  if [[ ! "${bind_target}" =~ ^/home/ ]]; then
+    echo "--bind flag '${bind_flag}' does not mount into /home" >&2
+    exit 1
+  fi
+  link_target="${homedir}/${bind_target#/home/}"
+  if [[ -d "${link_target}" && ! -L "${link_target}" ]]; then
+    rmdir "${link_target}"
+  fi
+  ln -sf "${bind_source}" "${link_target}"
+done
+
+exec /var/lib/omegajail/bin/omegajail.wrapped --disable-sandboxing "${args[@]}"

@@ -49,3 +49,25 @@ COPY ./tools/mkroot ./tools/java.base.aotcfg ./tools/Main.runtimeconfig.json ./t
 FROM setup AS build
 RUN /src/mkroot
 RUN rm -rf /src/ && mkdir /src
+
+FROM build AS runtime
+RUN wget --quiet https://github.com/omegaup/libinteractive/releases/download/v2.0.25/libinteractive.jar \
+    -O /usr/share/java/libinteractive.jar
+
+RUN mv /var/lib/omegajail/root-openjdk/java-14-openjdk-amd64/lib/server/classes.jsa \
+        /usr/lib/jvm/java-14-openjdk-amd64/lib/server/classes.jsa && \
+    mv /var/lib/omegajail/root-openjdk/java.base.so \
+        /usr/lib/jvm/java.base.so && \
+    mv /var/lib/omegajail/root-js /opt/nodejs && \
+    mv /var/lib/omegajail/root-dotnet/Main.runtimeconfig.json \
+        /var/lib/omegajail/root-dotnet/Release.rsp \
+        /usr/share/dotnet/ && \
+    ln -s /opt/nodejs/bin/node /usr/bin/node && \
+    ln -s /opt/nodejs/node_modules /usr/lib/node_modules && \
+    rm -rf /var/lib/omegajail && \
+    mkdir -p /var/lib/omegajail/root/dev/ && \
+    cp /dev/null /var/lib/omegajail/root/dev/null
+
+COPY --from=omegaup/omegajail-builder-distrib /var/lib/omegajail/ /var/lib/omegajail
+RUN mv /var/lib/omegajail/bin/omegajail /var/lib/omegajail/bin/omegajail.wrapped
+COPY ./tools/omegajail-container-wrapper /var/lib/omegajail/bin/omegajail

@@ -52,58 +52,6 @@ std::string MakeAbsolute(std::string_view path, std::string_view cwd) {
   return PathJoin(cwd, path);
 }
 
-std::string UseSeccompProgram(std::string_view seccomp_program_path,
-                              struct minijail* j) {
-  size_t basename_pos = seccomp_program_path.find_last_of('/');
-  if (basename_pos == std::string::npos)
-    basename_pos = 0;
-  else
-    basename_pos++;
-  struct sock_filter filter[BPF_MAXINSNS];
-  struct sock_fprog seccomp_program;
-  {
-    ScopedFD program_fd(
-        open(seccomp_program_path.data(), O_RDONLY | O_CLOEXEC));
-    if (!program_fd)
-      PLOG(FATAL) << "Failed to open BPF program";
-    ssize_t bytes_read = read(program_fd.get(), filter, sizeof(filter));
-    if (bytes_read < 0)
-      PLOG(FATAL) << "Failed to read BPF program";
-    if (bytes_read % sizeof(struct sock_filter) != 0)
-      LOG(FATAL) << "Bad size: " << bytes_read;
-    seccomp_program.filter = filter;
-    seccomp_program.len = bytes_read / sizeof(struct sock_filter);
-  }
-
-  minijail_use_seccomp_filter(j);
-  minijail_set_seccomp_filter_tsync(j);
-  minijail_set_seccomp_filters(j, &seccomp_program);
-  return std::string(seccomp_program_path.substr(
-      basename_pos, seccomp_program_path.size() - basename_pos - 4));
-}
-
-bool EnterPivotRoot(std::string_view root, struct minijail* j) {
-  int ret = minijail_enter_pivot_root(j, root.data());
-  if (ret) {
-    std::cerr << "chroot to \"" << root << "\" failed: " << strerror(-ret)
-              << std::endl;
-    return false;
-  }
-  return true;
-}
-
-bool BindReadOnly(std::string_view source,
-                  std::string_view target,
-                  struct minijail* j) {
-  int ret = minijail_bind(j, source.data(), target.data(), false);
-  if (ret) {
-    std::cerr << "bind \"" << source << "," << target
-              << "\" failed: " << strerror(-ret) << std::endl;
-    return false;
-  }
-  return true;
-}
-
 }  // namespace
 
 bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
@@ -161,6 +109,10 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
      cxxopts::value<ssize_t>(), "bytes")
     ("sigsys-detector", "one of 'sigsys_tracer' (default), 'ptrace', 'none'.",
      cxxopts::value<std::string>())
+    ("disable-sandboxing",
+     "completely disable containerization. This is very insecure and should "
+     "only be used when omegajail is already being run in a container",
+     cxxopts::value<bool>())
     ("program", "", cxxopts::value<std::vector<std::string>>());
   // clang-format on
 
@@ -182,6 +134,9 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
     return false;
   }
 
+  if (options.count("disable-sandboxing"))
+    disable_sandboxing = options["disable-sandboxing"].as<bool>();
+
   if (options.count("comm"))
     comm = options["comm"].as<std::string>() + "\n";
 
@@ -191,18 +146,22 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
                 << std::endl;
       return false;
     }
-    chdir = "/home";
-    const bool homedir_writable = options.count("homedir-writable") &&
-                                  options["homedir-writable"].as<bool>();
+    if (disable_sandboxing) {
+      chdir = options["homedir"].as<std::string>();
+    } else {
+      chdir = "/home";
+      const bool homedir_writable = options.count("homedir-writable") &&
+                                    options["homedir-writable"].as<bool>();
 
-    const std::string home_mount = options["homedir"].as<std::string>();
-    int ret =
-        minijail_bind(j, home_mount.c_str(), chdir.c_str(), homedir_writable);
-    if (ret) {
-      std::cerr << "Bind \"" << home_mount << "," << chdir
-                << (homedir_writable ? ",1" : "")
-                << "\" failed: " << strerror(-ret) << std::endl;
-      return false;
+      const std::string home_mount = options["homedir"].as<std::string>();
+      int ret =
+          minijail_bind(j, home_mount.c_str(), chdir.c_str(), homedir_writable);
+      if (ret) {
+        std::cerr << "Bind \"" << home_mount << "," << chdir
+                  << (homedir_writable ? ",1" : "")
+                  << "\" failed: " << strerror(-ret) << std::endl;
+        return false;
+      }
     }
   } else if (options.count("chdir")) {
     chdir = options["chdir"].as<std::string>();
@@ -218,6 +177,9 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
       std::cerr << options.help({""}) << std::endl;
       return false;
     }
+
+    if (disable_sandboxing)
+      continue;
 
     int ret = minijail_bind(j, bind[0].c_str(), bind[1].c_str(),
                             bind.size() == 3 && bind[2] == "1");
@@ -322,7 +284,10 @@ bool Args::SetCompileFlags(std::string_view root,
     return false;
 
   // Force-redirect stdin to an empty file.
-  stdin_redirect = PathJoin(root, "root-compilers/dev/null");
+  if (disable_sandboxing)
+    stdin_redirect = "/dev/null";
+  else
+    stdin_redirect = PathJoin(root, "root-compilers/dev/null");
 
   if (language == "c" || language == "c11-gcc") {
     script_basename = UseSeccompProgram(PathJoin(root, "policies/gcc.bpf"), j);
@@ -626,4 +591,63 @@ void Args::SetMemoryLimit(int64_t limit_bytes) {
   rlimits.emplace_back(ResourceLimit{
       RLIMIT_AS,
       {static_cast<rlim_t>(limit_bytes), static_cast<rlim_t>(limit_bytes)}});
+}
+
+std::string Args::UseSeccompProgram(const std::string_view seccomp_program_path,
+                                    struct minijail* j) const {
+  size_t basename_pos = seccomp_program_path.find_last_of('/');
+  if (basename_pos == std::string::npos)
+    basename_pos = 0;
+  else
+    basename_pos++;
+  struct sock_filter filter[BPF_MAXINSNS];
+  struct sock_fprog seccomp_program;
+  {
+    ScopedFD program_fd(
+        open(seccomp_program_path.data(), O_RDONLY | O_CLOEXEC));
+    if (!program_fd)
+      PLOG(FATAL) << "Failed to open BPF program";
+    ssize_t bytes_read = read(program_fd.get(), filter, sizeof(filter));
+    if (bytes_read < 0)
+      PLOG(FATAL) << "Failed to read BPF program";
+    if (bytes_read % sizeof(struct sock_filter) != 0)
+      LOG(FATAL) << "Bad size: " << bytes_read;
+    seccomp_program.filter = filter;
+    seccomp_program.len = bytes_read / sizeof(struct sock_filter);
+  }
+
+  if (!disable_sandboxing) {
+    minijail_use_seccomp_filter(j);
+    minijail_set_seccomp_filter_tsync(j);
+    minijail_set_seccomp_filters(j, &seccomp_program);
+  }
+  return std::string(seccomp_program_path.substr(
+      basename_pos, seccomp_program_path.size() - basename_pos - 4));
+}
+
+bool Args::EnterPivotRoot(const std::string_view root,
+                          struct minijail* j) const {
+  if (disable_sandboxing)
+    return true;
+  int ret = minijail_enter_pivot_root(j, root.data());
+  if (ret) {
+    std::cerr << "chroot to \"" << root << "\" failed: " << strerror(-ret)
+              << std::endl;
+    return false;
+  }
+  return true;
+}
+
+bool Args::BindReadOnly(const std::string_view source,
+                        const std::string_view target,
+                        struct minijail* j) const {
+  if (disable_sandboxing)
+    return true;
+  int ret = minijail_bind(j, source.data(), target.data(), false);
+  if (ret) {
+    std::cerr << "bind \"" << source << "," << target
+              << "\" failed: " << strerror(-ret) << std::endl;
+    return false;
+  }
+  return true;
 }
