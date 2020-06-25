@@ -40,23 +40,6 @@ constexpr size_t kRubyVmMemorySizeInBytes = 12 * 1024 * 1024;
 // }
 constexpr size_t kJavaMinHeapSizeInBytes = 18 * 1024 * 1024;
 
-std::vector<std::string> Split(std::string_view str, std::string_view sep) {
-  std::vector<std::string> result;
-  size_t pos = 0, sep_pos;
-
-  while (true) {
-    sep_pos = str.find(sep, pos);
-    if (sep_pos == std::string::npos)
-      break;
-    result.push_back(std::string(str.substr(pos, sep_pos - pos)));
-    pos = sep_pos + sep.size();
-  }
-
-  result.push_back(std::string(str.substr(pos)));
-
-  return result;
-}
-
 std::string GetCWD() {
   char path[4096];
   if (!getcwd(path, sizeof(path)))
@@ -147,7 +130,7 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
     ("comm", "the reported name of the program",
      cxxopts::value<std::string>(), "name")
     ("b,bind", "binds a directory",
-     cxxopts::value<std::vector<std::string>>(), "src,dest[,1]")
+     cxxopts::value<std::vector<std::string>>(), "src:dest[:1]")
     ("d,chdir", "changes directory to |path|",
      cxxopts::value<std::string>(), "path")
     ("C,chroot", "sets the root of the chroot",
@@ -206,7 +189,7 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
 
   for (const auto& bind_description :
        options["bind"].as<std::vector<std::string>>()) {
-    auto bind = Split(bind_description, ",");
+    auto bind = StringSplit(bind_description, ByAnyChar(",:"));
 
     if (bind.size() < 2 || bind.size() > 3) {
       std::cerr << "Invalid bind description: " << bind_description << std::endl
