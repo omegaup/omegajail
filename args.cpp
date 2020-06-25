@@ -131,10 +131,14 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
      cxxopts::value<std::string>(), "name")
     ("b,bind", "binds a directory",
      cxxopts::value<std::vector<std::string>>(), "src:dest[:1]")
-    ("d,chdir", "changes directory to |path|",
+    ("d,chdir", "changes directory to |path|. Ignored if --homedir is passed.",
      cxxopts::value<std::string>(), "path")
     ("C,chroot", "sets the root of the chroot",
      cxxopts::value<std::string>(), "path")
+    ("homedir", "specifies |path| to be mounted as /home and chdir'ed to.",
+     cxxopts::value<std::string>(), "path")
+    ("homedir-writable", "specifies that /home will be mounted read-write",
+     cxxopts::value<bool>())
     ("h,help", "prints this message")
     ("v,version", "displays the version and exits")
     ("S,seccomp-script", "the filename of the seccomp script to load",
@@ -187,6 +191,39 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
   if (options.count("comm"))
     comm = options["comm"].as<std::string>() + "\n";
 
+  if (options.count("homedir")) {
+    if (options.count("chdir")) {
+      std::cerr << "Specifying both --homedir and --chdir is not supported"
+                << std::endl;
+      return false;
+    }
+    chdir = "/home";
+    const bool homedir_writable = options.count("homedir-writable") &&
+                                  options["homedir-writable"].as<bool>();
+
+    const std::string home_mount = options["homedir"].as<std::string>();
+    int ret =
+        minijail_bind(j, home_mount.c_str(), chdir.c_str(), homedir_writable);
+    if (ret) {
+      std::cerr << "Bind \"" << home_mount << "," << chdir
+                << (homedir_writable ? ",1" : "")
+                << "\" failed: " << strerror(-ret) << std::endl;
+      return false;
+    }
+  } else if (options.count("chdir")) {
+    chdir = options["chdir"].as<std::string>();
+  }
+
+  if (options.count("chroot")) {
+    int ret = minijail_enter_pivot_root(
+        j, options["chroot"].as<std::string>().c_str());
+    if (ret) {
+      std::cerr << "chroot to \"" << options["chroot"].as<std::string>()
+                << "\" failed: " << strerror(-ret) << std::endl;
+      return false;
+    }
+  }
+
   for (const auto& bind_description :
        options["bind"].as<std::vector<std::string>>()) {
     auto bind = StringSplit(bind_description, ByAnyChar(",:"));
@@ -202,19 +239,6 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
                             bind.size() == 3 && bind[2] == "1");
     if (ret) {
       std::cerr << "Bind \"" << bind_description
-                << "\" failed: " << strerror(-ret) << std::endl;
-      return false;
-    }
-  }
-
-  if (options.count("chdir"))
-    chdir = options["chdir"].as<std::string>();
-
-  if (options.count("chroot")) {
-    int ret = minijail_enter_pivot_root(
-        j, options["chroot"].as<std::string>().c_str());
-    if (ret) {
-      std::cerr << "chroot to \"" << options["chroot"].as<std::string>()
                 << "\" failed: " << strerror(-ret) << std::endl;
       return false;
     }
