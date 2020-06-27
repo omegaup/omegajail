@@ -45,7 +45,8 @@ logging.o: logging.cpp logging.h util.h
 	$(CXX) $(CFLAGS) $(CXXFLAGS) -fno-exceptions $< -c -o $@
 
 args.o: args.cpp args.h logging.h version.h
-	$(CXX) $(CFLAGS) $(CXXFLAGS) -fexceptions -I cxxopts/include $< -c -o $@
+	$(CXX) $(CFLAGS) $(CXXFLAGS) "-DCXXOPTS_VECTOR_DELIMITER='\\0'" \
+		-fexceptions -I cxxopts/include $< -c -o $@
 
 omegajail: main.cpp ${MINIJAIL_CORE_OBJECT_FILES} args.o util.o logging.o version.o
 	$(CXX) $(CFLAGS) $(CXXFLAGS) -fno-exceptions $^ $(LDFLAGS) -o $@
