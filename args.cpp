@@ -52,13 +52,10 @@ std::string MakeAbsolute(std::string_view path, std::string_view cwd) {
   return PathJoin(cwd, path);
 }
 
-}  // namespace
-
-bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
+std::optional<std::pair<cxxopts::Options, cxxopts::ParseResult>>
+ParseArgs(int argc, char* argv[], const std::string_view cwd) throw() {
   cxxopts::Options options(argv[0], "The omegaUp sandbox");
   options.positional_help("-- program [args...]");
-
-  std::string cwd = GetCWD();
 
   // clang-format off
   options.add_options()
@@ -118,15 +115,27 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
 
   try {
     options.parse_positional("program");
-    options.parse(argc, argv);
-  } catch (const cxxopts::option_not_exists_exception& e) {
+    return std::make_pair(options, options.parse(argc, argv));
+  } catch (const std::exception& e) {
     std::cerr << "Invalid option: " << e.what() << std::endl;
     std::cerr << options.help({""}) << std::endl;
-    return false;
   }
+  return std::nullopt;
+}
+
+}  // namespace
+
+bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
+  std::string cwd = GetCWD();
+
+  const auto options_or = ParseArgs(argc, argv, cwd);
+  if (!options_or)
+    return false;
+
+  const auto [parser, options] = std::move(options_or).value();
 
   if (options.count("help")) {
-    std::cerr << options.help({""}) << std::endl;
+    std::cerr << parser.help({""}) << std::endl;
     return false;
   }
   if (options.count("version")) {
@@ -167,26 +176,29 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
     chdir = options["chdir"].as<std::string>();
   }
 
-  for (const auto& bind_description :
-       options["bind"].as<std::vector<std::string>>()) {
-    auto bind = StringSplit(bind_description, ByAnyChar(",:"));
+  if (options.count("bind")) {
+    for (const auto& bind_description :
+         options["bind"].as<std::vector<std::string>>()) {
+      auto bind = StringSplit(bind_description, ByAnyChar(",:"));
 
-    if (bind.size() < 2 || bind.size() > 3) {
-      std::cerr << "Invalid bind description: " << bind_description << std::endl
-                << std::endl;
-      std::cerr << options.help({""}) << std::endl;
-      return false;
-    }
+      if (bind.size() < 2 || bind.size() > 3) {
+        std::cerr << "Invalid bind description: " << bind_description
+                  << std::endl
+                  << std::endl;
+        std::cerr << parser.help({""}) << std::endl;
+        return false;
+      }
 
-    if (disable_sandboxing)
-      continue;
+      if (disable_sandboxing)
+        continue;
 
-    int ret = minijail_bind(j, bind[0].c_str(), bind[1].c_str(),
-                            bind.size() == 3 && bind[2] == "1");
-    if (ret) {
-      std::cerr << "Bind \"" << bind_description
-                << "\" failed: " << strerror(-ret) << std::endl;
-      return false;
+      int ret = minijail_bind(j, bind[0].c_str(), bind[1].c_str(),
+                              bind.size() == 3 && bind[2] == "1");
+      if (ret) {
+        std::cerr << "Bind \"" << bind_description
+                  << "\" failed: " << strerror(-ret) << std::endl;
+        return false;
+      }
     }
   }
 
@@ -260,7 +272,7 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
   }
 
   if (program_args_holder.empty()) {
-    std::cerr << options.help({""}) << std::endl;
+    std::cerr << parser.help({""}) << std::endl;
     return false;
   }
 
