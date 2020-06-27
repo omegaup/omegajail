@@ -18,7 +18,7 @@ DESTDIR ?= /var/lib/omegajail
 ARCH ?= $(shell uname -m)
 CXX ?= g++
 CFLAGS += -Wall -Werror -O2
-CXXFLAGS += -std=c++17
+CXXFLAGS += -std=c++2a
 LDFLAGS += -lcap -fPIE -fstack-protector
 
 TEST_CFLAGS += $(CFLAGS)
