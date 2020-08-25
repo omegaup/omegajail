@@ -453,7 +453,7 @@ bool Args::SetCompileFlags(std::string_view root,
       return false;
     program_args_holder = {
         "/usr/share/dotnet/dotnet",
-        "/usr/share/dotnet/sdk/3.1.301/Roslyn/bincore/csc.dll",
+        "/usr/share/dotnet/sdk/3.1.401/Roslyn/bincore/csc.dll",
         "-noconfig",
         "@/usr/share/dotnet/Release.rsp",
         StringPrintf("-out:%s.dll",
