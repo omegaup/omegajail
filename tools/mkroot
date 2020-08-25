@@ -15,6 +15,7 @@ import tarfile
 import tempfile
 import textwrap
 import urllib.request
+import zipfile
 from typing import Any, Dict, List, Optional, Sequence, Set, Union
 
 import apt
@@ -600,7 +601,7 @@ def _main() -> None:
                 root.copyfromhost(filename)
 
         with RemoteFile(
-                'https://raw.githubusercontent.com/omegaup/libkarel/master/libkarel.py',
+                'https://raw.githubusercontent.com/omegaup/libkarel/v0.0.99/libkarel.py',
                 '9b67427877bb8ba5bbf3bbde9dcf828c81d3f2cd') as remote_file:
             root.install('/usr/lib/python2.7/libkarel.py', remote_file.path)
 
@@ -615,9 +616,24 @@ def _main() -> None:
                 root.copyfromhost(filename)
 
         with RemoteFile(
-                'https://raw.githubusercontent.com/omegaup/libkarel/master/libkarel.py',
-                '9b67427877bb8ba5bbf3bbde9dcf828c81d3f2cd') as remote_file:
-            root.install('/usr/lib/python3.8/libkarel.py', remote_file.path)
+                'https://files.pythonhosted.org/packages/97/20/a73731474363a3998d7b9097632be23ab17c4ad551aea4f1234fd964e524/libkarel-1.0.2-py3-none-any.whl',
+                '1585263c50bf3956350fd617258b48ca05013776') as remote_file:
+            with zipfile.ZipFile(remote_file.path) as z:
+                z.extractall(os.path.join(PYTHON3_ROOT, 'dist-packages'))
+        logging.info('Precompiling libkarel.')
+        subprocess.check_call([
+            '/usr/bin/python3',
+            '-m',
+            'py_compile',
+            os.path.join(PYTHON3_ROOT, 'dist-packages/libkarel/__init__.py'),
+            os.path.join(PYTHON3_ROOT, 'dist-packages/libkarel/libkarel.py'),
+            os.path.join(PYTHON3_ROOT, 'dist-packages/libkarel/kareltest.py'),
+        ])
+        root.copyfromhost(os.path.join(PYTHON3_ROOT, 'dist-packages/libkarel'))
+        root.copyfromhost(
+            os.path.join(PYTHON3_ROOT,
+                         'dist-packages/libkarel-1.0.2.dist-info'))
+        logging.info('Done.')
 
     with Chroot(
             os.path.join(args.target, 'root-ruby'), RUBY_ROOT,
