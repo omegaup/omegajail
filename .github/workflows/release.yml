@@ -20,15 +20,15 @@ jobs:
 
       - name: Bump version and push tag
         id: bump-version
-        uses: anothrNick/github-tag-action@c170e78287f338a4af0dc49e033e50e5a072d82b
+        uses: anothrNick/github-tag-action@9aaabdb5e989894e95288328d8b17a6347217ae3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WITH_V: true
-          DEFAULT_BUMP: none
+          DEFAULT_BUMP: patch
           INITIAL_VERSION: 1.0.0
+          TAG_CONTEXT: repo
 
       - name: Build omegajail-focal-distrib-x86_64.tar.xz
-        if: ${{ steps.bump-version.outputs.part != '' }}
         run: make OMEGAJAIL_RELEASE=${{ steps.bump-version.outputs.tag }} omegajail-focal-distrib-x86_64.tar.xz
 
       - name: Build omegajail-focal-rootfs-x86_64.tar.xz
@@ -41,7 +41,6 @@ jobs:
 
       - name: Create Release
         id: create-release
-        if: ${{ steps.bump-version.outputs.part != '' }}
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -52,7 +51,6 @@ jobs:
           prerelease: false
 
       - name: Upload omegajail-focal-distrib-x86_64.tar.xz Release Asset
-        if: ${{ steps.bump-version.outputs.part != '' }}
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
