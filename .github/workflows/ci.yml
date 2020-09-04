@@ -9,7 +9,7 @@ on:
 jobs:
 
   ci:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
 
     steps:
       - uses: actions/checkout@v2
@@ -18,7 +18,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install dependencies
-        run: sudo apt-get install -y libcap-dev
+        run: sudo apt-get install -y libcap-dev util-linux
 
       - name: Build
         run: make CXX=g++-9 OMEGAJAIL_RELEASE=${{ github.sha }} all util_test
@@ -34,7 +34,7 @@ jobs:
           sudo mkdir -p -m 0775 /sys/fs/cgroup/memory/omegajail
           sudo chown $(whoami) /sys/fs/cgroup/memory/omegajail
           sudo chgrp $(whoami) /sys/fs/cgroup/memory/omegajail
-          ./smoketest/test --root=./rootfs --strace
+          taskset 0x1 ./smoketest/test --root=./rootfs --strace
 
       - name: Upload artifacts
         if: ${{ always() }}
@@ -44,7 +44,7 @@ jobs:
           path: smoketest/run/
 
   smoketest-docker:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
 
     steps:
       - uses: actions/checkout@v2
