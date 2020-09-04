@@ -604,25 +604,30 @@ def _main() -> None:
             if filename.startswith(PYTHON3_ROOT):
                 root.copyfromhost(filename)
 
-        with RemoteFile(
-                'https://files.pythonhosted.org/packages/97/20/a73731474363a3998d7b9097632be23ab17c4ad551aea4f1234fd964e524/libkarel-1.0.2-py3-none-any.whl'
-        ) as remote_file:
-            with zipfile.ZipFile(remote_file.path) as z:
-                z.extractall(os.path.join(PYTHON3_ROOT, 'dist-packages'))
-        logging.info('Precompiling libkarel.')
-        subprocess.check_call([
-            '/usr/bin/python3',
-            '-m',
-            'py_compile',
-            os.path.join(PYTHON3_ROOT, 'dist-packages/libkarel/__init__.py'),
-            os.path.join(PYTHON3_ROOT, 'dist-packages/libkarel/libkarel.py'),
-            os.path.join(PYTHON3_ROOT, 'dist-packages/libkarel/kareltest.py'),
-        ])
-        root.copyfromhost(os.path.join(PYTHON3_ROOT, 'dist-packages/libkarel'))
-        root.copyfromhost(
-            os.path.join(PYTHON3_ROOT,
-                         'dist-packages/libkarel-1.0.2.dist-info'))
-        logging.info('Done.')
+        for url in (
+                'https://files.pythonhosted.org/packages/97/20/a73731474363a3998d7b9097632be23ab17c4ad551aea4f1234fd964e524/libkarel-1.0.2-py3-none-any.whl',
+                'https://files.pythonhosted.org/packages/1d/05/57096ea78c6103bfeb6b2cc6b70827783b7374a4fb33180bdcc6a96ba12c/omegaup-1.0.1-py3-none-any.whl',
+        ):
+            package_name, version, *_ = os.path.basename(url).split('-')
+            with RemoteFile(url) as remote_file:
+                with zipfile.ZipFile(remote_file.path) as z:
+                    z.extractall(os.path.join(PYTHON3_ROOT, 'dist-packages'))
+            logging.info('Precompiling %s.', package_name)
+            package_files: List[str] = []
+            for dirpath, _, files in os.walk(
+                    os.path.join(PYTHON3_ROOT, 'dist-packages', package_name)):
+                package_files.extend(os.path.join(dirpath, f) for f in files)
+            subprocess.check_call([
+                '/usr/bin/python3',
+                '-m',
+                'py_compile',
+            ] + package_files)
+            root.copyfromhost(
+                os.path.join(PYTHON3_ROOT, 'dist-packages', package_name))
+            root.copyfromhost(
+                os.path.join(PYTHON3_ROOT, 'dist-packages',
+                             f'{package_name}-{version}.dist-info'))
+            logging.info('Done.')
 
     with Chroot(
             os.path.join(args.target, 'root-ruby'), RUBY_ROOT,
