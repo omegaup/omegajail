@@ -26,30 +26,20 @@ _CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
 class RemoteFile:
     """Represents a file that can be downloaded from the internet"""
 
-    def __init__(self, url: str, sha1sum: str):
+    def __init__(self, url: str):
+        sha1sum = hashlib.sha1(url.encode('utf-8')).hexdigest()
         self._path = os.path.join(_CURRENT_DIR, '.remote-file-cache', sha1sum)
-        if not os.path.isfile(self._path):
-            logging.warning('File for %s does not exist. Downloading...', url)
-            self._download(url)
+        if os.path.isfile(self._path):
             return
-
-        m = hashlib.sha1()
-        with open(self._path, 'rb') as f:
-            while True:
-                buf = f.read(4096)
-                if not buf:
-                    break
-                m.update(buf)
-
-        if m.hexdigest() != sha1sum:
-            logging.warning(
-                'Hash mismatch for %s. Expected %s got %s. '
-                'Downloading...', url, sha1sum, m.hexdigest())
-            self._download(url)
+        logging.warning('File for %s does not exist. Downloading...', url)
+        self._download(url)
+        return
 
     def _download(self, url: str) -> None:
         os.makedirs(os.path.dirname(self._path), exist_ok=True)
-        urllib.request.urlretrieve(url, self._path)
+        temp_path = f'{self._path}.download'
+        urllib.request.urlretrieve(url, temp_path)
+        os.rename(temp_path, self._path)
 
     @property
     def path(self) -> str:
@@ -328,12 +318,11 @@ class Chroot:
 
     def extract(self,
                 url: str,
-                sha1: str,
                 skip_prefix: str = '',
                 exclude: Sequence[str] = (),
                 include: Optional[Sequence[str]] = None) -> None:
         """Extracts a remote file into the chroot."""
-        remote_file = RemoteFile(url, sha1)
+        remote_file = RemoteFile(url)
         with tarfile.open(remote_file.path) as tar:
             for member in tar.getmembers():
                 path = os.path.normpath(member.name)
@@ -601,8 +590,8 @@ def _main() -> None:
                 root.copyfromhost(filename)
 
         with RemoteFile(
-                'https://raw.githubusercontent.com/omegaup/libkarel/v0.0.99/libkarel.py',
-                '9b67427877bb8ba5bbf3bbde9dcf828c81d3f2cd') as remote_file:
+                'https://raw.githubusercontent.com/omegaup/libkarel/v0.0.99/libkarel.py'
+        ) as remote_file:
             root.install('/usr/lib/python2.7/libkarel.py', remote_file.path)
 
     with Chroot(
@@ -616,8 +605,8 @@ def _main() -> None:
                 root.copyfromhost(filename)
 
         with RemoteFile(
-                'https://files.pythonhosted.org/packages/97/20/a73731474363a3998d7b9097632be23ab17c4ad551aea4f1234fd964e524/libkarel-1.0.2-py3-none-any.whl',
-                '1585263c50bf3956350fd617258b48ca05013776') as remote_file:
+                'https://files.pythonhosted.org/packages/97/20/a73731474363a3998d7b9097632be23ab17c4ad551aea4f1234fd964e524/libkarel-1.0.2-py3-none-any.whl'
+        ) as remote_file:
             with zipfile.ZipFile(remote_file.path) as z:
                 z.extractall(os.path.join(PYTHON3_ROOT, 'dist-packages'))
         logging.info('Precompiling libkarel.')
@@ -683,20 +672,19 @@ def _main() -> None:
                 link=args.link) as root:
         root.extract(
             'https://nodejs.org/dist/v12.17.0/node-v12.17.0-linux-x64.tar.xz',
-            '1b1c3dc8dea5c2bb40464149eeee87f407b1cfec',
             skip_prefix='node-v12.17.0-linux-x64/',
             include=[
                 os.path.join(JS_ROOT, 'LICENSE'),
                 os.path.join(JS_ROOT, 'bin/node')
             ])
         with RemoteFile(
-                'https://github.com/omegaup/karel.js/releases/download/v0.2.1/karel',
-                '6c9e6ffb7b9ec7c4dd107974cb3fab1b531428f0') as remote_file:
+                'https://github.com/omegaup/karel.js/releases/download/v0.2.1/karel'
+        ) as remote_file:
             root.install(
                 os.path.join(JS_ROOT, 'karel.wasm'), remote_file.path, mode=0o755)
         with RemoteFile(
-                'https://github.com/omegaup/karel.js/releases/download/v0.2.1/karel.js',
-                'e5aecd4a305aaaf810df6b5d038d2535fd52d857') as remote_file:
+                'https://github.com/omegaup/karel.js/releases/download/v0.2.1/karel.js'
+        ) as remote_file:
             root.install(os.path.join(JS_ROOT, 'karel.js'), remote_file.path)
 
         random.seed(b'\u03A9\u1F512')  # Ω🔒
