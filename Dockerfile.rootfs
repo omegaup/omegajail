@@ -9,9 +9,9 @@ RUN apt-get update -y && \
     apt-get clean
 
 RUN wget https://packages.microsoft.com/config/ubuntu/20.04/packages-microsoft-prod.deb \
-      -O packages-microsoft-prod.deb
-RUN dpkg -i packages-microsoft-prod.deb
-RUN rm packages-microsoft-prod.deb
+      -O packages-microsoft-prod.deb && \
+    dpkg -i packages-microsoft-prod.deb && \
+    rm packages-microsoft-prod.deb
 
 RUN apt-get update -y && \
     apt-get install --no-install-recommends -y \
@@ -41,6 +41,16 @@ RUN apt-get update -y && \
     apt-get autoremove -y && \
     apt-get clean
 
+RUN mkdir -p /opt/nodejs && \
+    wget https://nodejs.org/dist/v12.18.3/node-v12.18.3-linux-x64.tar.xz \
+        -O - | tar -xJ -C /opt/nodejs --strip-components=1 && \
+    wget https://github.com/omegaup/karel.js/releases/download/v0.2.1/karel \
+        -O /opt/nodejs/karel.wasm && \
+    wget https://github.com/omegaup/karel.js/releases/download/v0.2.1/karel.js \
+        -O /opt/nodejs/karel.js && \
+    chmod +x /opt/nodejs/karel.wasm /opt/nodejs/karel.js && \
+    python3 -c 'import random; random.seed("Ω🔒"); open("/opt/nodejs/urandom", "wb").write(bytes(random.randint(0, 255) for _ in range(4096)))'
+
 RUN mkdir /src
 WORKDIR /src
 
@@ -58,12 +68,11 @@ RUN mv /var/lib/omegajail/root-openjdk/java-14-openjdk-amd64/lib/server/classes.
         /usr/lib/jvm/java-14-openjdk-amd64/lib/server/classes.jsa && \
     mv /var/lib/omegajail/root-openjdk/java.base.so \
         /usr/lib/jvm/java.base.so && \
-    mv /var/lib/omegajail/root-js /opt/nodejs && \
     mv /var/lib/omegajail/root-dotnet/Main.runtimeconfig.json \
         /var/lib/omegajail/root-dotnet/Release.rsp \
         /usr/share/dotnet/ && \
     ln -s /opt/nodejs/bin/node /usr/bin/node && \
-    ln -s /opt/nodejs/node_modules /usr/lib/node_modules && \
+    ln -s /opt/nodejs/lib/node_modules /usr/lib/node_modules && \
     rm -rf /var/lib/omegajail && \
     mkdir -p /var/lib/omegajail/root/dev/ && \
     cp /dev/null /var/lib/omegajail/root/dev/null

@@ -316,32 +316,6 @@ class Chroot:
             f.write(contents)
         os.utime(self.__chroot_path(path), (0, 0))
 
-    def extract(self,
-                url: str,
-                skip_prefix: str = '',
-                exclude: Sequence[str] = (),
-                include: Optional[Sequence[str]] = None) -> None:
-        """Extracts a remote file into the chroot."""
-        remote_file = RemoteFile(url)
-        with tarfile.open(remote_file.path) as tar:
-            for member in tar.getmembers():
-                path = os.path.normpath(member.name)
-                if not path.startswith(skip_prefix):
-                    continue
-                path = self.mountpoint + path[len(skip_prefix):]
-                if any([path.startswith(e) for e in exclude]):
-                    continue
-                if include is not None and path not in include:
-                    continue
-                if member.issym():
-                    self.symlink(path, member.linkname)
-                elif member.isfile():
-                    self.mkdir(os.path.dirname(path))
-                    with open(self.__chroot_path(path), 'wb') as dst:
-                        shutil.copyfileobj(
-                            tar.extractfile(member), dst, member.size)
-                    os.chmod(self.__chroot_path(path), member.mode)
-
     # __enter__ and __exit__ are just provided to support with for clarity of code.
     def __enter__(self) -> 'Chroot':
         return self
@@ -675,27 +649,14 @@ def _main() -> None:
 
     with Chroot(os.path.join(args.target, 'root-js'), JS_ROOT,
                 link=args.link) as root:
-        root.extract(
-            'https://nodejs.org/dist/v12.17.0/node-v12.17.0-linux-x64.tar.xz',
-            skip_prefix='node-v12.17.0-linux-x64/',
-            include=[
-                os.path.join(JS_ROOT, 'LICENSE'),
-                os.path.join(JS_ROOT, 'bin/node')
-            ])
-        with RemoteFile(
-                'https://github.com/omegaup/karel.js/releases/download/v0.2.1/karel'
-        ) as remote_file:
-            root.install(
-                os.path.join(JS_ROOT, 'karel.wasm'), remote_file.path, mode=0o755)
-        with RemoteFile(
-                'https://github.com/omegaup/karel.js/releases/download/v0.2.1/karel.js'
-        ) as remote_file:
-            root.install(os.path.join(JS_ROOT, 'karel.js'), remote_file.path)
-
-        random.seed(b'\u03A9\u1F512')  # Ω🔒
-        root.write(
-            os.path.join(JS_ROOT, 'urandom'),
-            bytes(random.randint(0, 255) for _ in range(4096)))
+        for filename in (
+                '/opt/nodejs/urandom',
+                '/opt/nodejs/karel.js',
+                '/opt/nodejs/bin/node',
+                '/opt/nodejs/karel.wasm',
+                '/opt/nodejs/LICENSE',
+        ):
+            root.copyfromhost(filename, relative_to=JS_ROOT)
 
 
 if __name__ == '__main__':

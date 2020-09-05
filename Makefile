@@ -124,14 +124,14 @@ gtest_main.o : googletest/googletest/src/gtest_main.cc
 	touch $@
 
 rootfs: .omegajail-builder-rootfs-setup.stamp ${BINARIES} tools/omegajail-setup ${POLICIES}
-	sudo rm -rf $@
+	sudo rm -rf $@ ".$@.tmp"
 	mkdir ".$@.tmp"
-	$(MAKE) DESTDIR=".$@.tmp" install || rm -rf ".$@.tmp"
+	$(MAKE) DESTDIR=".$@.tmp" install || (sudo rm -rf ".$@.tmp" ; exit 1)
 	docker run \
 		--rm \
 		--mount "type=bind,source=${PWD}/.$@.tmp,target=/var/lib/omegajail" \
 		omegaup/omegajail-builder-rootfs-setup /src/mkroot --no-link && \
-	mv ".$@.tmp" "$@" || rm -rf ".$@.tmp"
+	mv ".$@.tmp" "$@" || (sudo rm -rf ".$@.tmp" ; exit 1)
 
 .omegajail-builder-rootfs-build.stamp: ${MKROOT_SOURCE_FILES}
 	docker build \
