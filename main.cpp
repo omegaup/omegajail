@@ -706,13 +706,24 @@ int main(int argc, char* argv[]) {
     }
   } else {
     LOG(WARN) << "Running with --disable-sandboxing";
+    if (args.stdin_redirect.empty() &&
+        minijail_preserve_fd(j.get(), STDIN_FILENO, STDIN_FILENO)) {
+      PLOG(ERROR) << "Failed to preserve stdin";
+      return 1;
+    }
     if (!args.stdout_redirect.empty()) {
       ScopedFD fd(open(args.stdout_redirect.data(),
                        O_WRONLY | O_CREAT | O_NOFOLLOW | O_TRUNC, 0644));
+    } else if (minijail_preserve_fd(j.get(), STDOUT_FILENO, STDOUT_FILENO)) {
+      PLOG(ERROR) << "Failed to preserve stdout";
+      return 1;
     }
     if (!args.stderr_redirect.empty()) {
       ScopedFD fd(open(args.stderr_redirect.data(),
                        O_WRONLY | O_CREAT | O_NOFOLLOW | O_TRUNC, 0644));
+    } else if (minijail_preserve_fd(j.get(), STDERR_FILENO, STDERR_FILENO)) {
+      PLOG(ERROR) << "Failed to preserve stderr";
+      return 1;
     }
   }
 
