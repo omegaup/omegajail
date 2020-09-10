@@ -35,6 +35,7 @@ RUN apt-get update -y && \
       openjdk-14-jre-headless \
       python2.7 \
       python3-apt \
+      python3-pip \
       python3.8 \
       ruby2.7 \
       xz-utils && \
@@ -49,7 +50,11 @@ RUN mkdir -p /opt/nodejs && \
     wget https://github.com/omegaup/karel.js/releases/download/v0.2.1/karel.js \
         -O /opt/nodejs/karel.js && \
     chmod +x /opt/nodejs/karel.wasm /opt/nodejs/karel.js && \
-    python3 -c 'import random; random.seed("Ω🔒"); open("/opt/nodejs/urandom", "wb").write(bytes(random.randint(0, 255) for _ in range(4096)))'
+    python3 -c 'import random; random.seed("Ω🔒"); open("/opt/nodejs/urandom", "wb").write(bytes(random.randint(0, 255) for _ in range(4096)))' && \
+    wget https://raw.githubusercontent.com/omegaup/libkarel/v0.0.99/libkarel.py \
+        -O /usr/lib/python2.7/libkarel.py && \
+    python3 -m pip install --target=/usr/lib/python3.8/dist-packages \
+        libkarel==1.0.2 omegaup==1.1.1
 
 RUN mkdir /src
 WORKDIR /src
