@@ -119,7 +119,7 @@ gtest_main.o : googletest/googletest/src/gtest_main.cc
 	docker build \
 		-t omegaup/omegajail-builder-rootfs-setup \
 		--file Dockerfile.rootfs \
-		--target setup \
+		--target rootfs-setup \
 		.
 	touch $@
 
@@ -137,7 +137,7 @@ rootfs: .omegajail-builder-rootfs-setup.stamp ${BINARIES} tools/omegajail-setup 
 	docker build \
 		-t omegaup/omegajail-builder-rootfs-build \
 		--file Dockerfile.rootfs \
-		--target build \
+		--target rootfs-build \
 		.
 	touch $@
 
