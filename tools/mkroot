@@ -23,36 +23,6 @@ import apt
 _CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
-class RemoteFile:
-    """Represents a file that can be downloaded from the internet"""
-
-    def __init__(self, url: str):
-        sha1sum = hashlib.sha1(url.encode('utf-8')).hexdigest()
-        self._path = os.path.join(_CURRENT_DIR, '.remote-file-cache', sha1sum)
-        if os.path.isfile(self._path):
-            return
-        logging.warning('File for %s does not exist. Downloading...', url)
-        self._download(url)
-        return
-
-    def _download(self, url: str) -> None:
-        os.makedirs(os.path.dirname(self._path), exist_ok=True)
-        temp_path = f'{self._path}.download'
-        urllib.request.urlretrieve(url, temp_path)
-        os.rename(temp_path, self._path)
-
-    @property
-    def path(self) -> str:
-        """Returns the local path of the remote file."""
-        return self._path
-
-    def __enter__(self) -> 'RemoteFile':
-        return self
-
-    def __exit__(self, *_: Any) -> None:
-        pass
-
-
 class FileResolver:
     """Class that enumerates all files installed by a certain Debian package.
 
@@ -563,10 +533,7 @@ def _main() -> None:
             if filename.startswith(PYTHON2_ROOT):
                 root.copyfromhost(filename)
 
-        with RemoteFile(
-                'https://raw.githubusercontent.com/omegaup/libkarel/v0.0.99/libkarel.py'
-        ) as remote_file:
-            root.install('/usr/lib/python2.7/libkarel.py', remote_file.path)
+        root.copyfromhost(os.path.join(PYTHON2_ROOT, 'libkarel.py'))
 
     with Chroot(
             os.path.join(args.target, 'root-python3'),
@@ -578,30 +545,16 @@ def _main() -> None:
             if filename.startswith(PYTHON3_ROOT):
                 root.copyfromhost(filename)
 
-        for url in (
-                'https://files.pythonhosted.org/packages/97/20/a73731474363a3998d7b9097632be23ab17c4ad551aea4f1234fd964e524/libkarel-1.0.2-py3-none-any.whl',
-                'https://files.pythonhosted.org/packages/1d/05/57096ea78c6103bfeb6b2cc6b70827783b7374a4fb33180bdcc6a96ba12c/omegaup-1.0.1-py3-none-any.whl',
-        ):
-            package_name, version, *_ = os.path.basename(url).split('-')
-            with RemoteFile(url) as remote_file:
-                with zipfile.ZipFile(remote_file.path) as z:
-                    z.extractall(os.path.join(PYTHON3_ROOT, 'dist-packages'))
-            logging.info('Precompiling %s.', package_name)
-            package_files: List[str] = []
-            for dirpath, _, files in os.walk(
-                    os.path.join(PYTHON3_ROOT, 'dist-packages', package_name)):
-                package_files.extend(os.path.join(dirpath, f) for f in files)
-            subprocess.check_call([
-                '/usr/bin/python3',
-                '-m',
-                'py_compile',
-            ] + package_files)
-            root.copyfromhost(
-                os.path.join(PYTHON3_ROOT, 'dist-packages', package_name))
-            root.copyfromhost(
-                os.path.join(PYTHON3_ROOT, 'dist-packages',
-                             f'{package_name}-{version}.dist-info'))
-            logging.info('Done.')
+        package_names = {'libkarel', 'omegaup'}
+        dist_packages = os.path.join(PYTHON3_ROOT, 'dist-packages')
+        for dirname in os.listdir(dist_packages):
+            # There are two directories for each package: '${package_name}' and
+            # '${package_name}-${version}.dist-info'.
+            # Copy them both.
+            if dirname.split('-')[0] not in package_names:
+                continue
+            root.copyfromhost(os.path.join(dist_packages, dirname),
+                              recurse=True)
 
     with Chroot(
             os.path.join(args.target, 'root-ruby'), RUBY_ROOT,
