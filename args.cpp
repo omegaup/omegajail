@@ -54,7 +54,7 @@ std::string MakeAbsolute(std::string_view path, std::string_view cwd) {
 
 std::optional<std::pair<cxxopts::Options, cxxopts::ParseResult>>
 ParseArgs(int argc, char* argv[], const std::string_view cwd) throw() {
-  cxxopts::Options options(argv[0], "The omegaUp sandbox");
+  cxxopts::Options options(argv[0], StringPrintf("The omegaUp sandbox %s", kVersion));
   options.positional_help("-- program [args...]");
 
   // clang-format off
