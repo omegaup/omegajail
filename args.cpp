@@ -104,8 +104,6 @@ ParseArgs(int argc, char* argv[], const std::string_view cwd) throw() {
      cxxopts::value<int64_t>()->default_value("-1"), "bytes")
     ("cgroup-memory-limit", "sets the memory limit with cgroups",
      cxxopts::value<ssize_t>(), "bytes")
-    ("sigsys-detector", "one of 'sigsys_tracer' (default), 'ptrace', 'none'.",
-     cxxopts::value<std::string>())
     ("disable-sandboxing",
      "completely disable containerization. This is very insecure and should "
      "only be used when omegajail is already being run in a container",
@@ -210,20 +208,6 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
     stderr_redirect = MakeAbsolute(options["stderr"].as<std::string>(), cwd);
   if (options.count("meta"))
     meta = options["meta"].as<std::string>();
-  if (options.count("sigsys-detector")) {
-    std::string detector = options["sigsys-detector"].as<std::string>();
-    if (detector == "sigsys_tracer") {
-      sigsys_detector = SigsysDetector::SIGSYS_TRACER;
-    } else if (detector == "ptrace") {
-      sigsys_detector = SigsysDetector::PTRACE;
-    } else if (detector == "none") {
-      sigsys_detector = SigsysDetector::NONE;
-    } else {
-      std::cerr << "invalid value for --sigsys-detector: \"" << detector
-                << "\"";
-      return false;
-    }
-  }
 
   if (options.count("time-limit")) {
     uint64_t raw_limit_msec = options["time-limit"].as<uint64_t>();
@@ -630,7 +614,8 @@ std::string Args::UseSeccompProgram(const std::string_view seccomp_program_path,
 
   if (!disable_sandboxing) {
     minijail_use_seccomp_filter(j);
-    minijail_set_seccomp_filter_tsync(j);
+    // TODO: Use TSYNC once all kernels are 5.8.
+    minijail_set_seccomp_filter_install_user_notification(j);
     minijail_set_seccomp_filters(j, &seccomp_program);
   }
   return std::string(seccomp_program_path.substr(

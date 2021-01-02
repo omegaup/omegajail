@@ -10,7 +10,6 @@
 **/*.stamp
 java-compile
 omegajail
-sigsys-tracer
 stdio-mux
 .git/**
 .mypy_cache/**

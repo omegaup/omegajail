@@ -33,7 +33,7 @@ namespace {
 
 constexpr int kLoggingFd = 3;
 constexpr int kMetaFd = 4;
-constexpr int kSigsysTracerFd = 5;
+constexpr int kSigsysNotificationFd = 5;
 
 const std::map<int, std::string_view> kSignalMap = {
 #define ENTRY(x) \
@@ -52,7 +52,6 @@ const std::map<int, std::string_view> kSignalMap = {
 struct InitPayload {
   bool disable_sandboxing = false;
   ScopedMinijail jail;
-  SigsysDetector sigsys_detector = SigsysDetector::SIGSYS_TRACER;
   std::string comm;
   std::string cgroup_path;
   ssize_t memory_limit_in_bytes;
@@ -60,6 +59,13 @@ struct InitPayload {
   std::vector<ResourceLimit> rlimits;
   struct timespec timeout;
 };
+
+extern "C" int pidfd_open(pid_t pid, unsigned int flags) {
+#if !defined(__NR_pidfd_open)
+  constexpr const int __NR_pidfd_open = 434;
+#endif
+  return syscall(__NR_pidfd_open, pid, flags);
+}
 
 // from minijail/util.h
 extern "C" const char* lookup_syscall_name(int nr);
@@ -344,10 +350,13 @@ int MetaInit(void* raw_payload) {
   deadline = t0;
   TimespecAdd(&deadline, &payload->timeout);
 
-  int child_pid = fork();
+  pid_t child_pid = fork();
   if (child_pid < 0) {
     _exit(child_pid);
-  } else if (child_pid == 0) {
+    return -errno;
+  }
+
+  if (child_pid == 0) {
     if (payload->disable_sandboxing && setsid() == -1) {
       {
         ScopedErrnoPreserver preserve_errno;
@@ -379,29 +388,12 @@ int MetaInit(void* raw_payload) {
       }
       return -errno;
     }
-    if (payload->sigsys_detector == SigsysDetector::PTRACE) {
-      if (ptrace(PTRACE_TRACEME, 0, nullptr, nullptr) < 0) {
-        {
-          ScopedErrnoPreserver preserve_errno;
-          PLOG(ERROR) << "Failed to PTRACE_TRACEME";
-        }
-        return -errno;
+    if (close(kSigsysNotificationFd) < 0) {
+      {
+        ScopedErrnoPreserver preserve_errno;
+        PLOG(ERROR) << "Failed to close the sigsys_tracer FD";
       }
-      if (raise(SIGSTOP) < 0) {
-        {
-          ScopedErrnoPreserver preserve_errno;
-          PLOG(ERROR) << "Failed to raise(SIGSTOP)";
-        }
-        return -errno;
-      }
-    } else if (payload->sigsys_detector == SigsysDetector::SIGSYS_TRACER) {
-      if (close(kSigsysTracerFd) < 0) {
-        {
-          ScopedErrnoPreserver preserve_errno;
-          PLOG(ERROR) << "Failed to close the sigsys_tracer FD";
-        }
-        return -errno;
-      }
+      return -errno;
     }
     if (close(kMetaFd) < 0) {
       {
@@ -417,6 +409,17 @@ int MetaInit(void* raw_payload) {
   // keep going.
 
   prctl(PR_SET_NAME, "minijail-init");
+
+  // Send the pidfd of the child process to the sigsys detector.
+  ScopedFD sigsys_socket_fd(kSigsysNotificationFd);
+  ScopedFD child_pid_fd(pidfd_open(child_pid, 0));
+  if (!child_pid_fd) {
+    PLOG(ERROR) << "Failed to open pidfd";
+  } else if (!SendFD(sigsys_socket_fd.get(), std::move(child_pid_fd))) {
+    PLOG(ERROR) << "Failed to write the child pid";
+    sigsys_socket_fd.reset();
+  }
+  shutdown(sigsys_socket_fd.get(), SHUT_WR);
 
   // Jail this process, too.
   minijail_enter(payload->jail.get());
@@ -507,9 +510,12 @@ int MetaInit(void* raw_payload) {
   clock_gettime(CLOCK_REALTIME, &t1);
   TimespecSub(&t1, &t0);
 
-  if (payload->sigsys_detector == SigsysDetector::SIGSYS_TRACER) {
-    SigsysTracerClient sigsys_tracer{ScopedFD(kSigsysTracerFd)};
-    sigsys_tracer.Read(&init_exitsyscall);
+  if (sigsys_socket_fd) {
+    if (HANDLE_EINTR(read(sigsys_socket_fd.get(), &init_exitsyscall,
+                          sizeof(init_exitsyscall))) < 0) {
+      PLOG(ERROR) << "Failed to read the exit syscall";
+    }
+    sigsys_socket_fd.reset();
   }
 
   if (memory_cgroup) {
@@ -768,9 +774,10 @@ int main(int argc, char* argv[]) {
   payload.rlimits = args.rlimits;
   payload.comm = args.comm;
   payload.cgroup_path = cgroup_path;
-  payload.sigsys_detector = args.sigsys_detector;
   payload.timeout.tv_sec = args.wall_time_limit_msec / 1000;
   payload.timeout.tv_nsec = (args.wall_time_limit_msec % 1000) * 1000000ul;
+
+  ScopedFD sigsys_socket_fd;
 
   if (!args.meta.empty()) {
     ScopedFD meta_fd(open(args.meta.c_str(),
@@ -784,19 +791,17 @@ int main(int argc, char* argv[]) {
       return 1;
     }
 
-    SigsysTracerClient sigsys_tracer;
-    if (args.sigsys_detector == SigsysDetector::SIGSYS_TRACER) {
-      if (sigsys_tracer.Initialize()) {
-        if (!MoveToWellKnownFd(j.get(), sigsys_tracer.TakeFD(),
-                               kSigsysTracerFd)) {
-          PLOG(ERROR) << "Failed to dup meta fd";
-          return 1;
-        }
-      } else {
-        // Fallback to using ptrace.
-        payload.sigsys_detector = SigsysDetector::PTRACE;
-      }
+    int sigsys_socket_fds[2];
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, sigsys_socket_fds)) {
+      PLOG(ERROR) << "Failed to open the sigsys pipe";
+      return 1;
     }
+    if (!MoveToWellKnownFd(j.get(), ScopedFD(sigsys_socket_fds[0]),
+                           kSigsysNotificationFd)) {
+      PLOG(ERROR) << "Failed to dup sigys notification fd";
+      return 1;
+    }
+    sigsys_socket_fd.reset(sigsys_socket_fds[1]);
 
     // Setup init's jail
     payload.jail.reset(minijail_new());
@@ -807,10 +812,7 @@ int main(int argc, char* argv[]) {
     if (!args.disable_sandboxing) {
       minijail_no_new_privs(payload.jail.get());
       minijail_set_ambient_caps(payload.jail.get());
-      minijail_use_caps(payload.jail.get(),
-                        (payload.sigsys_detector == SigsysDetector::PTRACE)
-                            ? (1 << CAP_SYS_PTRACE)
-                            : 0);
+      minijail_use_caps(payload.jail.get(), 0);
     }
 
     // Run MetaInit() as the container's init.
@@ -852,6 +854,18 @@ int main(int argc, char* argv[]) {
   if (ret < 0) {
     LOG(ERROR) << "Failed to run minijail: " << strerror(-ret);
     return 1;
+  }
+
+  if (sigsys_socket_fd) {
+    ScopedFD user_notification_fd(
+        minijail_seccomp_filter_user_notification_fd(j.get()));
+    if (!user_notification_fd) {
+      LOG(ERROR) << "User notification FD missing";
+    } else {
+      SigsysPipeThread sigsys_pipe_thread(std::move(sigsys_socket_fd),
+                                          std::move(user_notification_fd));
+      sigsys_pipe_thread.join();
+    }
   }
 
   return minijail_wait(j.get());

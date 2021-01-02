@@ -1,7 +1,7 @@
 [submodule "minijail"]
 	path = minijail
 	url = https://android.googlesource.com/platform/external/minijail
-	branch = master
+	branch = refs/changes/98/1538098/3
 [submodule "cxxopts"]
 	path = cxxopts
 	url = https://github.com/jarro2783/cxxopts.git

@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 #include "macros.h"
@@ -110,19 +111,16 @@ class ScopedUnlink {
   DISALLOW_COPY_AND_ASSIGN(ScopedUnlink);
 };
 
-class SigsysTracerClient {
+class SigsysPipeThread {
  public:
-  explicit SigsysTracerClient(ScopedFD fd = ScopedFD());
-  ~SigsysTracerClient();
+  SigsysPipeThread(ScopedFD sigsys_socket_fd, ScopedFD user_notification_fd);
+  ~SigsysPipeThread();
 
-  operator bool() const { return fd_; }
-  bool Initialize();
-  bool Read(int* syscall);
-  ScopedFD TakeFD();
+  void join() { thread_.join(); }
 
  private:
-  ScopedFD fd_;
-  DISALLOW_COPY_AND_ASSIGN(SigsysTracerClient);
+  std::thread thread_;
+  DISALLOW_COPY_AND_ASSIGN(SigsysPipeThread);
 };
 
 class ScopedErrnoPreserver {
@@ -195,6 +193,9 @@ bool WriteFile(std::string_view path,
                std::string_view contents,
                bool append = false,
                mode_t mode = 0664);
+
+bool SendFD(int sockfd, ScopedFD fd);
+ScopedFD ReceiveFD(int sockfd);
 
 template <typename T>
 inline void ignore_result(T /* unused result */) {}
