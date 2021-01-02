@@ -4,7 +4,6 @@
 *.stamp
 java-compile
 omegajail
-sigsys-tracer
 stdio-mux
 .mypy_cache/
 

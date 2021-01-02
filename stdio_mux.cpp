@@ -1,7 +1,6 @@
 #include <getopt.h>
 #include <linux/net_tstamp.h>
 #include <signal.h>
-#include <sys/epoll.h>
 #include <sys/fcntl.h>
 #include <sys/signalfd.h>
 #include <sys/socket.h>
@@ -32,51 +31,12 @@ const struct option kLongOptions[] = {
 
 uint32_t stream_counter = 0;
 
-struct EpollData {
-  uint32_t stream_id;
-  ScopedFD fd;
-  std::string comm;
-  bool has_limit;
-  size_t limit;
-  size_t written;
-  ScopedFD redirect_fd;
-};
-
 struct Mapping {
   std::string comm;
   size_t limit;
   std::string path;
   size_t open_fds;
 };
-
-bool AddToEpoll(int epoll_fd, int fd) {
-  struct epoll_event ev = {};
-  ev.events = EPOLLIN;
-  ev.data.fd = fd;
-  return epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &ev) == 0;
-}
-
-bool AddToEpoll(int epoll_fd, EpollData* client_data) {
-  struct epoll_event ev = {};
-  ev.events = EPOLLIN;
-  ev.data.ptr = client_data;
-  return epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_data->fd.get(), &ev) == 0;
-}
-
-bool RemoveFromEpoll(int epoll_fd,
-                     EpollData* client_data,
-                     std::vector<std::unique_ptr<EpollData>>* clients) {
-  if (epoll_ctl(epoll_fd, EPOLL_CTL_DEL, client_data->fd.get(), nullptr))
-    return false;
-
-  for (size_t i = 0; i < clients->size(); i++) {
-    if (clients->at(i).get() == client_data) {
-      clients->erase(clients->cbegin() + i);
-      break;
-    }
-  }
-  return true;
-}
 
 std::string GetProcessName(pid_t pid) {
   std::string path = StringPrintf("/proc/%d/comm", pid);
