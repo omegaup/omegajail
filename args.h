@@ -11,12 +11,6 @@
 
 struct minijail;
 
-enum class SigsysDetector {
-  SIGSYS_TRACER,
-  PTRACE,
-  NONE,
-};
-
 struct ResourceLimit {
   __rlimit_resource resource;
   struct rlimit rlim;
@@ -37,7 +31,6 @@ struct Args {
   ssize_t memory_limit_in_bytes = -1;
   size_t vm_memory_size_in_bytes = 0;
   uint64_t wall_time_limit_msec = kMaxWallTimeLimitMsec;
-  SigsysDetector sigsys_detector = SigsysDetector::PTRACE;
   bool disable_sandboxing = false;
   std::vector<ResourceLimit> rlimits{
       ResourceLimit{RLIMIT_STACK, {RLIM_INFINITY, RLIM_INFINITY}}};

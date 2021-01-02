@@ -4,6 +4,7 @@
 #include <pwd.h>
 #include <sched.h>
 #include <stdlib.h>
+#include <sys/epoll.h>
 #include <sys/mount.h>
 #include <sys/prctl.h>
 #include <sys/ptrace.h>
@@ -21,6 +22,7 @@
 #include <fstream>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string_view>
 #include <utility>
 
@@ -33,7 +35,7 @@ namespace {
 
 constexpr int kLoggingFd = 3;
 constexpr int kMetaFd = 4;
-constexpr int kSigsysTracerFd = 5;
+constexpr int kSigsysNotificationFd = 5;
 
 const std::map<int, std::string_view> kSignalMap = {
 #define ENTRY(x) \
@@ -52,7 +54,6 @@ const std::map<int, std::string_view> kSignalMap = {
 struct InitPayload {
   bool disable_sandboxing = false;
   ScopedMinijail jail;
-  SigsysDetector sigsys_detector = SigsysDetector::SIGSYS_TRACER;
   std::string comm;
   std::string cgroup_path;
   ssize_t memory_limit_in_bytes;
@@ -60,6 +61,13 @@ struct InitPayload {
   std::vector<ResourceLimit> rlimits;
   struct timespec timeout;
 };
+
+extern "C" int pidfd_open(pid_t pid, unsigned int flags) {
+#if !defined(__NR_pidfd_open)
+  constexpr const int __NR_pidfd_open = 434;
+#endif
+  return syscall(__NR_pidfd_open, pid, flags);
+}
 
 // from minijail/util.h
 extern "C" const char* lookup_syscall_name(int nr);
@@ -277,6 +285,55 @@ int TimespecCmp(struct timespec* dst, const struct timespec* src) {
   return 0;
 }
 
+// Receives the exit syscall from the Socket FD.
+std::optional<int> ReceiveExitSyscall(ScopedFD sigsys_socket_fd) {
+  ScopedFD epoll_fd(epoll_create1(EPOLL_CLOEXEC));
+  if (!epoll_fd) {
+    PLOG(ERROR) << "Failed to create epoll fd";
+    return std::nullopt;
+  }
+  if (!AddToEpoll(epoll_fd.get(), sigsys_socket_fd.get())) {
+    PLOG(ERROR) << "Failed to add the sigsys socket into epoll";
+    return std::nullopt;
+  }
+  struct epoll_event events[128];
+  // TODO: This is handling a small deadlock that's caused by the fact that
+  // minijail and this process are both waiting for different things, _and_ if
+  // the sandboxed process is killed very early during its lifetime, some
+  // leaked FDs will cause those waits to hang forever.
+  int nfds = HANDLE_EINTR(
+      epoll_wait(epoll_fd.get(), events, array_length(events), 1000));
+  if (nfds == -1) {
+    PLOG(ERROR) << "Failed to read the exit syscall";
+    return std::nullopt;
+  }
+  if (nfds == 0) {
+    LOG(ERROR) << "No file descriptor ready";
+    return std::nullopt;
+  }
+  if (events[0].data.fd != sigsys_socket_fd.get()) {
+    LOG(ERROR) << "Unexpected file descriptor was ready";
+    return std::nullopt;
+  }
+
+  int exitsyscall = 0;
+  int read_len = HANDLE_EINTR(recv(sigsys_socket_fd.get(), &exitsyscall,
+                                   sizeof(exitsyscall), MSG_DONTWAIT));
+  if (read_len < 0) {
+    PLOG(ERROR) << "Failed to read the exit syscall";
+    return std::nullopt;
+  }
+  if (read_len == 0) {
+    // Nothing to read.
+    return std::nullopt;
+  }
+  if (read_len != sizeof(exitsyscall)) {
+    LOG(ERROR) << "Short read";
+    return std::nullopt;
+  }
+  return exitsyscall;
+}
+
 int MetaInit(void* raw_payload) {
   InitPayload* payload = reinterpret_cast<InitPayload*>(raw_payload);
 
@@ -344,10 +401,13 @@ int MetaInit(void* raw_payload) {
   deadline = t0;
   TimespecAdd(&deadline, &payload->timeout);
 
-  int child_pid = fork();
+  pid_t child_pid = fork();
   if (child_pid < 0) {
     _exit(child_pid);
-  } else if (child_pid == 0) {
+    return -errno;
+  }
+
+  if (child_pid == 0) {
     if (payload->disable_sandboxing && setsid() == -1) {
       {
         ScopedErrnoPreserver preserve_errno;
@@ -379,29 +439,12 @@ int MetaInit(void* raw_payload) {
       }
       return -errno;
     }
-    if (payload->sigsys_detector == SigsysDetector::PTRACE) {
-      if (ptrace(PTRACE_TRACEME, 0, nullptr, nullptr) < 0) {
-        {
-          ScopedErrnoPreserver preserve_errno;
-          PLOG(ERROR) << "Failed to PTRACE_TRACEME";
-        }
-        return -errno;
+    if (close(kSigsysNotificationFd) < 0) {
+      {
+        ScopedErrnoPreserver preserve_errno;
+        PLOG(ERROR) << "Failed to close the sigsys_tracer FD";
       }
-      if (raise(SIGSTOP) < 0) {
-        {
-          ScopedErrnoPreserver preserve_errno;
-          PLOG(ERROR) << "Failed to raise(SIGSTOP)";
-        }
-        return -errno;
-      }
-    } else if (payload->sigsys_detector == SigsysDetector::SIGSYS_TRACER) {
-      if (close(kSigsysTracerFd) < 0) {
-        {
-          ScopedErrnoPreserver preserve_errno;
-          PLOG(ERROR) << "Failed to close the sigsys_tracer FD";
-        }
-        return -errno;
-      }
+      return -errno;
     }
     if (close(kMetaFd) < 0) {
       {
@@ -417,6 +460,17 @@ int MetaInit(void* raw_payload) {
   // keep going.
 
   prctl(PR_SET_NAME, "minijail-init");
+
+  // Send the pidfd of the child process to the sigsys detector.
+  ScopedFD sigsys_socket_fd(kSigsysNotificationFd);
+  ScopedFD child_pid_fd(pidfd_open(child_pid, 0));
+  if (!child_pid_fd) {
+    PLOG(ERROR) << "Failed to open pidfd";
+  } else if (!SendFD(sigsys_socket_fd.get(), std::move(child_pid_fd))) {
+    PLOG(ERROR) << "Failed to write the child pid";
+    sigsys_socket_fd.reset();
+  }
+  shutdown(sigsys_socket_fd.get(), SHUT_WR);
 
   // Jail this process, too.
   minijail_enter(payload->jail.get());
@@ -507,9 +561,12 @@ int MetaInit(void* raw_payload) {
   clock_gettime(CLOCK_REALTIME, &t1);
   TimespecSub(&t1, &t0);
 
-  if (payload->sigsys_detector == SigsysDetector::SIGSYS_TRACER) {
-    SigsysTracerClient sigsys_tracer{ScopedFD(kSigsysTracerFd)};
-    sigsys_tracer.Read(&init_exitsyscall);
+  if (sigsys_socket_fd) {
+    const std::optional<int> exitsyscall =
+        ReceiveExitSyscall(std::move(sigsys_socket_fd));
+    if (exitsyscall.has_value()) {
+      init_exitsyscall = exitsyscall.value();
+    }
   }
 
   if (memory_cgroup) {
@@ -761,16 +818,22 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  InitPayload payload;
-  payload.disable_sandboxing = args.disable_sandboxing;
-  payload.memory_limit_in_bytes = args.memory_limit_in_bytes;
-  payload.vm_memory_size_in_bytes = args.vm_memory_size_in_bytes;
-  payload.rlimits = args.rlimits;
-  payload.comm = args.comm;
-  payload.cgroup_path = cgroup_path;
-  payload.sigsys_detector = args.sigsys_detector;
-  payload.timeout.tv_sec = args.wall_time_limit_msec / 1000;
-  payload.timeout.tv_nsec = (args.wall_time_limit_msec % 1000) * 1000000ul;
+  InitPayload payload{
+      .disable_sandboxing = args.disable_sandboxing,
+      .comm = args.comm,
+      .cgroup_path = cgroup_path,
+      .memory_limit_in_bytes = args.memory_limit_in_bytes,
+      .vm_memory_size_in_bytes = args.vm_memory_size_in_bytes,
+      .rlimits = args.rlimits,
+      .timeout =
+          {
+              .tv_sec = static_cast<time_t>(args.wall_time_limit_msec / 1000),
+              .tv_nsec = static_cast<long>((args.wall_time_limit_msec % 1000) *
+                                           1000000l),
+          },
+  };
+
+  ScopedFD sigsys_socket_fd;
 
   if (!args.meta.empty()) {
     ScopedFD meta_fd(open(args.meta.c_str(),
@@ -784,19 +847,17 @@ int main(int argc, char* argv[]) {
       return 1;
     }
 
-    SigsysTracerClient sigsys_tracer;
-    if (args.sigsys_detector == SigsysDetector::SIGSYS_TRACER) {
-      if (sigsys_tracer.Initialize()) {
-        if (!MoveToWellKnownFd(j.get(), sigsys_tracer.TakeFD(),
-                               kSigsysTracerFd)) {
-          PLOG(ERROR) << "Failed to dup meta fd";
-          return 1;
-        }
-      } else {
-        // Fallback to using ptrace.
-        payload.sigsys_detector = SigsysDetector::PTRACE;
-      }
+    int sigsys_socket_fds[2];
+    if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, sigsys_socket_fds)) {
+      PLOG(ERROR) << "Failed to open the sigsys pipe";
+      return 1;
     }
+    if (!MoveToWellKnownFd(j.get(), ScopedFD(sigsys_socket_fds[0]),
+                           kSigsysNotificationFd)) {
+      PLOG(ERROR) << "Failed to dup sigys notification fd";
+      return 1;
+    }
+    sigsys_socket_fd.reset(sigsys_socket_fds[1]);
 
     // Setup init's jail
     payload.jail.reset(minijail_new());
@@ -807,10 +868,7 @@ int main(int argc, char* argv[]) {
     if (!args.disable_sandboxing) {
       minijail_no_new_privs(payload.jail.get());
       minijail_set_ambient_caps(payload.jail.get());
-      minijail_use_caps(payload.jail.get(),
-                        (payload.sigsys_detector == SigsysDetector::PTRACE)
-                            ? (1 << CAP_SYS_PTRACE)
-                            : 0);
+      minijail_use_caps(payload.jail.get(), 0);
     }
 
     // Run MetaInit() as the container's init.
@@ -852,6 +910,18 @@ int main(int argc, char* argv[]) {
   if (ret < 0) {
     LOG(ERROR) << "Failed to run minijail: " << strerror(-ret);
     return 1;
+  }
+
+  if (sigsys_socket_fd) {
+    ScopedFD user_notification_fd(
+        minijail_seccomp_filter_user_notification_fd(j.get()));
+    if (!user_notification_fd) {
+      LOG(ERROR) << "User notification FD missing";
+    } else {
+      SigsysPipeThread sigsys_pipe_thread(std::move(sigsys_socket_fd),
+                                          std::move(user_notification_fd));
+      sigsys_pipe_thread.join();
+    }
   }
 
   return minijail_wait(j.get());
