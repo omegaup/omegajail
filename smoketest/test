@@ -79,7 +79,7 @@ def _omegajail_compile(root: str, lang: str, strace: bool) -> bool:
         args = [
             'strace', '-f', '-o',
             os.path.join(lang_dir, 'strace-compiler.txt'), '-s', '512',
-            os.path.join(root, 'bin/omegajail'), '--sigsys-detector=none'
+            os.path.join(root, 'bin/omegajail'),
         ]
     else:
         args = [os.path.join(root, 'bin/omegajail')]
@@ -120,7 +120,7 @@ def _omegajail_run(root: str, lang: str, strace: bool, input_file: str,
         args = [
             'strace', '-f', '-o',
             os.path.join(lang_dir, 'strace-main.txt'), '-s', '512',
-            os.path.join(root, 'bin/omegajail'), '--sigsys-detector=none'
+            os.path.join(root, 'bin/omegajail'),
         ]
     else:
         args = [os.path.join(root, 'bin/omegajail')]

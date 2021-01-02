@@ -1,1 +1,2 @@
 execve: allow
+sendmsg: allow

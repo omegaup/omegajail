@@ -1,4 +1,4 @@
-BINARIES := omegajail sigsys-tracer stdio-mux java-compile
+BINARIES := omegajail stdio-mux java-compile
 POLICIES := policies/gcc.bpf policies/cpp.bpf policies/ghc.bpf policies/hs.bpf \
             policies/javac.bpf policies/java.bpf policies/fpc.bpf policies/pas.bpf \
             policies/pyc.bpf policies/py.bpf policies/ruby.bpf policies/lua.bpf \
@@ -19,11 +19,11 @@ ARCH ?= $(shell uname -m)
 CXX ?= g++
 CFLAGS += -Wall -Werror -O2
 CXXFLAGS += -std=c++2a
-LDFLAGS += -lcap -fPIE -fstack-protector
+LDFLAGS += -lcap -pthread -fPIE -fstack-protector
 
 TEST_CFLAGS += $(CFLAGS)
 TEST_CXXFLAGS += $(CXXFLAGS) -isystem googletest/googletest/include
-TEST_LDFLAGS += $(LDFLAGS) -pthread
+TEST_LDFLAGS += $(LDFLAGS)
 
 .PHONY: all
 all: ${BINARIES} ${POLICIES}
@@ -51,19 +51,18 @@ args.o: args.cpp args.h logging.h version.h
 omegajail: main.cpp ${MINIJAIL_CORE_OBJECT_FILES} args.o util.o logging.o version.o
 	$(CXX) $(CFLAGS) $(CXXFLAGS) -fno-exceptions $^ $(LDFLAGS) -o $@
 
-sigsys-tracer: sigsys_tracer.cpp ${MINIJAIL_CORE_OBJECT_FILES} util.o logging.o
-	$(CXX) $(CFLAGS) $(CXXFLAGS) -fno-exceptions $^ $(LDFLAGS) -o $@
-
 stdio-mux: stdio_mux.cpp util.o logging.o
 	$(CXX) $(CFLAGS) $(CXXFLAGS) -fno-exceptions $^ $(LDFLAGS) -o $@
 
 java-compile: java_compile.cpp util.o logging.o
 	$(CXX) $(CFLAGS) $(CXXFLAGS) -Os -fno-exceptions $^ $(LDFLAGS) -static -o $@
 
-policies/%.bpf: policies/%.policy | minijail/constants.json
+policies/%.bpf: policies/%.policy policies/omegajail.policy | minijail/constants.json
 	./minijail/tools/compile_seccomp_policy.py \
-		--use-kill-process --arch-json=minijail/constants.json \
-		$^ $@
+		--use-kill-process \
+		--default-action=user-notify \
+		--arch-json=minijail/constants.json \
+		$< $@
 
 .PHONY: install
 install: ${BINARIES} tools/omegajail-setup ${POLICIES}
