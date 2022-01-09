@@ -48,3 +48,8 @@ sysinfo: allow
 rt_sigreturn: allow
 rt_sigaction: arg0 != SIGSYS
 rt_sigprocmask: allow
+
+# abort()
+getpid: allow
+gettid: allow
+tgkill: arg0 == 2

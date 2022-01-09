@@ -84,6 +84,9 @@ class FileResolver:
             return set()
         if name in self.files:
             return self.files[name]
+        if name not in self.apt_cache:
+            logging.warning('%s not in apt cache', name)
+            return set()
         pkg = self.apt_cache[name]
         self.files[name] = set()
         for f in pkg.installed_files:
@@ -169,7 +172,8 @@ class Chroot:
                      path: str,
                      relative_to: Optional[str] = None,
                      exclude: Sequence[str] = (),
-                     recurse: bool = False) -> None:
+                     recurse: bool = False,
+                     force_symlinks: bool = False) -> None:
         """Copies a file from the host in the same path."""
         if '*' in path:
             for p in glob.glob(path):
@@ -198,7 +202,7 @@ class Chroot:
                     target = os.readlink(filepath)
                     abspath = os.path.realpath(
                         os.path.join(os.path.dirname(filepath), target))
-                    if abspath.startswith(self.mountpoint):
+                    if abspath.startswith(self.mountpoint) or force_symlinks:
                         self.symlink(filepath, target)
                     else:
                         try:
@@ -215,7 +219,7 @@ class Chroot:
                     target = os.readlink(dirpath)
                     abspath = os.path.realpath(
                         os.path.join(os.path.dirname(dirpath), target))
-                    if abspath.startswith(self.mountpoint):
+                    if abspath.startswith(self.mountpoint) or force_symlinks:
                         self.symlink(dirpath, target)
                     else:
                         shutil.copytree(
@@ -225,7 +229,8 @@ class Chroot:
                 path: str,
                 source: str,
                 relative_to: Optional[str] = None,
-                mode: Optional[int] = None) -> None:
+                mode: Optional[int] = None,
+                force_symlinks: bool = False) -> None:
         """Installs a file from the host using the provided path."""
         try:
             self.mkdir(os.path.dirname(path), relative_to)
@@ -239,12 +244,18 @@ class Chroot:
                 if os.path.isfile(target):
                     return
                 if os.path.islink(target):
-                    if os.path.readlink(target) != source:
-                        raise ValueError('Target file %r points to %r, but it was expected to point to %r' % (target, os.path.readlink(target), source))
+                    if os.readlink(target) != source:
+                        raise ValueError(
+                            'Target file %r points to %r, but it was expected to point to %r'
+                            % (target, os.readlink(target), source))
                     return
                 os.link(source, target)
             else:
-                shutil.copy(source, self.__chroot_path(path, relative_to))
+                if os.path.islink(source) and force_symlinks:
+                    target = os.readlink(source)
+                    os.symlink(self.__chroot_path(path, relative_to), target)
+                else:
+                    shutil.copy(source, self.__chroot_path(path, relative_to))
             if mode is not None:
                 os.chmod(self.__chroot_path(path, relative_to), mode)
         except Exception:
@@ -342,8 +353,10 @@ def _main() -> None:
         'clang-10',
         'fp-compiler-3.0.4',
         'fp-units-fcl-3.0.4',
-        'g++',
         'gcc',
+        'cpp-10',
+        'g++-10',
+        'gcc-10',
         'libbsd-dev',
         'libc6-dev',
         'libffi-dev',
@@ -351,28 +364,31 @@ def _main() -> None:
         'libitm1',
         'libquadmath0',
         'libtsan0',
+        'zlib1g-dev',
     ]
 
     RUBY_ROOT = '/usr/lib/ruby/'
     HASKELL_ROOT = '/usr/lib/ghc/'
     PYTHON2_ROOT = '/usr/lib/python2.7/'
-    PYTHON3_ROOT = '/usr/lib/python3.8/'
+    PYTHON3_ROOT = '/opt/python3/'
     JAVA_ROOT = '/usr/lib/jvm/'
     DOTNET_ROOT = '/usr/share/dotnet/'
     JS_ROOT = '/opt/nodejs/'
+    GO_ROOT = '/opt/go/'
+    RUST_ROOT = '/opt/rust/'
 
     RUBY_FILES = resolver.files_for('ruby', exclude_packages=COMPILER_PACKAGES)
     PYTHON2_FILES = resolver.files_for(
         'python2.7', exclude_packages=COMPILER_PACKAGES)
     PYTHON3_FILES = resolver.files_for(
-        'python3.8', exclude_packages=COMPILER_PACKAGES)
+        'python3.9', exclude_packages=COMPILER_PACKAGES)
     HASKELL_FILES = resolver.files_for(
         'ghc', exclude_packages=COMPILER_PACKAGES + ['libncurses5-dev'])
     JAVA_FILES = resolver.files_for([
-        'openjdk-14-jdk',
-        'openjdk-14-jdk-headless',
-        'openjdk-14-jre',
-        'openjdk-14-jre-headless',
+        'openjdk-16-jdk',
+        'openjdk-16-jdk-headless',
+        'openjdk-16-jre',
+        'openjdk-16-jre-headless',
     ],
                                     recursive=False,
                                     exclude_files=['/etc'])
@@ -382,9 +398,9 @@ def _main() -> None:
     raw_resolver = FileResolver(exclude_files=())
     DOTNET_FILES = raw_resolver.files_for([
         'dotnet-host',
-        'dotnet-hostfxr-3.1',
-        'dotnet-runtime-3.1',
-        'dotnet-sdk-3.1',
+        'dotnet-hostfxr-6.0',
+        'dotnet-runtime-6.0',
+        'dotnet-sdk-6.0',
     ],
                                           recursive=False)
 
@@ -411,6 +427,8 @@ def _main() -> None:
         root.mkdir(HASKELL_ROOT)
         root.mkdir(DOTNET_ROOT)
         root.mkdir(JS_ROOT)
+        root.mkdir(RUST_ROOT)
+        root.mkdir(GO_ROOT)
 
         # Other miscellaneous mountpoints
         root.mkdir('/dev/')
@@ -428,8 +446,10 @@ def _main() -> None:
         root.mkdir('/sys/fs/cgroup/memory/omegajail')
         root.mkdir('/sys/fs/cgroup/pids/omegajail')
 
-        # Node.js really wants a source of randomness.
-        root.symlink('/dev/urandom', os.path.join(JS_ROOT, 'urandom'))
+        # Node.js and Java really want a source of randomness.
+        random.seed("Ω🔒")
+        root.write('/dev/urandom', bytes(random.randint(0, 255) for _ in range(4096)))
+        root.write('/dev/random', bytes(random.randint(0, 255) for _ in range(4096)))
 
         # Device nodes
         root.mknod(
@@ -440,10 +460,15 @@ def _main() -> None:
         root.symlink('/usr/bin/java',
                      [x for x in JAVA_FILES if x.endswith('bin/java')][0])
         root.symlink('/usr/bin/python2.7', os.path.join(PYTHON2_ROOT, 'python2.7'))
-        root.symlink('/usr/bin/python3', os.path.join(PYTHON3_ROOT, 'python3'))
+        root.symlink('/usr/bin/python3', os.path.join(PYTHON3_ROOT, 'bin/python3'))
+        root.symlink('/usr/bin/python3.9', os.path.join(PYTHON3_ROOT, 'bin/python3.9'))
+        root.symlink('/usr/lib/python3', os.path.join(PYTHON3_ROOT, 'lib/python3'))
+        root.symlink('/usr/lib/python3.9', os.path.join(PYTHON3_ROOT, 'lib/python3.9'))
         root.symlink('/usr/bin/node', os.path.join(JS_ROOT, 'bin/node'))
         root.symlink('/usr/lib/node_modules',
                      os.path.join(JS_ROOT, 'node_modules'))
+        root.symlink('/etc/rustup',
+                     os.path.join(RUST_ROOT, 'rustup'))
         for f in RUBY_FILES:
             if f.startswith(RUBY_ROOT):
                 continue
@@ -491,36 +516,55 @@ def _main() -> None:
             if root.file_exists(f):
                 continue
             root.symlink(f, os.path.join(HASKELL_ROOT, f.replace('/', '_')))
+
+        root.write('/rust-toolchain.toml', b'[toolchain]\npath = "/opt/rust/rustup/toolchains/stable-x86_64-unknown-linux-gnu"')
+        root.symlink('/usr/bin/cc', 'clang-10')
         root.mkdir('/tmp/')
         root.mkdir('/var/lib/omegajail/bin')
 
         root.symlink('/usr/bin/luac', 'luac5.3')
 
     with Chroot(
-            os.path.join(args.target, 'root-openjdk'), JAVA_ROOT,
+            os.path.join(args.target, 'root-java'), JAVA_ROOT,
             link=args.link) as root:
         for filename in JAVA_FILES:
             if not filename.startswith(JAVA_ROOT):
                 continue
             root.copyfromhost(filename)
+        root.copyfromhost('/usr/lib/jvm/kotlinc',
+                          relative_to=JAVA_ROOT,
+                          recurse=True)
         logging.info('Generating the Java Class Data Sharing bundle.')
         subprocess.check_call([
             '/usr/bin/java',
             '-Xshare:dump',
-            f'-XX:SharedArchiveFile={root.path}/java-14-openjdk-amd64/lib/server/classes.jsa',
+            f'-XX:SharedArchiveFile={root.path}/java-16-openjdk-amd64/lib/server/classes.jsa',
         ])
         logging.info('Precompiling critical methods from java.base.')
         subprocess.check_call([
             '/usr/bin/jaotc',
             '-J-Xshare:on',
             '-J-XX:+UseSerialGC',
-            f'-J-XX:SharedArchiveFile={root.path}/java-14-openjdk-amd64/lib/server/classes.jsa',
+            '-J-XX:+UnlockExperimentalVMOptions',
+            f'-J-XX:SharedArchiveFile={root.path}/java-16-openjdk-amd64/lib/server/classes.jsa',
             '--compile-commands',
             os.path.join(_CURRENT_DIR, 'java.base.aotcfg'),
             '--module',
             'java.base',
             '--output',
             f'{root.path}/java.base.so',
+        ])
+        logging.info('Precompiling the kotlin runtime.')
+        subprocess.check_call([
+            '/usr/bin/jaotc',
+            '-J-Xshare:on',
+            '-J-XX:+UseSerialGC',
+            '-J-XX:+UnlockExperimentalVMOptions',
+            f'-J-XX:SharedArchiveFile={root.path}/java-16-openjdk-amd64/lib/server/classes.jsa',
+            '--jar',
+            '/usr/lib/jvm/kotlinc/lib/kotlin-stdlib.jar',
+            '--output',
+            f'{root.path}/kotlin-stdlib.jar.so',
         ])
         logging.info('Done.')
 
@@ -540,20 +584,33 @@ def _main() -> None:
             PYTHON3_ROOT,
             link=args.link) as root:
         root.install(
-            os.path.join(PYTHON3_ROOT, 'python3'), '/usr/bin/python3.8')
+            os.path.join(PYTHON3_ROOT, 'bin/python3.9'), '/usr/bin/python3.9')
+        root.install(
+            os.path.join(PYTHON3_ROOT, 'bin/python3'), '/usr/bin/python3')
         for filename in PYTHON3_FILES:
-            if filename.startswith(PYTHON3_ROOT):
-                root.copyfromhost(filename)
+            # Note the lack of trailing slash to match both python3 and
+            # python3.9.
+            if filename.startswith('/usr/lib/python3'):
+                root.copyfromhost(filename, relative_to='/usr/')
 
-        package_names = {'libkarel', 'omegaup'}
-        dist_packages = os.path.join(PYTHON3_ROOT, 'dist-packages')
+        package_names = {
+            'certifi',
+            'charset-normalizer',
+            'idna',
+            'libkarel',
+            'omegaup',
+            'requests',
+            'urllib3',
+        }
+        dist_packages = '/usr/lib/python3/dist-packages'
         for dirname in os.listdir(dist_packages):
-            # There are two directories for each package: '${package_name}' and
-            # '${package_name}-${version}.dist-info'.
+            # There are two directories for each package: '${package_name}'
+            # and '${package_name}-${version}.dist-info'.
             # Copy them both.
             if dirname.split('-')[0] not in package_names:
                 continue
             root.copyfromhost(os.path.join(dist_packages, dirname),
+                              relative_to='/usr/',
                               recurse=True)
 
     with Chroot(
@@ -573,11 +630,13 @@ def _main() -> None:
             link=args.link) as root:
         for filename in HASKELL_FILES:
             if filename.startswith(HASKELL_ROOT):
-                root.copyfromhost(filename)
+                root.copyfromhost(filename, force_symlinks=True)
         for f in HASKELL_FILES:
             if f.startswith(HASKELL_ROOT):
                 continue
-            root.install(os.path.join(HASKELL_ROOT, f.replace('/', '_')), f)
+            root.install(os.path.join(HASKELL_ROOT, f.replace('/', '_')),
+                         f,
+                         force_symlinks=True)
         root.copyfromhost(
             '/usr/lib/ghc/package.conf.d',
             relative_to=HASKELL_ROOT,
@@ -603,13 +662,20 @@ def _main() -> None:
     with Chroot(os.path.join(args.target, 'root-js'), JS_ROOT,
                 link=args.link) as root:
         for filename in (
-                '/opt/nodejs/urandom',
                 '/opt/nodejs/karel.js',
                 '/opt/nodejs/bin/node',
                 '/opt/nodejs/karel.wasm',
                 '/opt/nodejs/LICENSE',
         ):
             root.copyfromhost(filename, relative_to=JS_ROOT)
+
+    with Chroot(os.path.join(args.target, 'root-go'), GO_ROOT,
+                link=args.link) as root:
+        root.copyfromhost('/opt/go', relative_to=GO_ROOT, recurse=True)
+
+    with Chroot(os.path.join(args.target, 'root-rust'), RUST_ROOT,
+                link=args.link) as root:
+        root.copyfromhost('/opt/rust', relative_to=RUST_ROOT, recurse=True)
 
 
 if __name__ == '__main__':

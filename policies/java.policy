@@ -19,6 +19,7 @@ ioctl: return ENOTTY
 {lseek, _llseek[arch=armv7]}: allow
 {lstat[arch=x86_64], lstat64[arch=armv7]}: allow
 mkdir: allow
+newfstatat: allow
 openat: allow
 {read, pread64}: allow
 readlink: allow
@@ -48,16 +49,17 @@ uname: allow
 
 # Processes / threads
 clone: arg0 == CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID
-futex: allow
 clock_nanosleep: allow
+futex: allow
+prctl: arg0 == PR_SET_NAME
 rt_sigaction: arg0 != SIGSYS
 rt_sigprocmask: allow
 rt_sigreturn: allow
 sched_getaffinity: allow
 sched_yield: allow
-prctl: arg0 == PR_SET_NAME
 set_robust_list: allow
 set_tid_address: allow
+setpriority: return SIGSYS
 tgkill: allow
 
 # Time

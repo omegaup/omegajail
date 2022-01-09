@@ -10,6 +10,8 @@
 
 #include <cxxopts.hpp>
 
+#include <optional>
+
 #include "logging.h"
 #include "minijail/libminijail.h"
 #include "util.h"
@@ -19,6 +21,7 @@ namespace {
 
 constexpr size_t kExtraMemorySizeInBytes = 16 * 1024 * 1024;
 constexpr size_t kRubyExtraMemorySizeInBytes = 56 * 1024 * 1024;
+constexpr size_t kGoExtraMemorySizeInBytes = 512 * 1024 * 1024;
 
 
 // These are obtained by running an "empty" and measuring
@@ -287,7 +290,7 @@ bool Args::SetCompileFlags(std::string_view root,
 
   if (language == "c" || language == "c11-gcc") {
     script_basename = UseSeccompProgram(PathJoin(root, "policies/gcc.bpf"), j);
-    program_args_holder = {"/usr/bin/gcc", "-o", std::string(target),
+    program_args_holder = {"/usr/bin/gcc-10", "-o", std::string(target),
                            "--std=c11", "-O2"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
@@ -306,7 +309,7 @@ bool Args::SetCompileFlags(std::string_view root,
   }
   if (language == "cpp03-gcc") {
     script_basename = UseSeccompProgram(PathJoin(root, "policies/gcc.bpf"), j);
-    program_args_holder = {"/usr/bin/g++", "--std=c++03", "-o",
+    program_args_holder = {"/usr/bin/g++-10", "--std=c++03", "-o",
                            std::string(target), "-O2"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
@@ -324,7 +327,7 @@ bool Args::SetCompileFlags(std::string_view root,
   }
   if (language == "cpp" || language == "cpp11" || language == "cpp11-gcc") {
     script_basename = UseSeccompProgram(PathJoin(root, "policies/gcc.bpf"), j);
-    program_args_holder = {"/usr/bin/g++", "--std=c++11", "-o",
+    program_args_holder = {"/usr/bin/g++-10", "--std=c++11", "-o",
                            std::string(target), "-O2"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
@@ -343,7 +346,7 @@ bool Args::SetCompileFlags(std::string_view root,
   }
   if (language == "cpp17-gcc") {
     script_basename = UseSeccompProgram(PathJoin(root, "policies/gcc.bpf"), j);
-    program_args_holder = {"/usr/bin/g++", "--std=c++17", "-o",
+    program_args_holder = {"/usr/bin/g++-10", "--std=c++17", "-o",
                            std::string(target), "-O2"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
@@ -354,6 +357,25 @@ bool Args::SetCompileFlags(std::string_view root,
     script_basename =
         UseSeccompProgram(PathJoin(root, "policies/clang.bpf"), j);
     program_args_holder = {"/usr/bin/clang++-10",  "--std=c++17", "-o",
+                           std::string(target), "-O3",         "-march=native"};
+    program_args_holder.insert(program_args_holder.end(), sources.begin(),
+                               sources.end());
+    program_args_holder.emplace_back("-lm");
+    return true;
+  }
+  if (language == "cpp20-gcc") {
+    script_basename = UseSeccompProgram(PathJoin(root, "policies/gcc.bpf"), j);
+    program_args_holder = {"/usr/bin/g++-10", "--std=c++20", "-o",
+                           std::string(target), "-O2"};
+    program_args_holder.insert(program_args_holder.end(), sources.begin(),
+                               sources.end());
+    program_args_holder.emplace_back("-lm");
+    return true;
+  }
+  if (language == "cpp20-clang") {
+    script_basename =
+        UseSeccompProgram(PathJoin(root, "policies/clang.bpf"), j);
+    program_args_holder = {"/usr/bin/clang++-10",  "--std=c++20", "-o",
                            std::string(target), "-O3",         "-march=native"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
@@ -395,11 +417,25 @@ bool Args::SetCompileFlags(std::string_view root,
   if (language == "java") {
     script_basename =
         UseSeccompProgram(PathJoin(root, "policies/javac.bpf"), j);
-    if (!BindReadOnly(PathJoin(root, "root-openjdk"), "/usr/lib/jvm", j))
+    if (!BindReadOnly(PathJoin(root, "root-java"), "/usr/lib/jvm", j))
       return false;
     if (!BindReadOnly(PathJoin(root, "bin"), "/var/lib/omegajail/bin", j))
       return false;
-    program_args_holder = {"/var/lib/omegajail/bin/java-compile", std::string(target)};
+    program_args_holder = {"/var/lib/omegajail/bin/java-compile",
+                           "--language=java", std::string(target)};
+    program_args_holder.insert(program_args_holder.end(), sources.begin(),
+                               sources.end());
+    return true;
+  }
+  if (language == "kt") {
+    script_basename =
+        UseSeccompProgram(PathJoin(root, "policies/javac.bpf"), j);
+    if (!BindReadOnly(PathJoin(root, "root-java"), "/usr/lib/jvm", j))
+      return false;
+    if (!BindReadOnly(PathJoin(root, "bin"), "/var/lib/omegajail/bin", j))
+      return false;
+    program_args_holder = {"/var/lib/omegajail/bin/java-compile",
+                           "--language=kotlin", std::string(target)};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
     return true;
@@ -415,9 +451,9 @@ bool Args::SetCompileFlags(std::string_view root,
   }
   if (language == "py" || language == "py3") {
     script_basename = UseSeccompProgram(PathJoin(root, "policies/pyc.bpf"), j);
-    if (!BindReadOnly(PathJoin(root, "root-python3"), "/usr/lib/python3.8", j))
+    if (!BindReadOnly(PathJoin(root, "root-python3"), "/opt/python3/", j))
       return false;
-    program_args_holder = {"/usr/bin/python3", "-m", "py_compile"};
+    program_args_holder = {"/usr/bin/python3.9", "-m", "py_compile"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
     return true;
@@ -437,12 +473,53 @@ bool Args::SetCompileFlags(std::string_view root,
       return false;
     program_args_holder = {
         "/usr/share/dotnet/dotnet",
-        "/usr/share/dotnet/sdk/3.1.401/Roslyn/bincore/csc.dll",
+        "/usr/share/dotnet/sdk/6.0.101/Roslyn/bincore/csc.dll",
         "-noconfig",
         "@/usr/share/dotnet/Release.rsp",
         StringPrintf("-out:%s.dll",
                      PathJoin(Dirname(sources.front()), target).c_str()),
         "-target:exe",
+    };
+    program_args_holder.insert(program_args_holder.end(), sources.begin(),
+                               sources.end());
+    return true;
+  }
+  if (language == "rs") {
+    script_basename = UseSeccompProgram(PathJoin(root, "policies/rustc.bpf"), j);
+    if (!BindReadOnly(PathJoin(root, "root-rust"), "/opt/rust", j))
+      return false;
+    program_args_holder = {
+        "/opt/rust/cargo/bin/rustc",
+        "-O",
+        "-o",
+        std::string(target),
+    };
+    program_args_holder.insert(program_args_holder.end(), sources.begin(),
+                               sources.end());
+    return true;
+  }
+  if (language == "go") {
+    script_basename = UseSeccompProgram(PathJoin(root, "policies/go-build.bpf"), j);
+    if (!BindReadOnly(PathJoin(root, "root-go"), "/opt/go", j))
+      return false;
+    program_args_holder = {
+        "/opt/go/bin/go",
+        "build",
+        "-o",
+        std::string(target),
+    };
+    program_args_holder.insert(program_args_holder.end(), sources.begin(),
+                               sources.end());
+    return true;
+  }
+  if (language == "js") {
+    script_basename = UseSeccompProgram(PathJoin(root, "policies/js.bpf"), j);
+    if (!BindReadOnly(PathJoin(root, "root-js"), "/opt/nodejs", j))
+      return false;
+    program_args_holder = {
+        "/usr/bin/node",
+        "--check",
+        StringPrintf("%s.js", target.data()),
     };
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
@@ -481,9 +558,22 @@ bool Args::SetRunFlags(std::string_view root,
       language == "cpp" || language == "cpp03-gcc" ||
       language == "cpp03-clang" || language == "cpp11" ||
       language == "cpp11-gcc" || language == "cpp11-clang" ||
-      language == "cpp17-gcc" || language == "cpp17-clang") {
+      language == "cpp17-gcc" || language == "cpp17-clang" ||
+      language == "cpp20-gcc" || language == "cpp20-clang") {
     SetMemoryLimit(memory_limit_bytes + kExtraMemorySizeInBytes);
     script_basename = UseSeccompProgram(PathJoin(root, "policies/cpp.bpf"), j);
+    program_args_holder = {StringPrintf("./%s", target.data())};
+    return true;
+  }
+  if (language == "rs") {
+    SetMemoryLimit(memory_limit_bytes + kExtraMemorySizeInBytes);
+    script_basename = UseSeccompProgram(PathJoin(root, "policies/rs.bpf"), j);
+    program_args_holder = {StringPrintf("./%s", target.data())};
+    return true;
+  }
+  if (language == "go") {
+    SetMemoryLimit(memory_limit_bytes + kGoExtraMemorySizeInBytes);
+    script_basename = UseSeccompProgram(PathJoin(root, "policies/go.bpf"), j);
     program_args_holder = {StringPrintf("./%s", target.data())};
     return true;
   }
@@ -507,24 +597,35 @@ bool Args::SetRunFlags(std::string_view root,
     program_args_holder = {StringPrintf("./%s", target.data())};
     return true;
   }
-  if (language == "java") {
+  if (language == "java" || language == "kt") {
     script_basename = UseSeccompProgram(PathJoin(root, "policies/java.bpf"), j);
     vm_memory_size_in_bytes = kJavaVmMemorySizeInBytes;
-    if (!BindReadOnly(PathJoin(root, "root-openjdk"), "/usr/lib/jvm", j))
+    if (!BindReadOnly(PathJoin(root, "root-java"), "/usr/lib/jvm", j))
       return false;
     program_args_holder = {
         "/usr/bin/java",
         "-Xshare:on",
         "-XX:+UnlockExperimentalVMOptions",
         "-XX:+UseSerialGC",
-        StringPrintf("-XX:AOTLibrary=/usr/lib/jvm/java.base.so,./%s.so",
-                     target.data()),
     };
     if (memory_limit_bytes > 0) {
-      program_args_holder.push_back(StringPrintf(
+      program_args_holder.emplace_back(StringPrintf(
           "-Xmx%" PRId64, memory_limit_bytes + kJavaMinHeapSizeInBytes));
     }
-    program_args_holder.emplace_back(target);
+    if (language == "kt") {
+      program_args_holder.emplace_back(
+          StringPrintf("-XX:AOTLibrary=/usr/lib/jvm/java.base.so,"
+                       "/usr/lib/jvm/kotlin-stdlib.jar.so,./%s.so",
+                       target.data()));
+      program_args_holder.emplace_back("-cp");
+      program_args_holder.emplace_back(
+          "/usr/lib/jvm/kotlinc/lib/kotlin-stdlib.jar:.");
+      program_args_holder.emplace_back(StringPrintf("%sKt", target.data()));
+    } else {
+      program_args_holder.emplace_back(StringPrintf(
+          "-XX:AOTLibrary=/usr/lib/jvm/java.base.so,./%s.so", target.data()));
+      program_args_holder.emplace_back(target);
+    }
     return true;
   }
   if (language == "py2") {
@@ -539,9 +640,9 @@ bool Args::SetRunFlags(std::string_view root,
   if (language == "py" || language == "py3") {
     SetMemoryLimit(memory_limit_bytes + kExtraMemorySizeInBytes);
     script_basename = UseSeccompProgram(PathJoin(root, "policies/py.bpf"), j);
-    if (!BindReadOnly(PathJoin(root, "root-python3"), "/usr/lib/python3.8", j))
+    if (!BindReadOnly(PathJoin(root, "root-python3"), "/opt/python3", j))
       return false;
-    program_args_holder = {"/usr/bin/python3",
+    program_args_holder = {"/usr/bin/python3.9",
                            StringPrintf("%s.py", target.data())};
     return true;
   }
@@ -564,6 +665,19 @@ bool Args::SetRunFlags(std::string_view root,
       return false;
     program_args_holder = {"/usr/share/dotnet/dotnet",
                            StringPrintf("%s.dll", target.data())};
+    return true;
+  }
+  if (language == "js") {
+    SetMemoryLimit(memory_limit_bytes + kExtraMemorySizeInBytes);
+    script_basename =
+        UseSeccompProgram(PathJoin(root, "policies/js.bpf"), j);
+    if (!BindReadOnly(PathJoin(root, "root-js"), "/opt/nodejs", j))
+      return false;
+    program_args_holder = {
+        "/opt/nodejs/bin/node",
+        "--jitless",
+        StringPrintf("%s.js", target.data()),
+    };
     return true;
   }
   if (language == "kp" || language == "kj") {
@@ -614,7 +728,7 @@ std::string Args::UseSeccompProgram(const std::string_view seccomp_program_path,
 
   if (!disable_sandboxing) {
     minijail_use_seccomp_filter(j);
-    minijail_use_seccomp_filter_tsync(j);
+    minijail_set_seccomp_filter_tsync(j);
     minijail_set_seccomp_filter_install_user_notification(j);
     minijail_set_seccomp_filters(j, &seccomp_program);
   }

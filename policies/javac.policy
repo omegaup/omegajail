@@ -7,6 +7,7 @@
 # I/O
 access: allow
 chmod: allow
+chdir: allow
 close: allow
 {dup, dup2}: allow
 fchdir: allow
@@ -15,17 +16,23 @@ fchdir: allow
 ftruncate: allow
 getcwd: allow
 getdents64: allow
-ioctl: arg1 == FIONREAD
+getrandom: allow
+ioctl: arg1 == FIONREAD || arg1 == TCGETS
 {lseek, _llseek[arch=armv7]}: allow
 {lstat[arch=x86_64], lstat64[arch=armv7]}: allow
 mkdir: allow
+newfstatat: allow
 openat: allow
 pipe: allow
+pipe2: allow
 {read, pread64}: allow
 readlink: allow
+rmdir: allow
+shutdown: allow
 socket: return ENETDOWN
 socketpair: allow
 {stat[arch=x86_64], stat64[arch=armv7]}: allow
+statfs: allow
 umask: allow
 unlink: allow
 write: allow
@@ -44,26 +51,32 @@ munmap: allow
 getpid: allow
 gettid: allow
 {getuid[arch=x86_64], getuid32[arch=armv7]}: allow
-prlimit64: {arg1 == RLIMIT_STACK || arg2 == 0; allow, return EPERM}
+prlimit64: {arg1 == RLIMIT_STACK || arg2 == 0; allow, arg1 == RLIMIT_NOFILE; return 0, return EPERM}
 getrusage: allow
 sysinfo: allow
 uname: allow
 
 # Processes / threads
-clone: arg0 == CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID || arg0 == CLONE_VM|CLONE_VFORK|SIGCHLD
-futex: allow
 clock_nanosleep: allow
+clone: arg0 == CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID || arg0 == CLONE_VM|CLONE_VFORK|SIGCHLD || arg0 == CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD
+futex: allow
+getpriority: allow
+kill: {arg0 == 2; allow, return SIGSYS}
+prctl: arg0 == PR_SET_NAME
 rt_sigaction: {arg0 != SIGSYS; allow, return EPERM}
 rt_sigprocmask: allow
 rt_sigreturn: allow
 sched_getaffinity: allow
 sched_yield: allow
-prctl: arg0 == PR_SET_NAME
 set_robust_list: allow
 set_tid_address: allow
+setpriority: return SIGSYS
 tgkill: allow  # This is needed by the compilation wrapper.
 vfork: allow  # This is needed by the compilation wrapper.
 wait4: allow  # This is needed by the compilation wrapper.
+
+# Signals
+restart_syscall[arch=armv7]: allow
 
 # Time
 clock_getres: allow

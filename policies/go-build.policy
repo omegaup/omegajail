@@ -1,0 +1,41 @@
+@include ./gcc.policy
+
+# I/O
+chdir: allow
+copy_file_range: allow
+dup3: allow
+epoll_create1: allow
+epoll_ctl: allow
+epoll_pwait: allow
+getdents64: allow
+fallocate: allow
+fchmodat: allow
+{fcntl[arch=x86_64], fcntl64[arch=armv7]}: arg1 == F_GETFD || arg1 == F_GETFL || arg1 == F_SETFD || arg1 == F_SETFL || arg1 == F_DUPFD_CLOEXEC
+flock: allow
+ftruncate: allow
+mkdirat: allow
+newfstatat: allow
+pwrite64: allow
+readlinkat: allow
+renameat: allow
+unlinkat: allow
+utimensat: allow
+
+# Threads
+clone: allow
+futex: allow
+nanosleep: allow
+restart_syscall: allow
+rt_sigaction: allow
+sched_getaffinity: allow
+sched_yield: allow
+set_robust_list: allow
+set_tid_address: allow
+sigaltstack: allow
+tgkill: allow
+
+# System
+uname: allow
+
+# Processes
+waitid: allow
