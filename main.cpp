@@ -125,6 +125,13 @@ int RemountRootReadOnly(void* payload) {
     }
     return -errno;
   }
+  if (mount(nullptr, "/tmp", nullptr, MS_NODEV | MS_NOSUID | MS_REMOUNT, nullptr)) {
+    {
+      ScopedErrnoPreserver preserve_errno;
+      PLOG(ERROR) << "Failed to remount tmp as exec-able";
+    }
+    return -errno;
+  }
   return 0;
 }
 

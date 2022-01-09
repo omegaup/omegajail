@@ -3,7 +3,9 @@ POLICIES := policies/gcc.bpf policies/cpp.bpf policies/ghc.bpf policies/hs.bpf \
             policies/javac.bpf policies/java.bpf policies/fpc.bpf policies/pas.bpf \
             policies/pyc.bpf policies/py.bpf policies/ruby.bpf policies/lua.bpf \
             policies/csc.bpf policies/cs.bpf policies/js.bpf policies/karel.bpf \
-            policies/cpp-asan.bpf policies/clang.bpf
+            policies/cpp-asan.bpf policies/clang.bpf \
+            policies/go.bpf policies/go-build.bpf \
+            policies/rustc.bpf policies/rs.bpf
 
 MINIJAIL_SOURCE_FILES := $(addprefix minijail/,\
 	$(cd minijail && git ls-tree --name-only HEAD -- *.c *.c))
@@ -122,7 +124,7 @@ gtest_main.o : googletest/googletest/src/gtest_main.cc
 		.
 	touch $@
 
-rootfs: .omegajail-builder-rootfs-setup.stamp ${BINARIES} tools/omegajail-setup ${POLICIES}
+rootfs: .omegajail-builder-rootfs-runtime.stamp .omegajail-builder-rootfs-setup.stamp ${BINARIES} tools/omegajail-setup ${POLICIES}
 	sudo rm -rf $@ ".$@.tmp"
 	mkdir ".$@.tmp"
 	$(MAKE) DESTDIR=".$@.tmp" install || (sudo rm -rf ".$@.tmp" ; exit 1)

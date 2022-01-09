@@ -4,6 +4,7 @@
 #include <sys/epoll.h>
 #include <sys/mman.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #include <memory>
 #include <string>
@@ -142,6 +143,8 @@ template <>
 std::string PathJoin(std::string_view path, std::string_view component);
 
 bool ReadUint64(std::string_view path, uint64_t* value);
+
+bool FileExists(std::string_view path, int mode = F_OK);
 
 bool WriteFile(std::string_view path,
                std::string_view contents,

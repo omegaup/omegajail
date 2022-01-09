@@ -10,7 +10,6 @@
 #include <sys/syscall.h>
 #include <sys/types.h>
 #include <sys/un.h>
-#include <unistd.h>
 
 #include <fstream>
 #include <sstream>
@@ -434,6 +433,10 @@ bool WriteFile(std::string_view path,
     return false;
   }
   return true;
+}
+
+bool FileExists(std::string_view path, int mode) {
+  return access(path.data(), mode) == 0;
 }
 
 bool ReadUint64(std::string_view path, uint64_t* value) {

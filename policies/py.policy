@@ -16,6 +16,7 @@ ioctl: return ENOTTY
 {lseek, _llseek[arch=armv7]}: allow
 {lstat[arch=x86_64], lstat64[arch=armv7]}: allow
 mkdir: allow
+newfstatat: allow
 openat: allow
 read: allow
 pread64: allow
@@ -55,3 +56,6 @@ gettid: allow
 set_robust_list: allow
 set_tid_address: allow
 sigaltstack: allow
+
+# abort()
+tgkill: arg0 == 2
