@@ -11,13 +11,12 @@
 
 namespace {
 
-std::string TrimJavaExtension(std::string_view filename) {
-  static constexpr std::string_view java_extension = ".java";
-
-  if (filename.size() >= java_extension.size() &&
-      filename.compare(filename.size() - java_extension.size(),
-                       std::string::npos, java_extension) == 0) {
-    filename.remove_suffix(java_extension.size());
+std::string TrimExtension(std::string_view filename,
+                          std::string_view extension) {
+  if (filename.size() >= extension.size() &&
+      filename.compare(filename.size() - extension.size(), std::string::npos,
+                       extension) == 0) {
+    filename.remove_suffix(extension.size());
   }
   return std::string(filename);
 }
@@ -59,30 +58,65 @@ int ForkExec(const std::vector<std::string>& args) {
 }  // namespace
 
 int main(int argc, char* argv[]) {
-  if (argc < 3)
-    PLOG(FATAL) << argv[0] << " <target> <source> [<source> ...]";
-  const char* target = argv[1];
-  std::vector<std::string> javac_args = {
-      "/usr/bin/javac",
-      "-J-Xmx512M",
-      "-d",
-      ".",
-  };
+  bool kotlin = false;
+  if (argc >= 2 && std::string_view(argv[1]).rfind("--language=") == 0) {
+    if (std::string_view(argv[1]) == "--language=kotlin") {
+      kotlin = true;
+    }
+    argc--;
+    argv[1] = argv[0];
+    argv++;
+  }
+  if (argc < 3) {
+    PLOG(FATAL) << argv[0]
+                << " [--language=...] <target> <source> [<source> ...]";
+  }
+  std::vector<std::string> compiler_args;
   std::vector<std::string> jaotc_args = {
-      "/usr/bin/jaotc",
-      "-J-Xmx512M",
-      "-J-XX:+UseSerialGC",
-      "-J-Xshare:on",
-      "--output",
-      StringPrintf("%s.so", target),
+      "/usr/bin/jaotc", "-J-Xmx512M", "-J-XX:+UseSerialGC",
+      "-J-Xshare:on",   "--output",   StringPrintf("%s.so", argv[1]),
   };
-  for (int i = 2; i < argc; ++i) {
-    javac_args.emplace_back(argv[i]);
+  if (kotlin) {
+    compiler_args = {
+        "/usr/bin/java",
+        "-Xmx896M",
+        "-Xms32M",
+        "-Xshare:on",
+        "-XX:+UseSerialGC",
+        "-XX:+UnlockExperimentalVMOptions",
+        "-XX:AOTLibrary=/usr/lib/jvm/java.base.so",
+        "-cp",
+        "/usr/lib/jvm/kotlinc/lib/kotlin-preloader.jar",
+        "org.jetbrains.kotlin.preloading.Preloader",
+        "-cp",
+        "/usr/lib/jvm/kotlinc/lib/kotlin-compiler.jar",
+        "org.jetbrains.kotlin.cli.jvm.K2JVMCompiler",
+    };
+    jaotc_args.emplace_back("-J-XX:+UnlockExperimentalVMOptions");
     jaotc_args.emplace_back(
-        StringPrintf("%s.class", TrimJavaExtension(argv[i]).c_str()));
+        "-J-XX:AOTLibrary=/usr/lib/jvm/java.base.so,/usr/lib/jvm/"
+        "kotlin-stdlib.jar.so");
+  } else {
+    compiler_args = {
+        "/usr/bin/javac",
+        "-J-Xmx896M",
+        "-J-Xms32M",
+    };
+  }
+  compiler_args.emplace_back("-d");
+  compiler_args.emplace_back(".");
+  for (int i = 2; i < argc; ++i) {
+    compiler_args.emplace_back(argv[i]);
+    if (kotlin) {
+      jaotc_args.emplace_back(
+          StringPrintf("%sKt.class", TrimExtension(argv[i], ".kt").data()));
+    } else {
+      jaotc_args.emplace_back(
+          StringPrintf("%s.class", TrimExtension(argv[i], ".java").data()));
+    }
   }
 
-  int status = ForkExec(javac_args);
+  int status = ForkExec(compiler_args);
   if (status != 0)
     return status;
   Exec(jaotc_args);

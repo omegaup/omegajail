@@ -20,10 +20,11 @@ ioctl: return ENOTTY
 {lstat[arch=x86_64], lstat64[arch=armv7]}: allow
 {lseek, _llseek[arch=armv7]}: allow
 mkdir: allow
-mknod: arg1 == S_IFIFO|0o700
+mknod: arg1 == S_IFIFO|0700
 openat: allow
-pipe2: allow
+{pipe, pipe2}: allow
 pread64: allow
+pwrite64: allow
 read: allow
 readlink: allow
 {stat[arch=x86_64], stat64[arch=armv7]}: allow
@@ -39,6 +40,7 @@ poll: allow
 {getuid[arch=x86_64], getuid32[arch=armv7]}: allow
 {geteuid[arch=x86_64], geteuid32[arch=armv7]}: allow
 getrusage: allow
+prctl: arg0 == PR_SET_NAME
 prlimit64: {arg1 == RLIMIT_STACK || arg2 == 0; allow, return EPERM}
 sysinfo: return ENOSYS
 

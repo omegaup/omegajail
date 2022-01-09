@@ -1,5 +1,4 @@
 @include ./omegajail.policy
-@frequency ./cpp.frequency
 
 # Exit
 {exit, exit_group}: allow
@@ -10,10 +9,8 @@ close: allow
 {dup, dup2, dup3}: allow
 {fcntl[arch=x86_64], fcntl64[arch=armv7]}: arg1 == F_GETFD || arg1 == F_GETFL || arg1 == F_SETFD || arg1 == F_SETFL || arg1 == F_DUPFD_CLOEXEC
 {fstat[arch=x86_64], fstat64[arch=armv7]}: allow
-getrandom: allow
 ioctl: return ENOTTY
 {lseek, _llseek[arch=armv7]}: allow
-newfstatat: allow
 openat: allow
 read: allow
 pread64: allow
@@ -26,28 +23,21 @@ socket: return ENETDOWN
 brk: allow
 madvise: allow
 {mmap[arch=x86_64], mmap2[arch=armv7]}: allow
-mremap: allow
-munmap: allow
-mprotect: allow
-prlimit64: {arg1 == RLIMIT_STACK || arg2 == 0; allow, return EPERM}
 
 # Threads
-clone: arg0 == CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID
-futex: return ENOSYS
-
-# Environment
-sysinfo: return ENOSYS
-
-# Time
-clock_gettime: allow
-gettimeofday: allow
-time[arch=x86_64]: allow
-times: allow
+clone: arg0 == CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS
+futex: allow
+nanosleep: allow
+sched_getaffinity: allow
+sched_yield: allow
+set_robust_list: allow
+set_tid_address: allow
+sigaltstack: allow
 
 # abort()
 getpid: allow
 gettid: allow
-rt_sigaction: arg0 != SIGSYS
+rt_sigaction: allow
 rt_sigprocmask: allow
 rt_sigreturn: allow
 tgkill: arg0 == 2

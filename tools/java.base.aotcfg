@@ -943,6 +943,7 @@ compileOnly java.lang.Thread.exit()V
 compileOnly java.lang.StringLatin1.canEncode(I)Z
 compileOnly sun.invoke.util.Wrapper.isDoubleWord()Z
 compileOnly java.util.Set.isEmpty()Z
+compileOnly java.util.Set.size()I
 compileOnly jdk.internal.util.StaticProperty.javaHome()Ljava/lang/String;
 compileOnly sun.util.locale.BaseLocale$Cache.<init>()V
 compileOnly java.lang.String.rangeCheck([CII)Ljava/lang/Void;

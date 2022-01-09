@@ -12,7 +12,7 @@ close: allow
 {dup, dup2}: allow
 {fcntl[arch=x86_64], fcntl64[arch=armv7]}: arg1 == F_GETFL || arg1 == F_SETFD || arg1 == F_GETFD
 {fstat[arch=x86_64], fstat64[arch=armv7]}: allow
-ioctl: return ENOTTY
+ioctl: arg1 == TCGETS || arg1 == FIONBIO
 {lseek, _llseek[arch=armv7]}: allow
 {lstat[arch=x86_64], lstat64[arch=armv7]}: allow
 openat: allow

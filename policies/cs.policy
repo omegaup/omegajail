@@ -8,6 +8,7 @@
 access: allow
 close: allow
 dup: allow
+fadvise64: allow
 {fcntl[arch=x86_64], fcntl64[arch=armv7]}: arg1 == F_GETFD || arg1 == F_GETFL || arg1 == F_SETFD || arg1 == F_SETFL || arg1 == F_DUPFD_CLOEXEC
 {fstat[arch=x86_64], fstat64[arch=armv7]}: allow
 getdents64: allow
@@ -16,9 +17,10 @@ getcwd: allow
 ioctl: return ENOTTY
 {lstat[arch=x86_64], lstat64[arch=armv7]}: allow
 {lseek, _llseek[arch=armv7]}: allow
-mknod: arg1 == S_IFIFO|0o700
+mknod: arg1 == S_IFIFO|0700
+newfstatat: allow
 openat: allow
-pipe2: allow
+{pipe, pipe2}: allow
 pread64: allow
 read: allow
 readlink: allow

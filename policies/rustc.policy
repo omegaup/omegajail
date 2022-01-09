@@ -1,0 +1,36 @@
+@include ./gcc.policy
+
+# I/O
+epoll_create1: allow
+epoll_ctl: allow
+epoll_wait: allow
+eventfd2: allow
+fdatasync: allow
+getdents64: allow
+getrandom: allow
+mkdir: allow
+newfstatat: allow
+open: allow
+poll: allow
+rename: allow
+rmdir: allow
+statx: allow
+unlinkat: allow
+
+# System
+getegid: allow
+geteuid: allow
+getgid: allow
+getuid: allow
+prctl: arg0 == PR_SET_NAME
+uname: allow
+
+# Threads
+clone: allow
+futex: allow
+rt_sigaction: {arg0 != SIGSYS; allow, return EINVAL}
+sched_getaffinity: allow
+sched_yield: allow
+set_robust_list: allow
+set_tid_address: allow
+sigaltstack: allow
