@@ -171,6 +171,15 @@ def _main() -> None:
     parser.add_argument('--root', default='/var/lib/omegajail', type=str)
     args = parser.parse_args()
 
+    if os.path.isdir('/sys/fs/cgroup/omegajail'):
+        subprocess.run(
+            ['sudo', 'tee', '/sys/fs/cgroup/omegajail/smoketest/cgroup.procs'],
+            check=True,
+            input=f'{os.getpid()}',
+            stdout=subprocess.DEVNULL,
+            universal_newlines=True,
+        )
+
     args.root = os.path.abspath(args.root)
 
     languages = _LANGUAGES

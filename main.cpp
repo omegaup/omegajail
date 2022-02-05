@@ -337,7 +337,29 @@ std::optional<int> ReceiveExitSyscall(ScopedFD sigsys_socket_fd) {
 int MetaInit(void* raw_payload) {
   InitPayload* payload = reinterpret_cast<InitPayload*>(raw_payload);
 
-  std::unique_ptr<ScopedCgroup> memory_cgroup;
+  std::unique_ptr<ScopedCgroup> memory_cgroup, unified_cgroup, pid_cgroup;
+  if (!payload->cgroup_path.empty()) {
+    if (IsCgroupV2()) {
+      unified_cgroup = std::make_unique<ScopedCgroup>(payload->cgroup_path);
+      if (!*unified_cgroup) {
+        {
+          ScopedErrnoPreserver preserve_errno;
+          PLOG(ERROR) << "Failed to create an omegajail cgroup";
+        }
+        return -errno;
+      }
+    } else {
+      pid_cgroup = std::make_unique<ScopedCgroup>(payload->cgroup_path);
+      if (!*pid_cgroup) {
+        {
+          ScopedErrnoPreserver preserve_errno;
+          PLOG(ERROR) << "Failed to create an omegajail pid cgroup";
+        }
+        return -errno;
+      }
+    }
+  }
+
   if (payload->disable_sandboxing) {
     if (prctl(PR_SET_CHILD_SUBREAPER, 1) == -1) {
       {
@@ -347,35 +369,35 @@ int MetaInit(void* raw_payload) {
       return -errno;
     }
   } else if (payload->memory_limit_in_bytes >= 0) {
-    memory_cgroup =
-        std::make_unique<ScopedCgroup>("/sys/fs/cgroup/memory/omegajail");
-    if (!*memory_cgroup) {
+    std::string memory_limit_path;
+    if (unified_cgroup) {
+      memory_limit_path = PathJoin(unified_cgroup->path(), "memory.max");
+    } else {
+      memory_cgroup =
+          std::make_unique<ScopedCgroup>("/sys/fs/cgroup/memory/omegajail");
+      if (!*memory_cgroup) {
+        {
+          ScopedErrnoPreserver preserve_errno;
+          PLOG(ERROR) << "Failed to create an omegajail memory cgroup";
+        }
+        return -errno;
+      }
+      memory_limit_path =
+          PathJoin(memory_cgroup->path(), "memory.limit_in_bytes");
+    }
+    if (!WriteFile(memory_limit_path,
+                   StringPrintf("%zd", payload->memory_limit_in_bytes))) {
       {
         ScopedErrnoPreserver preserve_errno;
-        PLOG(ERROR) << "Failed to create an omegajail memory cgroup";
+        PLOG(ERROR) << "Failed to write the cgroup memory limit to "
+                    << memory_limit_path;
       }
       return -errno;
     }
-    std::string memory_limit_path =
-        StringPrintf("%s/memory.limit_in_bytes", memory_cgroup->path().data());
-    WriteFile(memory_limit_path,
-              StringPrintf("%zd", payload->memory_limit_in_bytes));
     if (chmod(memory_limit_path.c_str(), 0444)) {
       {
         ScopedErrnoPreserver preserve_errno;
         PLOG(ERROR) << "Failed to make the cgroup memory limit read-only";
-      }
-      return -errno;
-    }
-  }
-
-  std::unique_ptr<ScopedCgroup> pid_cgroup;
-  if (!payload->cgroup_path.empty()) {
-    pid_cgroup = std::make_unique<ScopedCgroup>(payload->cgroup_path);
-    if (!*pid_cgroup) {
-      {
-        ScopedErrnoPreserver preserve_errno;
-        PLOG(ERROR) << "Failed to create an omegajail memory cgroup";
       }
       return -errno;
     }
@@ -417,19 +439,46 @@ int MetaInit(void* raw_payload) {
     }
     if (!payload->comm.empty())
       prctl(PR_SET_NAME, payload->comm.c_str());
-    for (auto* cgroup_ptr : {&memory_cgroup, &pid_cgroup}) {
-      auto& cgroup = *cgroup_ptr;
-      if (!cgroup)
-        continue;
-      std::string tasks_path = StringPrintf("%s/tasks", cgroup->path().data());
-      WriteFile(tasks_path.c_str(), "2\n", true);
-      cgroup->release();
-      if (chmod(tasks_path.c_str(), 0444)) {
+    if (unified_cgroup) {
+      std::string procs_path = PathJoin(unified_cgroup->path(), "cgroup.procs");
+      if (!WriteFile(procs_path.c_str(), "+2\n", true)) {
         {
           ScopedErrnoPreserver preserve_errno;
-          PLOG(ERROR) << "Failed to make the cgroup task list read-only";
+          PLOG(ERROR) << "Failed to add the cgroup proc to "
+                      << procs_path;
         }
         return -errno;
+      }
+      unified_cgroup->release();
+      if (chmod(procs_path.c_str(), 0444)) {
+        {
+          ScopedErrnoPreserver preserve_errno;
+          PLOG(ERROR) << "Failed to make " << procs_path << " read-only";
+        }
+        return -errno;
+      }
+    } else {
+      for (auto* cgroup_ptr : {&memory_cgroup, &pid_cgroup}) {
+        auto& cgroup = *cgroup_ptr;
+        if (!cgroup)
+          continue;
+        std::string tasks_path = PathJoin(cgroup->path(), "tasks");
+        if (!WriteFile(tasks_path.c_str(), "2\n", true)) {
+          {
+            ScopedErrnoPreserver preserve_errno;
+            PLOG(ERROR) << "Failed to write the cgroup task list to "
+                        << tasks_path;
+          }
+          return -errno;
+        }
+        cgroup->release();
+        if (chmod(tasks_path.c_str(), 0444)) {
+          {
+            ScopedErrnoPreserver preserve_errno;
+            PLOG(ERROR) << "Failed to make " << tasks_path << " read-only";
+          }
+          return -errno;
+        }
       }
     }
     if (sigprocmask(SIG_SETMASK, &orig_mask, nullptr) < 0) {
@@ -771,6 +820,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (args.memory_limit_in_bytes >= 0 &&
+        !IsCgroupV2() &&
         minijail_mount(j.get(), "/sys/fs/cgroup/memory/omegajail",
                        "/sys/fs/cgroup/memory/omegajail", "", MS_BIND)) {
       LOG(ERROR) << "Failed to mount /sys/fs/cgroup/memory";
@@ -806,15 +856,46 @@ int main(int argc, char* argv[]) {
 
   std::string cgroup_path;
   if (!args.script_basename.empty()) {
-    cgroup_path = StringPrintf("/sys/fs/cgroup/pids/omegajail/%s",
-                               args.script_basename.c_str());
-    if (access(cgroup_path.c_str(), W_OK) != 0) {
-      cgroup_path.clear();
-    } else if (!args.disable_sandboxing &&
-               minijail_mount(j.get(), "/sys/fs/cgroup/pids/omegajail",
-                              "/sys/fs/cgroup/pids/omegajail", "", MS_BIND)) {
-      LOG(ERROR) << "Failed to mount /sys/fs/cgroup/pids";
-      return 1;
+    if (IsCgroupV2()) {
+      cgroup_path = "/sys/fs/cgroup/omegajail";
+      if (access(cgroup_path.c_str(), W_OK) != 0) {
+        cgroup_path.clear();
+      } else {
+        cgroup_path =
+            PathJoin("/sys/fs/cgroup/omegajail", args.script_basename);
+        if (mkdir(cgroup_path.c_str(), 0775) == 0) {
+          const std::string subtree_control_path =
+              PathJoin(cgroup_path, "cgroup.subtree_control");
+          if (!WriteFile(subtree_control_path, "+memory")) {
+            {
+              ScopedErrnoPreserver preserve_errno;
+              PLOG(ERROR) << "Failed to write the cgroup subtree control "
+                          << subtree_control_path;
+            }
+            return -errno;
+          }
+        } else if (errno != EEXIST) {
+          LOG(ERROR) << "Failed to create " << cgroup_path;
+          return 1;
+        }
+        if (!args.disable_sandboxing &&
+            minijail_mount(j.get(), "/sys/fs/cgroup/omegajail",
+                           "/sys/fs/cgroup/omegajail", "", MS_BIND)) {
+          LOG(ERROR) << "Failed to mount /sys/fs/cgroup/omegajail";
+          return 1;
+        }
+      }
+    } else {
+      cgroup_path =
+          PathJoin("/sys/fs/cgroup/pids/omegajail", args.script_basename);
+      if (access(cgroup_path.c_str(), W_OK) != 0) {
+        cgroup_path.clear();
+      } else if (!args.disable_sandboxing &&
+                 minijail_mount(j.get(), "/sys/fs/cgroup/pids/omegajail",
+                                "/sys/fs/cgroup/pids/omegajail", "", MS_BIND)) {
+        LOG(ERROR) << "Failed to mount /sys/fs/cgroup/pids";
+        return 1;
+      }
     }
   }
 

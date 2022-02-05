@@ -123,10 +123,10 @@ void ScopedCgroup::reset(std::string_view subsystem) {
   for (int attempts = 0; attempts <= 1000; ++attempts) {
     std::string path =
         StringPrintf("%s/omegajail_%d", subsystem.data(), attempts);
-    if (mkdir(path.c_str(), 0755)) {
+    if (mkdir(path.c_str(), 0755) == -1) {
       if (errno == EEXIST)
         continue;
-      return;
+      PLOG(FATAL) << path;
     }
     path_ = path;
     break;
@@ -441,6 +441,12 @@ bool ReadUint64(std::string_view path, uint64_t* value) {
   if (!is || !(is >> *value))
     return false;
   return true;
+}
+
+bool IsCgroupV2() {
+  static const bool is_cgroup_v2 =
+      FileExists("/sys/fs/cgroup/cgroup.controllers");
+  return is_cgroup_v2;
 }
 
 bool SendFD(int sockfd, ScopedFD fd) {

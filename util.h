@@ -148,6 +148,8 @@ bool WriteFile(std::string_view path,
                bool append = false,
                mode_t mode = 0664);
 
+bool IsCgroupV2();
+
 bool SendFD(int sockfd, ScopedFD fd);
 ScopedFD ReceiveFD(int sockfd);
 

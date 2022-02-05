@@ -425,6 +425,7 @@ def _main() -> None:
         root.write('/sys/devices/system/cpu/online', b'0')
 
         # cgroups support
+        root.mkdir('/sys/fs/cgroup/omegajail')
         root.mkdir('/sys/fs/cgroup/memory/omegajail')
         root.mkdir('/sys/fs/cgroup/pids/omegajail')
 
