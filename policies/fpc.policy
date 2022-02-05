@@ -15,6 +15,7 @@ getdents64: allow
 ioctl: return ENOTTY
 {lseek, _llseek[arch=armv7]}: allow
 {lstat[arch=x86_64], lstat64[arch=armv7]}: allow
+newfstatat: allow
 {open, openat}: allow
 pread64: allow
 read: allow
@@ -38,6 +39,9 @@ munmap: allow
 getrusage: allow
 prlimit64: {arg1 == RLIMIT_STACK || arg2 == 0; allow, return EPERM}
 
+# System
+getrandom: allow
+
 # Signals
 rt_sigaction: arg0 != SIGSYS
 rt_sigprocmask: allow
@@ -48,5 +52,9 @@ time: allow
 gettimeofday: allow
 
 # Processes / threads
+getpid: allow
 {fork, vfork}: allow
+futex: allow
+set_tid_address: allow
+set_robust_list: allow
 wait4: allow

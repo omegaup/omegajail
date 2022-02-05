@@ -290,7 +290,7 @@ bool Args::SetCompileFlags(std::string_view root,
 
   if (language == "c" || language == "c11-gcc") {
     script_basename = UseSeccompProgram(PathJoin(root, "policies/gcc.bpf"), j);
-    program_args_holder = {"/usr/bin/gcc-10", "-o", std::string(target),
+    program_args_holder = {"/usr/bin/gcc-11", "-o", std::string(target),
                            "--std=c11", "-O2"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
@@ -300,7 +300,7 @@ bool Args::SetCompileFlags(std::string_view root,
   if (language == "c11-clang") {
     script_basename =
         UseSeccompProgram(PathJoin(root, "policies/clang.bpf"), j);
-    program_args_holder = {"/usr/bin/clang-10", "-o",  std::string(target),
+    program_args_holder = {"/usr/bin/clang-11", "-o",  std::string(target),
                            "--std=c11",      "-O3", "-march=native"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
@@ -309,7 +309,7 @@ bool Args::SetCompileFlags(std::string_view root,
   }
   if (language == "cpp03-gcc") {
     script_basename = UseSeccompProgram(PathJoin(root, "policies/gcc.bpf"), j);
-    program_args_holder = {"/usr/bin/g++-10", "--std=c++03", "-o",
+    program_args_holder = {"/usr/bin/g++-11", "--std=c++03", "-o",
                            std::string(target), "-O2"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
@@ -318,7 +318,7 @@ bool Args::SetCompileFlags(std::string_view root,
   }
   if (language == "cpp03-clang") {
     script_basename = UseSeccompProgram(PathJoin(root, "policies/clang.bpf"), j);
-    program_args_holder = {"/usr/bin/clang++-10", "--std=c++03", "-o",
+    program_args_holder = {"/usr/bin/clang++-11", "--std=c++03", "-o",
                            std::string(target), "-O2"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
@@ -327,7 +327,7 @@ bool Args::SetCompileFlags(std::string_view root,
   }
   if (language == "cpp" || language == "cpp11" || language == "cpp11-gcc") {
     script_basename = UseSeccompProgram(PathJoin(root, "policies/gcc.bpf"), j);
-    program_args_holder = {"/usr/bin/g++-10", "--std=c++11", "-o",
+    program_args_holder = {"/usr/bin/g++-11", "--std=c++11", "-o",
                            std::string(target), "-O2"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
@@ -337,7 +337,7 @@ bool Args::SetCompileFlags(std::string_view root,
   if (language == "cpp11-clang") {
     script_basename =
         UseSeccompProgram(PathJoin(root, "policies/clang.bpf"), j);
-    program_args_holder = {"/usr/bin/clang++-10",  "--std=c++11", "-o",
+    program_args_holder = {"/usr/bin/clang++-11",  "--std=c++11", "-o",
                            std::string(target), "-O3",         "-march=native"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
@@ -346,7 +346,7 @@ bool Args::SetCompileFlags(std::string_view root,
   }
   if (language == "cpp17-gcc") {
     script_basename = UseSeccompProgram(PathJoin(root, "policies/gcc.bpf"), j);
-    program_args_holder = {"/usr/bin/g++-10", "--std=c++17", "-o",
+    program_args_holder = {"/usr/bin/g++-11", "--std=c++17", "-o",
                            std::string(target), "-O2"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
@@ -356,7 +356,7 @@ bool Args::SetCompileFlags(std::string_view root,
   if (language == "cpp17-clang") {
     script_basename =
         UseSeccompProgram(PathJoin(root, "policies/clang.bpf"), j);
-    program_args_holder = {"/usr/bin/clang++-10",  "--std=c++17", "-o",
+    program_args_holder = {"/usr/bin/clang++-11",  "--std=c++17", "-o",
                            std::string(target), "-O3",         "-march=native"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
@@ -365,7 +365,7 @@ bool Args::SetCompileFlags(std::string_view root,
   }
   if (language == "cpp20-gcc") {
     script_basename = UseSeccompProgram(PathJoin(root, "policies/gcc.bpf"), j);
-    program_args_holder = {"/usr/bin/g++-10", "--std=c++20", "-o",
+    program_args_holder = {"/usr/bin/g++-11", "--std=c++20", "-o",
                            std::string(target), "-O2"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
@@ -375,7 +375,7 @@ bool Args::SetCompileFlags(std::string_view root,
   if (language == "cpp20-clang") {
     script_basename =
         UseSeccompProgram(PathJoin(root, "policies/clang.bpf"), j);
-    program_args_holder = {"/usr/bin/clang++-10",  "--std=c++20", "-o",
+    program_args_holder = {"/usr/bin/clang++-11",  "--std=c++20", "-o",
                            std::string(target), "-O3",         "-march=native"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
@@ -399,7 +399,7 @@ bool Args::SetCompileFlags(std::string_view root,
   }
   if (language == "lua") {
     script_basename = UseSeccompProgram(PathJoin(root, "policies/lua.bpf"), j);
-    program_args_holder = {"/usr/bin/luac5.3", "-o", std::string(target)};
+    program_args_holder = {"/usr/bin/luac5.4", "-o", std::string(target)};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
     return true;
@@ -586,7 +586,7 @@ bool Args::SetRunFlags(std::string_view root,
   if (language == "lua") {
     SetMemoryLimit(memory_limit_bytes + kExtraMemorySizeInBytes);
     script_basename = UseSeccompProgram(PathJoin(root, "policies/lua.bpf"), j);
-    program_args_holder = {"/usr/bin/lua5.3", StringPrintf("./%s", target.data())};
+    program_args_holder = {"/usr/bin/lua5.4", StringPrintf("./%s", target.data())};
     return true;
   }
   if (language == "hs") {
@@ -603,28 +603,11 @@ bool Args::SetRunFlags(std::string_view root,
     if (!BindReadOnly(PathJoin(root, "root-java"), "/usr/lib/jvm", j))
       return false;
     program_args_holder = {
-        "/usr/bin/java",
-        "-Xshare:on",
-        "-XX:+UnlockExperimentalVMOptions",
-        "-XX:+UseSerialGC",
+        StringPrintf("./%s", target.data()),
     };
     if (memory_limit_bytes > 0) {
       program_args_holder.emplace_back(StringPrintf(
           "-Xmx%" PRId64, memory_limit_bytes + kJavaMinHeapSizeInBytes));
-    }
-    if (language == "kt") {
-      program_args_holder.emplace_back(
-          StringPrintf("-XX:AOTLibrary=/usr/lib/jvm/java.base.so,"
-                       "/usr/lib/jvm/kotlin-stdlib.jar.so,./%s.so",
-                       target.data()));
-      program_args_holder.emplace_back("-cp");
-      program_args_holder.emplace_back(
-          "/usr/lib/jvm/kotlinc/lib/kotlin-stdlib.jar:.");
-      program_args_holder.emplace_back(StringPrintf("%sKt", target.data()));
-    } else {
-      program_args_holder.emplace_back(StringPrintf(
-          "-XX:AOTLibrary=/usr/lib/jvm/java.base.so,./%s.so", target.data()));
-      program_args_holder.emplace_back(target);
     }
     return true;
   }

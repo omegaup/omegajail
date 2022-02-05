@@ -5,7 +5,7 @@
 {exit, exit_group}: allow
 
 # I/O
-access: allow
+{access, faccessat2}: allow
 chmod: allow
 close: allow
 {dup, dup2}: allow
@@ -18,6 +18,7 @@ ioctl: return ENOTTY
 {lseek, _llseek[arch=armv7]}: allow
 {lstat[arch=x86_64], lstat64[arch=armv7]}: allow
 mkdir: allow
+newfstatat: allow
 openat: allow
 {pipe, pipe2}: allow
 {read, readv, pread64}: allow
@@ -27,6 +28,9 @@ readlink: allow
 umask: allow
 unlink: allow
 {write, writev}: allow
+
+# System
+getrandom: allow
 
 # Environment
 getcwd: allow
@@ -60,6 +64,7 @@ clone: arg0 == CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SY
 getpid: allow
 futex: allow
 sched_yield: allow
+sched_getaffinity: allow
 restart_syscall: allow
 rt_sigaction: arg0 != SIGSYS
 rt_sigprocmask: allow

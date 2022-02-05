@@ -142,7 +142,7 @@ rootfs: .omegajail-builder-rootfs-runtime.stamp .omegajail-builder-rootfs-setup.
 		.
 	touch $@
 
-omegajail-focal-rootfs-x86_64.tar.xz: .omegajail-builder-rootfs-build.stamp
+omegajail-jammy-rootfs-x86_64.tar.xz: .omegajail-builder-rootfs-build.stamp
 	rm -f $@
 	touch ".$@.tmp"
 	docker run \
@@ -164,7 +164,7 @@ omegajail-focal-rootfs-x86_64.tar.xz: .omegajail-builder-rootfs-build.stamp
 		.
 	touch $@
 
-omegajail-focal-distrib-x86_64.tar.xz: .omegajail-builder-distrib.stamp
+omegajail-jammy-distrib-x86_64.tar.xz: .omegajail-builder-distrib.stamp
 	rm -f $@
 	touch ".$@.tmp"
 	docker run \

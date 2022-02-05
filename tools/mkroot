@@ -267,8 +267,11 @@ class Chroot:
         self.mkdir(os.path.dirname(path))
         target = self.__chroot_path(path)
         if os.path.islink(target):
-            if os.path.readlink(target) != destination:
-                raise ValueError('Target file %r points to %r, but it was expected to point to %r' % (target, os.path.readlink(target), destination))
+            real_destination = os.readlink(target)
+            if real_destination != destination:
+                raise ValueError(
+                    'Target file %r points to %r, but it was expected to point to %r'
+                    % (target, real_destination, destination))
             return
         if os.path.isfile(target):
             return
@@ -332,11 +335,11 @@ def _main() -> None:
         'libcap2',
         'libcrypt1',
         'libexpat1',
-        'libffi7',
+        'libffi8',
         'libgdbm-compat4',
         'libgdbm6',
         'libgmp10',
-        'libicu66',
+        'libicu67',
         'liblzma5',
         'libreadline8',
         'libssl1.1',
@@ -345,23 +348,25 @@ def _main() -> None:
         'libunwind8',
         'libuuid1',
         'libyaml-0-2',
-        'lua5.3',
+        'lua5.4',
         'zlib1g',
     ]
 
     COMPILER_PACKAGES = ROOT_PACKAGES + [
-        'clang-10',
-        'fp-compiler-3.0.4',
-        'fp-units-fcl-3.0.4',
+        'clang-11',
+        'fp-compiler-3.2.2',
+        'fp-units-fcl-3.2.2',
         'gcc',
-        'cpp-10',
-        'g++-10',
-        'gcc-10',
+        'cpp-11',
+        'g++-11',
+        'gcc-11',
         'libbsd-dev',
         'libc6-dev',
+        'libedit2',
         'libffi-dev',
         'libgmp-dev',
         'libitm1',
+        'libmd0',
         'libquadmath0',
         'libtsan0',
         'zlib1g-dev',
@@ -385,10 +390,10 @@ def _main() -> None:
     HASKELL_FILES = resolver.files_for(
         'ghc', exclude_packages=COMPILER_PACKAGES + ['libncurses5-dev'])
     JAVA_FILES = resolver.files_for([
-        'openjdk-16-jdk',
-        'openjdk-16-jdk-headless',
-        'openjdk-16-jre',
-        'openjdk-16-jre-headless',
+        'openjdk-17-jdk',
+        'openjdk-17-jdk-headless',
+        'openjdk-17-jre',
+        'openjdk-17-jre-headless',
     ],
                                     recursive=False,
                                     exclude_files=['/etc'])
@@ -460,8 +465,6 @@ def _main() -> None:
 
         root.symlink('/usr/bin/java',
                      [x for x in JAVA_FILES if x.endswith('bin/java')][0])
-        root.symlink('/usr/bin/jaotc',
-                     [x for x in JAVA_FILES if x.endswith('bin/jaotc')][0])
         root.symlink('/usr/bin/python2.7', os.path.join(PYTHON2_ROOT, 'python2.7'))
         root.symlink('/usr/bin/python3', os.path.join(PYTHON3_ROOT, 'bin/python3'))
         root.symlink('/usr/bin/python3.9', os.path.join(PYTHON3_ROOT, 'bin/python3.9'))
@@ -488,7 +491,7 @@ def _main() -> None:
         # will be left read-only for the programs that don't need it.
         root.mkdir('/tmp/')
 
-        root.symlink('/usr/bin/lua', 'lua5.3')
+        root.symlink('/usr/bin/lua', 'lua5.4')
 
     with Chroot(
             os.path.join(args.target, 'root-compilers'), '/',
@@ -519,11 +522,11 @@ def _main() -> None:
             root.symlink(f, os.path.join(HASKELL_ROOT, f.replace('/', '_')))
 
         root.write('/rust-toolchain.toml', b'[toolchain]\npath = "/opt/rust/rustup/toolchains/stable-x86_64-unknown-linux-gnu"')
-        root.symlink('/usr/bin/cc', 'clang-10')
+        root.symlink('/usr/bin/cc', 'clang-11')
         root.mkdir('/tmp/')
         root.mkdir('/var/lib/omegajail/bin')
 
-        root.symlink('/usr/bin/luac', 'luac5.3')
+        root.symlink('/usr/bin/luac', 'luac5.4')
 
     with Chroot(
             os.path.join(args.target, 'root-java'), JAVA_ROOT,
@@ -532,42 +535,10 @@ def _main() -> None:
             if not filename.startswith(JAVA_ROOT):
                 continue
             root.copyfromhost(filename)
-        root.copyfromhost('/usr/lib/jvm/kotlinc',
-                          relative_to=JAVA_ROOT,
-                          recurse=True)
-        logging.info('Generating the Java Class Data Sharing bundle.')
-        subprocess.check_call([
-            '/usr/bin/java',
-            '-Xshare:dump',
-            f'-XX:SharedArchiveFile={root.path}/java-16-openjdk-amd64/lib/server/classes.jsa',
-        ])
-        logging.info('Precompiling critical methods from java.base.')
-        subprocess.check_call([
-            '/usr/bin/jaotc',
-            '-J-Xshare:on',
-            '-J-XX:+UseSerialGC',
-            '-J-XX:+UnlockExperimentalVMOptions',
-            f'-J-XX:SharedArchiveFile={root.path}/java-16-openjdk-amd64/lib/server/classes.jsa',
-            '--compile-commands',
-            os.path.join(_CURRENT_DIR, 'java.base.aotcfg'),
-            '--module',
-            'java.base',
-            '--output',
-            f'{root.path}/java.base.so',
-        ])
-        logging.info('Precompiling the kotlin runtime.')
-        subprocess.check_call([
-            '/usr/bin/jaotc',
-            '-J-Xshare:on',
-            '-J-XX:+UseSerialGC',
-            '-J-XX:+UnlockExperimentalVMOptions',
-            f'-J-XX:SharedArchiveFile={root.path}/java-16-openjdk-amd64/lib/server/classes.jsa',
-            '--jar',
-            '/usr/lib/jvm/kotlinc/lib/kotlin-stdlib.jar',
-            '--output',
-            f'{root.path}/kotlin-stdlib.jar.so',
-        ])
-        logging.info('Done.')
+        for directory in ('graalvm', 'kotlinc'):
+            root.copyfromhost(os.path.join('/usr/lib/jvm', directory),
+                              relative_to=JAVA_ROOT,
+                              recurse=True)
 
     with Chroot(
             os.path.join(args.target, 'root-python2'), PYTHON2_ROOT,

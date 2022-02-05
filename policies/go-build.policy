@@ -14,7 +14,6 @@ fchmodat: allow
 flock: allow
 ftruncate: allow
 mkdirat: allow
-newfstatat: allow
 pwrite64: allow
 readlinkat: allow
 renameat: allow
@@ -23,14 +22,11 @@ utimensat: allow
 
 # Threads
 clone: allow
-futex: allow
 nanosleep: allow
 restart_syscall: allow
 rt_sigaction: allow
 sched_getaffinity: allow
 sched_yield: allow
-set_robust_list: allow
-set_tid_address: allow
 sigaltstack: allow
 tgkill: allow
 

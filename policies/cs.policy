@@ -18,6 +18,7 @@ ioctl: return ENOTTY
 {lstat[arch=x86_64], lstat64[arch=armv7]}: allow
 {lseek, _llseek[arch=armv7]}: allow
 mknod: arg1 == S_IFIFO|0700
+mknodat: arg2 == S_IFIFO|0700
 newfstatat: allow
 openat: allow
 {pipe, pipe2}: allow
@@ -70,6 +71,9 @@ sched_yield: allow
 set_robust_list: allow
 set_tid_address: allow
 sigaltstack: allow
+
+# System
+getrandom: allow
 
 # abort
 tgkill: arg0 == 2

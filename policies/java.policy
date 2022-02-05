@@ -62,6 +62,9 @@ set_tid_address: allow
 setpriority: return SIGSYS
 tgkill: allow
 
+# System
+getrandom: allow
+
 # Time
 clock_getres: allow
 clock_gettime: allow

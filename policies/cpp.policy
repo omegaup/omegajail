@@ -33,7 +33,9 @@ prlimit64: {arg1 == RLIMIT_STACK || arg2 == 0; allow, return EPERM}
 
 # Threads
 clone: arg0 == CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID
-futex: return ENOSYS
+futex: allow
+set_robust_list: allow
+set_tid_address: allow
 
 # Environment
 sysinfo: return ENOSYS
@@ -50,4 +52,4 @@ gettid: allow
 rt_sigaction: arg0 != SIGSYS
 rt_sigprocmask: allow
 rt_sigreturn: allow
-tgkill: arg0 == 2
+{kill, tgkill}: arg0 == 2

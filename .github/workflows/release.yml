@@ -28,12 +28,12 @@ jobs:
           INITIAL_VERSION: 1.0.0
           TAG_CONTEXT: repo
 
-      - name: Build omegajail-focal-distrib-x86_64.tar.xz
-        run: make OMEGAJAIL_RELEASE=${{ steps.bump-version.outputs.tag }} omegajail-focal-distrib-x86_64.tar.xz
+      - name: Build omegajail-jammy-distrib-x86_64.tar.xz
+        run: make OMEGAJAIL_RELEASE=${{ steps.bump-version.outputs.tag }} omegajail-jammy-distrib-x86_64.tar.xz
 
-      - name: Build omegajail-focal-rootfs-x86_64.tar.xz
+      - name: Build omegajail-jammy-rootfs-x86_64.tar.xz
         if: ${{ steps.bump-version.outputs.part == 'major' || steps.bump-version.outputs.part == 'minor' }}
-        run: make omegajail-focal-rootfs-x86_64.tar.xz
+        run: make omegajail-jammy-rootfs-x86_64.tar.xz
 
       - name: Build omegaup/omegajail-builder-rootfs-runtime container
         if: ${{ steps.bump-version.outputs.part == 'major' || steps.bump-version.outputs.part == 'minor' }}
@@ -50,25 +50,25 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Upload omegajail-focal-distrib-x86_64.tar.xz Release Asset
+      - name: Upload omegajail-jammy-distrib-x86_64.tar.xz Release Asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create-release.outputs.upload_url }}
-          asset_path: ./omegajail-focal-distrib-x86_64.tar.xz
-          asset_name: omegajail-focal-distrib-x86_64.tar.xz
+          asset_path: ./omegajail-jammy-distrib-x86_64.tar.xz
+          asset_name: omegajail-jammy-distrib-x86_64.tar.xz
           asset_content_type: application/octet-stream
 
-      - name: Upload omegajail-focal-rootfs-x86_64.tar.xz Release Asset
+      - name: Upload omegajail-jammy-rootfs-x86_64.tar.xz Release Asset
         if: ${{ steps.bump-version.outputs.part == 'major' || steps.bump-version.outputs.part == 'minor' }}
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create-release.outputs.upload_url }}
-          asset_path: ./omegajail-focal-rootfs-x86_64.tar.xz
-          asset_name: omegajail-focal-rootfs-x86_64.tar.xz
+          asset_path: ./omegajail-jammy-rootfs-x86_64.tar.xz
+          asset_name: omegajail-jammy-rootfs-x86_64.tar.xz
           asset_content_type: application/octet-stream
 
       - name: Publish omegaup/omegajail-builder-rootfs-runtime container package

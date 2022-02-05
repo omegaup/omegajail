@@ -12,6 +12,7 @@ close: allow
 getcwd: allow
 ioctl: arg1 == FIOCLEX || arg1 == TCGETS
 {lstat[arch=x86_64], lstat64[arch=armv7]}: allow
+newfstatat: allow
 openat: allow
 pipe2: allow
 {pwrite64, write}: allow

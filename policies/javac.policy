@@ -5,7 +5,7 @@
 {exit, exit_group}: allow
 
 # I/O
-access: allow
+{access, faccessat2}: allow
 chmod: allow
 chdir: allow
 close: allow
@@ -82,3 +82,4 @@ restart_syscall[arch=armv7]: allow
 clock_getres: allow
 clock_gettime: allow
 gettimeofday: allow  # This is needed by the compilation wrapper.
+times: allow

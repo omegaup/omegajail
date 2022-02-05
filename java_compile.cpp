@@ -72,19 +72,19 @@ int main(int argc, char* argv[]) {
                 << " [--language=...] <target> <source> [<source> ...]";
   }
   std::vector<std::string> compiler_args;
-  std::vector<std::string> jaotc_args = {
-      "/usr/bin/jaotc", "-J-Xmx512M", "-J-XX:+UseSerialGC",
-      "-J-Xshare:on",   "--output",   StringPrintf("%s.so", argv[1]),
+  std::vector<std::string> native_image_args = {
+      "/usr/lib/jvm/graalvm/bin/native-image",
+      "-dsa",
+      "-H:NumberOfThreads=1",
+      "-J-Xms512M",
+      "-J-Xmx896M",
   };
   if (kotlin) {
     compiler_args = {
         "/usr/bin/java",
         "-Xmx896M",
         "-Xms32M",
-        "-Xshare:on",
         "-XX:+UseSerialGC",
-        "-XX:+UnlockExperimentalVMOptions",
-        "-XX:AOTLibrary=/usr/lib/jvm/java.base.so",
         "-cp",
         "/usr/lib/jvm/kotlinc/lib/kotlin-preloader.jar",
         "org.jetbrains.kotlin.preloading.Preloader",
@@ -92,15 +92,15 @@ int main(int argc, char* argv[]) {
         "/usr/lib/jvm/kotlinc/lib/kotlin-compiler.jar",
         "org.jetbrains.kotlin.cli.jvm.K2JVMCompiler",
     };
-    jaotc_args.emplace_back("-J-XX:+UnlockExperimentalVMOptions");
-    jaotc_args.emplace_back(
-        "-J-XX:AOTLibrary=/usr/lib/jvm/java.base.so,/usr/lib/jvm/"
-        "kotlin-stdlib.jar.so");
+    native_image_args.emplace_back("-cp");
+    native_image_args.emplace_back(
+        "/usr/lib/jvm/kotlinc/lib/kotlin-stdlib.jar:.");
   } else {
     compiler_args = {
         "/usr/bin/javac",
         "-J-Xmx896M",
         "-J-Xms32M",
+        "-J-XX:+UseSerialGC",
     };
   }
   compiler_args.emplace_back("-d");
@@ -108,16 +108,16 @@ int main(int argc, char* argv[]) {
   for (int i = 2; i < argc; ++i) {
     compiler_args.emplace_back(argv[i]);
     if (kotlin) {
-      jaotc_args.emplace_back(
-          StringPrintf("%sKt.class", TrimExtension(argv[i], ".kt").data()));
+      native_image_args.emplace_back(
+          StringPrintf("%sKt", TrimExtension(argv[i], ".kt").data()));
     } else {
-      jaotc_args.emplace_back(
-          StringPrintf("%s.class", TrimExtension(argv[i], ".java").data()));
+      native_image_args.emplace_back(TrimExtension(argv[i], ".java").data());
     }
   }
+  native_image_args.emplace_back(argv[1]);
 
   int status = ForkExec(compiler_args);
   if (status != 0)
     return status;
-  Exec(jaotc_args);
+  Exec(native_image_args);
 }
