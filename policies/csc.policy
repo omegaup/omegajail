@@ -75,4 +75,4 @@ sched_yield: allow
 set_robust_list: allow
 set_tid_address: allow
 sigaltstack: allow
-tgkill: arg0 == 2
+tgkill: arg0 != 1

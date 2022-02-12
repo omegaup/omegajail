@@ -23,6 +23,7 @@ ioctl: arg1 == FIONREAD || arg1 == TCGETS
 mkdir: allow
 newfstatat: allow
 openat: allow
+poll: allow
 pipe: allow
 pipe2: allow
 {read, pread64}: allow
@@ -35,7 +36,7 @@ socketpair: allow
 statfs: allow
 umask: allow
 unlink: allow
-write: allow
+{write, writev}: allow
 
 # Memory
 {arch_prctl[arch=x86_64], ARM_set_tls[arch=armv7]}: allow
@@ -77,6 +78,7 @@ wait4: allow  # This is needed by the compilation wrapper.
 
 # Signals
 restart_syscall[arch=armv7]: allow
+sigaltstack: allow
 
 # Time
 clock_getres: allow

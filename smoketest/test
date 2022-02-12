@@ -208,7 +208,7 @@ def _main() -> None:
                                  'cgroup.subtree_control'), 'w') as f:
                 f.write('+memory')
             os.makedirs(smoketest_cgroup, exist_ok=True)
-            with open(os.path.join(smoketest_cgroup, 'cgroup.subtree_control'),
+            with open(os.path.join(smoketest_cgroup, 'cgroup.controllers'),
                       'w') as f:
                 f.write('+memory')
         with open(os.path.join(smoketest_cgroup, 'cgroup.procs'), 'w') as f:

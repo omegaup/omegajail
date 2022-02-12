@@ -61,4 +61,4 @@ epoll_wait: allow
 eventfd2: allow
 
 # abort()
-tgkill: arg0 == 2
+tgkill: arg0 != 1

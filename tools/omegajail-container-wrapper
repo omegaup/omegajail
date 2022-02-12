@@ -56,4 +56,4 @@ for bind_flag in "${bind_flags[@]}"; do
   ln -sf "${bind_source}" "${link_target}"
 done
 
-exec /var/lib/omegajail/bin/omegajail.wrapped --disable-sandboxing "${args[@]}"
+exec /var/lib/omegajail/bin/omegajail.wrapped --disable-sandboxing "${filtered_args[@]}"

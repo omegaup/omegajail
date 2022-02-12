@@ -52,4 +52,4 @@ rt_sigprocmask: allow
 # abort()
 getpid: allow
 gettid: allow
-tgkill: arg0 == 2
+tgkill: arg0 != 1
