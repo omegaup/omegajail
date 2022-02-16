@@ -10,7 +10,7 @@ close: allow
 {fstat[arch=x86_64], fstat64[arch=armv7]}: allow
 {fcntl[arch=x86_64], fcntl64[arch=armv7]}: arg1 == F_GETFL || arg1 == F_SETFD || arg1 == F_GETFD
 getcwd: allow
-ioctl: arg1 == FIOCLEX || arg1 == TCGETS
+ioctl: {arg1 == FIOCLEX || arg1 == TCGETS; allow, return EPERM}
 {lstat[arch=x86_64], lstat64[arch=armv7]}: allow
 openat: allow
 pipe2: allow
