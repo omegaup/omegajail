@@ -16,17 +16,16 @@ jobs:
       - uses: actions/checkout@v2
         with:
           submodules: recursive
-          fetch-depth: 0
+          fetch-depth: '0'
 
       - name: Bump version and push tag
         id: bump-version
-        uses: anothrNick/github-tag-action@9aaabdb5e989894e95288328d8b17a6347217ae3
+        uses: anothrNick/github-tag-action@9885a4f9af674ba472de91fb3c0cb033ecb32b7e
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WITH_V: true
           DEFAULT_BUMP: patch
           INITIAL_VERSION: 1.0.0
-          TAG_CONTEXT: repo
 
       - name: Build omegajail-focal-distrib-x86_64.tar.xz
         run: make OMEGAJAIL_RELEASE=${{ steps.bump-version.outputs.tag }} omegajail-focal-distrib-x86_64.tar.xz
