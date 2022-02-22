@@ -290,8 +290,8 @@ bool Args::SetCompileFlags(std::string_view root,
 
   if (language == "c" || language == "c11-gcc") {
     script_basename = UseSeccompProgram(PathJoin(root, "policies/gcc.bpf"), j);
-    program_args_holder = {"/usr/bin/gcc-10", "-o", std::string(target),
-                           "--std=c11", "-O2"};
+    program_args_holder = {"/usr/bin/gcc-10",   "-xc",       "-o",
+                           std::string(target), "--std=c11", "-O2"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
     program_args_holder.emplace_back("-lm");
@@ -300,8 +300,9 @@ bool Args::SetCompileFlags(std::string_view root,
   if (language == "c11-clang") {
     script_basename =
         UseSeccompProgram(PathJoin(root, "policies/clang.bpf"), j);
-    program_args_holder = {"/usr/bin/clang-10", "-o",  std::string(target),
-                           "--std=c11",      "-O3", "-march=native"};
+    program_args_holder = {"/usr/bin/clang-10", "-xc",       "-o",
+                           std::string(target), "--std=c11", "-O3",
+                           "-march=native"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
     program_args_holder.emplace_back("-lm");
@@ -309,7 +310,7 @@ bool Args::SetCompileFlags(std::string_view root,
   }
   if (language == "cpp03-gcc") {
     script_basename = UseSeccompProgram(PathJoin(root, "policies/gcc.bpf"), j);
-    program_args_holder = {"/usr/bin/g++-10", "--std=c++03", "-o",
+    program_args_holder = {"/usr/bin/g++-10",   "-xc++", "--std=c++03", "-o",
                            std::string(target), "-O2"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
@@ -318,8 +319,8 @@ bool Args::SetCompileFlags(std::string_view root,
   }
   if (language == "cpp03-clang") {
     script_basename = UseSeccompProgram(PathJoin(root, "policies/clang.bpf"), j);
-    program_args_holder = {"/usr/bin/clang++-10", "--std=c++03", "-o",
-                           std::string(target), "-O2"};
+    program_args_holder = {"/usr/bin/clang++-10", "-xc++", "--std=c++03", "-o",
+                           std::string(target),   "-O2"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
     program_args_holder.emplace_back("-lm");
@@ -327,7 +328,7 @@ bool Args::SetCompileFlags(std::string_view root,
   }
   if (language == "cpp" || language == "cpp11" || language == "cpp11-gcc") {
     script_basename = UseSeccompProgram(PathJoin(root, "policies/gcc.bpf"), j);
-    program_args_holder = {"/usr/bin/g++-10", "--std=c++11", "-o",
+    program_args_holder = {"/usr/bin/g++-10",   "-xc++", "--std=c++11", "-o",
                            std::string(target), "-O2"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
@@ -337,8 +338,8 @@ bool Args::SetCompileFlags(std::string_view root,
   if (language == "cpp11-clang") {
     script_basename =
         UseSeccompProgram(PathJoin(root, "policies/clang.bpf"), j);
-    program_args_holder = {"/usr/bin/clang++-10",  "--std=c++11", "-o",
-                           std::string(target), "-O3",         "-march=native"};
+    program_args_holder = {"/usr/bin/clang++-10", "-xc++", "--std=c++11",  "-o",
+                           std::string(target),   "-O3",   "-march=native"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
     program_args_holder.emplace_back("-lm");
@@ -346,7 +347,7 @@ bool Args::SetCompileFlags(std::string_view root,
   }
   if (language == "cpp17-gcc") {
     script_basename = UseSeccompProgram(PathJoin(root, "policies/gcc.bpf"), j);
-    program_args_holder = {"/usr/bin/g++-10", "--std=c++17", "-o",
+    program_args_holder = {"/usr/bin/g++-10",   "-xc++", "--std=c++17", "-o",
                            std::string(target), "-O2"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
@@ -356,8 +357,8 @@ bool Args::SetCompileFlags(std::string_view root,
   if (language == "cpp17-clang") {
     script_basename =
         UseSeccompProgram(PathJoin(root, "policies/clang.bpf"), j);
-    program_args_holder = {"/usr/bin/clang++-10",  "--std=c++17", "-o",
-                           std::string(target), "-O3",         "-march=native"};
+    program_args_holder = {"/usr/bin/clang++-10", "-xc++", "--std=c++17",  "-o",
+                           std::string(target),   "-O3",   "-march=native"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
     program_args_holder.emplace_back("-lm");
@@ -365,7 +366,7 @@ bool Args::SetCompileFlags(std::string_view root,
   }
   if (language == "cpp20-gcc") {
     script_basename = UseSeccompProgram(PathJoin(root, "policies/gcc.bpf"), j);
-    program_args_holder = {"/usr/bin/g++-10", "--std=c++20", "-o",
+    program_args_holder = {"/usr/bin/g++-10",   "-xc++", "--std=c++20", "-o",
                            std::string(target), "-O2"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
@@ -375,8 +376,8 @@ bool Args::SetCompileFlags(std::string_view root,
   if (language == "cpp20-clang") {
     script_basename =
         UseSeccompProgram(PathJoin(root, "policies/clang.bpf"), j);
-    program_args_holder = {"/usr/bin/clang++-10",  "--std=c++20", "-o",
-                           std::string(target), "-O3",         "-march=native"};
+    program_args_holder = {"/usr/bin/clang++-10", "-xc++", "--std=c++20",  "-o",
+                           std::string(target),   "-O3",   "-march=native"};
     program_args_holder.insert(program_args_holder.end(), sources.begin(),
                                sources.end());
     program_args_holder.emplace_back("-lm");
