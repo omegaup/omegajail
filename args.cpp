@@ -21,12 +21,14 @@ namespace {
 
 constexpr size_t kExtraMemorySizeInBytes = 16 * 1024 * 1024;
 constexpr size_t kRubyExtraMemorySizeInBytes = 56 * 1024 * 1024;
-constexpr size_t kGoExtraMemorySizeInBytes = 512 * 1024 * 1024;
+constexpr size_t kGoExtraMemorySizeInBytes = 1024 * 1024 * 1024;
+constexpr size_t kJavaScriptExtraMemorySizeInBytes = 48 * 1024 * 1024;
 
 
 // These are obtained by running an "empty" and measuring
 // its memory consumption, as reported by omegajail.
 constexpr size_t kJavaVmMemorySizeInBytes = 47 * 1024 * 1024;
+constexpr size_t kJavaScriptVmMemorySizeInBytes = 30 * 1024 * 1024;
 constexpr size_t kClrVmMemorySizeInBytes = 20 * 1024 * 1024;
 constexpr size_t kRubyVmMemorySizeInBytes = 12 * 1024 * 1024;
 
@@ -668,13 +670,14 @@ bool Args::SetRunFlags(std::string_view root,
     return true;
   }
   if (language == "js") {
-    SetMemoryLimit(memory_limit_bytes + kExtraMemorySizeInBytes);
+    SetMemoryLimit(memory_limit_bytes + kJavaScriptExtraMemorySizeInBytes);
+    vm_memory_size_in_bytes = kJavaScriptVmMemorySizeInBytes;
     script_basename =
         UseSeccompProgram(PathJoin(root, "policies/js.bpf"), j);
     if (!BindReadOnly(PathJoin(root, "root-js"), "/opt/nodejs", j))
       return false;
     program_args_holder = {
-        "/opt/nodejs/bin/node",
+        "/usr/bin/node",
         "--jitless",
         StringPrintf("%s.js", target.data()),
     };
