@@ -107,6 +107,10 @@ ParseArgs(int argc, char* argv[], const std::string_view cwd) throw() {
      cxxopts::value<uint64_t>(), "bytes")
     ("m,memory-limit", "sets the memory limit",
      cxxopts::value<int64_t>()->default_value("-1"), "bytes")
+    ("cgroup-path",
+     "the path under the cgroup hierarchy where the jailed processes should "
+     "be placed",
+     cxxopts::value<std::string>()->default_value("/omegajail"), "cgroup path")
     ("cgroup-memory-limit", "sets the memory limit with cgroups",
      cxxopts::value<ssize_t>(), "bytes")
     ("disable-sandboxing",
@@ -144,6 +148,13 @@ bool Args::Parse(int argc, char* argv[], struct minijail* j) throw() {
   if (options.count("version")) {
     std::cout << "omegajail " << kVersion << std::endl;
     return false;
+  }
+
+  cgroup_path = options["cgroup-path"].as<std::string>();
+  if (!cgroup_path.empty() && cgroup_path.front() == '/') {
+    // cgroup paths are normally expressed with a leading /, but that's not
+    // conducive to path joining.
+    cgroup_path = cgroup_path.substr(1);
   }
 
   if (options.count("disable-sandboxing"))
