@@ -73,7 +73,12 @@ def _check_call(args: List[str]) -> bool:
         return False
 
 
-def _omegajail_compile(root: str, lang: str, strace: bool) -> bool:
+def _omegajail_compile(
+    root: str,
+    lang: str,
+    strace: bool,
+    cgroup_path: str,
+) -> bool:
     lang_dir = os.path.join(_PWD, 'run', lang)
     if os.path.isdir(lang_dir):
         shutil.rmtree(lang_dir, True)
@@ -114,6 +119,8 @@ def _omegajail_compile(root: str, lang: str, strace: bool) -> bool:
         source,
         '--compile-target',
         target,
+        '--cgroup-path',
+        cgroup_path,
     ]
     if lang == 'cs':
         os.symlink('/usr/share/dotnet/Main.runtimeconfig.json',
@@ -121,8 +128,14 @@ def _omegajail_compile(root: str, lang: str, strace: bool) -> bool:
     return _check_call(args)
 
 
-def _omegajail_run(root: str, lang: str, strace: bool, input_file: str,
-                   output_file: str) -> bool:
+def _omegajail_run(
+    root: str,
+    lang: str,
+    strace: bool,
+    input_path: str,
+    output_path: str,
+    cgroup_path: str,
+) -> bool:
     lang_dir = os.path.join(_PWD, 'run', lang)
     if strace:
         args = [
@@ -137,7 +150,7 @@ def _omegajail_run(root: str, lang: str, strace: bool, input_file: str,
         '--homedir',
         lang_dir,
         '-0',
-        os.path.join(_PWD, input_file),
+        os.path.join(_PWD, input_path),
         '-1',
         os.path.join(lang_dir, 'run.out'),
         '-2',
@@ -156,6 +169,8 @@ def _omegajail_run(root: str, lang: str, strace: bool, input_file: str,
         root,
         '--run',
         lang,
+        '--cgroup-path',
+        cgroup_path,
         '--run-target',
         'Main',
     ]
@@ -163,7 +178,7 @@ def _omegajail_run(root: str, lang: str, strace: bool, input_file: str,
         return False
     with open(os.path.join(lang_dir, 'run.out'), 'r') as run_out:
         got = run_out.read().strip()
-    with open(os.path.join(_PWD, output_file), 'r') as output:
+    with open(os.path.join(_PWD, output_path), 'r') as output:
         expected = output.read().strip()
     if got != expected:
         logging.error('Wrong answer when running \'%s\'. got %r, expected %r',
@@ -177,7 +192,27 @@ def _main() -> None:
     parser.add_argument('--strace', action='store_true')
     parser.add_argument('--verbose', action='store_true')
     parser.add_argument('--root', default='/var/lib/omegajail', type=str)
+    parser.add_argument('--cgroup-path',
+                        default='/omegajail',
+                        type=str)
     args = parser.parse_args()
+
+    # Set this process up for cgroups v2, since it uses slightly different
+    # rules.
+    if os.path.isdir(os.path.join('/sys/fs/cgroup', args.cgroup_path[1:])):
+        smoketest_cgroup = os.path.join('/sys/fs/cgroup', args.cgroup_path[1:],
+                                        'smoketest')
+        if not os.path.isdir(smoketest_cgroup):
+            with open(
+                    os.path.join('/sys/fs/cgroup', args.cgroup_path[1:],
+                                 'cgroup.subtree_control'), 'w') as f:
+                f.write('+memory')
+            os.makedirs(smoketest_cgroup, exist_ok=True)
+            with open(os.path.join(smoketest_cgroup, 'cgroup.subtree_control'),
+                      'w') as f:
+                f.write('+memory')
+        with open(os.path.join(smoketest_cgroup, 'cgroup.procs'), 'w') as f:
+            f.write(str(os.getpid()))
 
     args.root = os.path.abspath(args.root)
 
@@ -192,7 +227,12 @@ def _main() -> None:
 
     for lang in languages:
         print('%-20s' % lang, end='')
-        if not _omegajail_compile(args.root, lang, args.strace):
+        if not _omegajail_compile(
+                root=args.root,
+                lang=lang,
+                strace=args.strace,
+                cgroup_path=args.cgroup_path,
+        ):
             print('ERROR (COMPILE)')
             passed = False
             continue
@@ -200,7 +240,14 @@ def _main() -> None:
             input_path, output_path = 'input-karel', 'output-karel'
         else:
             input_path, output_path = 'input', 'output'
-        if _omegajail_run(args.root, lang, args.strace, input_path, output_path):
+        if _omegajail_run(
+                root=args.root,
+                lang=lang,
+                strace=args.strace,
+                input_path=input_path,
+                output_path=output_path,
+                cgroup_path=args.cgroup_path,
+        ):
             print('OK')
         else:
             print('ERROR')

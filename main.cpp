@@ -56,6 +56,7 @@ struct InitPayload {
   ScopedMinijail jail;
   std::string comm;
   std::string cgroup_path;
+  std::string pid_cgroup_path;
   ssize_t memory_limit_in_bytes;
   size_t vm_memory_size_in_bytes;
   std::vector<ResourceLimit> rlimits;
@@ -354,8 +355,8 @@ int MetaInit(void* raw_payload) {
       return -errno;
     }
   } else if (payload->memory_limit_in_bytes >= 0) {
-    memory_cgroup =
-        std::make_unique<ScopedCgroup>("/sys/fs/cgroup/memory/omegajail");
+    memory_cgroup = std::make_unique<ScopedCgroup>(
+        PathJoin("/sys/fs/cgroup/memory", payload->cgroup_path));
     if (!*memory_cgroup) {
       {
         ScopedErrnoPreserver preserve_errno;
@@ -377,8 +378,8 @@ int MetaInit(void* raw_payload) {
   }
 
   std::unique_ptr<ScopedCgroup> pid_cgroup;
-  if (!payload->cgroup_path.empty()) {
-    pid_cgroup = std::make_unique<ScopedCgroup>(payload->cgroup_path);
+  if (!payload->pid_cgroup_path.empty()) {
+    pid_cgroup = std::make_unique<ScopedCgroup>(payload->pid_cgroup_path);
     if (!*pid_cgroup) {
       {
         ScopedErrnoPreserver preserve_errno;
@@ -777,10 +778,12 @@ int main(int argc, char* argv[]) {
                                 "/mnt/stdio/stderr", true);
     }
 
+    std::string memory_cgroup_path =
+        PathJoin("/sys/fs/cgroup/memory", args.cgroup_path);
     if (args.memory_limit_in_bytes >= 0 &&
-        minijail_mount(j.get(), "/sys/fs/cgroup/memory/omegajail",
-                       "/sys/fs/cgroup/memory/omegajail", "", MS_BIND)) {
-      LOG(ERROR) << "Failed to mount /sys/fs/cgroup/memory";
+        minijail_mount(j.get(), memory_cgroup_path.c_str(),
+                       memory_cgroup_path.c_str(), "", MS_BIND)) {
+      LOG(ERROR) << "Failed to mount " << memory_cgroup_path;
       return 1;
     }
   } else {
@@ -811,16 +814,16 @@ int main(int argc, char* argv[]) {
                       MINIJAIL_HOOK_EVENT_PRE_DROP_CAPS);
   }
 
-  std::string cgroup_path;
+  std::string pid_cgroup_path;
   if (!args.script_basename.empty()) {
-    cgroup_path = StringPrintf("/sys/fs/cgroup/pids/omegajail/%s",
-                               args.script_basename.c_str());
-    if (access(cgroup_path.c_str(), W_OK) != 0) {
-      cgroup_path.clear();
+    pid_cgroup_path =
+        PathJoin("/sys/fs/cgroup/pids", args.cgroup_path, args.script_basename);
+    if (access(pid_cgroup_path.c_str(), W_OK) != 0) {
+      pid_cgroup_path.clear();
     } else if (!args.disable_sandboxing &&
-               minijail_mount(j.get(), "/sys/fs/cgroup/pids/omegajail",
-                              "/sys/fs/cgroup/pids/omegajail", "", MS_BIND)) {
-      LOG(ERROR) << "Failed to mount /sys/fs/cgroup/pids";
+               minijail_mount(j.get(), pid_cgroup_path.c_str(),
+                              pid_cgroup_path.c_str(), "", MS_BIND)) {
+      LOG(ERROR) << "Failed to mount " << pid_cgroup_path.c_str();
       return 1;
     }
   }
@@ -828,7 +831,8 @@ int main(int argc, char* argv[]) {
   InitPayload payload{
       .disable_sandboxing = args.disable_sandboxing,
       .comm = args.comm,
-      .cgroup_path = cgroup_path,
+      .cgroup_path = args.cgroup_path,
+      .pid_cgroup_path = pid_cgroup_path,
       .memory_limit_in_bytes = args.memory_limit_in_bytes,
       .vm_memory_size_in_bytes = args.vm_memory_size_in_bytes,
       .rlimits = args.rlimits,
