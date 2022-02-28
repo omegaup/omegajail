@@ -19,6 +19,7 @@ COPY ./cxxopts/include/ ./cxxopts/include/
 COPY ./minijail/ ./minijail/
 COPY Makefile *.h *.cpp ./
 COPY tools/omegajail-setup ./tools/
+COPY tools/omegajail-cgroups-wrapper ./tools/
 COPY ./policies/*.policy ./policies/*.frequency ./policies/
 
 ARG OMEGAJAIL_RELEASE

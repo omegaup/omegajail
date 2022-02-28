@@ -55,5 +55,6 @@
 !tools/mkroot
 !tools/omegajail-setup
 !tools/omegajail-container-wrapper
+!tools/omegajail-cgroups-wrapper
 !policies/*.policy
 !policies/*.frequency
