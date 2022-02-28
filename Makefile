@@ -70,6 +70,7 @@ policies/%.bpf: policies/%.policy policies/omegajail.policy | minijail/constants
 install: ${BINARIES} tools/omegajail-setup ${POLICIES}
 	install -d $(DESTDIR)/bin
 	install -t $(DESTDIR)/bin ${BINARIES} tools/omegajail-setup
+	install -t $(DESTDIR)/bin ${BINARIES} tools/omegajail-cgroups-wrapper
 	install -d $(DESTDIR)/policies
 	install -t $(DESTDIR)/policies -m 0644 ${POLICIES}
 

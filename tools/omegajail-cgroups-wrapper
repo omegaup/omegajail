@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# Wraps the original omegaup runner binary to set its cgroups up.
+
+set -e
+
+if [[ -f /sys/fs/cgroup/cgroup.controllers ]]; then
+  mkdir -p "/sys/fs/cgroup/system.slice/omegaup-runner.service"/{omegaup-runner,omegajail}
+
+  # Move the process to another group to avoid violating the "no processes in
+  # intermediate nodes" rule.
+  echo $$ > "/sys/fs/cgroup/system.slice/omegaup-runner.service/omegaup-runner/cgroup.procs"
+  # Delegate the memory subtree control for both the OG cgroup and the one where
+  # all the omegajail processes will live in.
+  echo '+memory' > "/sys/fs/cgroup/system.slice/omegaup-runner.service/cgroup.subtree_control"
+  echo '+memory' > "/sys/fs/cgroup/system.slice/omegaup-runner.service/omegajail/cgroup.subtree_control"
+else
+  mkdir -p "/sys/fs/cgroup/memory/system.slice/omegaup-runner.service"/{omegaup-runner,omegajail}
+
+  # Move the process to another group to avoid violating the "no processes in
+  # intermediate nodes" rule.
+  echo $$ > "/sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegaup-runner/cgroup.procs"
+fi
+
+# Now that all the cgroups are set, let's start the process.
+exec "$@"

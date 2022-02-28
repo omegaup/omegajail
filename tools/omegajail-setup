@@ -1,10 +1,11 @@
 #!/bin/bash
 
-# Performs per-boot setup of the environment needed for omegajail.
+# Performs setup of the omegaup cgroups needed for omegajail.
 # Should be run as root.
 
 set -e
 
-# Create a memory cgroup and make omegaup an admin.
-/bin/mkdir -p -m 0775 /sys/fs/cgroup/memory/omegajail
-/bin/chgrp omegaup /sys/fs/cgroup/memory/omegajail
+# Make omegup the admin of the delegated memory cgroup.
+if [[ ! -f /sys/fs/cgroup/cgroup.controllers ]]; then
+  chown omegaup:omegaup -R /sys/fs/cgroup/memory/system.slice/omegaup-runner.service
+fi
