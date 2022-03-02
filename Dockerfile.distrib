@@ -2,6 +2,8 @@ FROM ubuntu:focal
 
 RUN apt-get update -y && \
     apt-get install --no-install-recommends -y \
+      ca-certificates \
+      curl \
       g++ \
       git \
       python3 \
@@ -9,20 +11,26 @@ RUN apt-get update -y && \
       libcap2 \
       make \
       xz-utils && \
+    /usr/sbin/update-ca-certificates && \
     apt-get autoremove -y && \
-    apt-get clean
+    apt-get clean && \
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
 RUN mkdir /src
 WORKDIR /src
 
-COPY ./cxxopts/include/ ./cxxopts/include/
+COPY README.md ./
+COPY Cargo.lock ./
+COPY Cargo.toml ./
+COPY ./src/ ./src/
 COPY ./minijail/ ./minijail/
-COPY Makefile *.h *.cpp ./
+COPY Makefile ./
 COPY tools/omegajail-setup ./tools/
 COPY tools/omegajail-cgroups-wrapper ./tools/
 COPY ./policies/*.policy ./policies/*.frequency ./policies/
 
 ARG OMEGAJAIL_RELEASE
 
-RUN make OMEGAJAIL_RELEASE=$OMEGAJAIL_RELEASE
+ENV PATH=/root/.cargo/bin:$PATH
+RUN make ECHO=echo OMEGAJAIL_RELEASE=$OMEGAJAIL_RELEASE
 RUN make install

@@ -40,4 +40,4 @@ gettid: allow
 rt_sigaction: allow
 rt_sigprocmask: allow
 rt_sigreturn: allow
-tgkill: arg0 == 2
+tgkill: arg0 != 1

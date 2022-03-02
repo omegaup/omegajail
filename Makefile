@@ -1,4 +1,4 @@
-BINARIES := omegajail stdio-mux java-compile
+BINARIES := omegajail java-compile
 POLICIES := policies/gcc.bpf policies/cpp.bpf policies/ghc.bpf policies/hs.bpf \
             policies/javac.bpf policies/java.bpf policies/fpc.bpf policies/pas.bpf \
             policies/pyc.bpf policies/py.bpf policies/ruby.bpf policies/lua.bpf \
@@ -11,53 +11,22 @@ MINIJAIL_SOURCE_FILES := $(addprefix minijail/,\
 	$(cd minijail && git ls-tree --name-only HEAD -- *.c *.c))
 MKROOT_SOURCE_FILES := Dockerfile.rootfs tools/mkroot tools/java.base.aotcfg \
                        tools/Main.runtimeconfig.json tools/Release.rsp
-MINIJAIL_CORE_OBJECT_FILES := $(addprefix minijail/,$(patsubst %.o,%.pic.o,\
-	libminijail.o syscall_filter.o signal_handler.o bpf.o util.o system.o \
-	syscall_wrapper.o libconstants.gen.o libsyscalls.gen.o))
 OMEGAJAIL_RELEASE ?= $(shell git describe --tags)
 DESTDIR ?= /var/lib/omegajail
-
-ARCH ?= $(shell uname -m)
-CXX ?= g++
-CFLAGS += -Wall -Werror -O2
-CXXFLAGS += -std=c++2a
-LDFLAGS += -lcap -pthread -fPIE -fstack-protector
-
-TEST_CFLAGS += $(CFLAGS)
-TEST_CXXFLAGS += $(CXXFLAGS) -isystem googletest/googletest/include
-TEST_LDFLAGS += $(LDFLAGS)
 
 .PHONY: all
 all: ${BINARIES} ${POLICIES}
 
-${MINIJAIL_CORE_OBJECT_FILES}: ${MINIJAIL_SOURCE_FILES}
-	LDFLAGS= $(MAKE) OUT=${PWD}/minijail -C minijail
-
 minijail/constants.json:
 	$(MAKE) OUT=${PWD}/minijail -C minijail constants.json
 
-version.o: version.cpp version.h
-	$(CXX) "-DOMEGAJAIL_VERSION=\"$(OMEGAJAIL_RELEASE)\"" \
-		$(CFLAGS) $(CXXFLAGS) -fno-exceptions $< -c -o $@
+omegajail: $(shell find src/ -name '*.rs')
+	cargo build --release --bin=$@
+	cp target/release/$@ $@
 
-util.o: util.cpp util.h logging.h macros.h
-	$(CXX) $(CFLAGS) $(CXXFLAGS) -fno-exceptions $< -c -o $@
-
-logging.o: logging.cpp logging.h util.h
-	$(CXX) $(CFLAGS) $(CXXFLAGS) -fno-exceptions $< -c -o $@
-
-args.o: args.cpp args.h logging.h version.h
-	$(CXX) $(CFLAGS) $(CXXFLAGS) "-DCXXOPTS_VECTOR_DELIMITER='\\0'" \
-		-fexceptions -I cxxopts/include $< -c -o $@
-
-omegajail: main.cpp ${MINIJAIL_CORE_OBJECT_FILES} args.o util.o logging.o version.o
-	$(CXX) $(CFLAGS) $(CXXFLAGS) -fno-exceptions $^ $(LDFLAGS) -o $@
-
-stdio-mux: stdio_mux.cpp util.o logging.o
-	$(CXX) $(CFLAGS) $(CXXFLAGS) -fno-exceptions $^ $(LDFLAGS) -o $@
-
-java-compile: java_compile.cpp util.o logging.o
-	$(CXX) $(CFLAGS) $(CXXFLAGS) -Os -fno-exceptions $^ $(LDFLAGS) -static -o $@
+java-compile: src/java_compile.rs
+	cargo build --release --bin=$@
+	cp target/release/$@ $@
 
 policies/%.bpf: policies/%.policy policies/omegajail.policy | minijail/constants.json
 	./minijail/tools/compile_seccomp_policy.py \
@@ -68,10 +37,8 @@ policies/%.bpf: policies/%.policy policies/omegajail.policy | minijail/constants
 
 .PHONY: install
 install: ${BINARIES} tools/omegajail-setup ${POLICIES}
-	install -d $(DESTDIR)/bin
-	install -t $(DESTDIR)/bin ${BINARIES} tools/omegajail-setup
-	install -t $(DESTDIR)/bin ${BINARIES} tools/omegajail-cgroups-wrapper
-	install -d $(DESTDIR)/policies
+	install -d $(DESTDIR)/bin $(DESTDIR)/policies
+	install -t $(DESTDIR)/bin ${BINARIES} tools/omegajail-setup tools/omegajail-cgroups-wrapper
 	install -t $(DESTDIR)/policies -m 0644 ${POLICIES}
 
 .PHONY: clean
@@ -81,8 +48,8 @@ clean:
 	$(MAKE) OUT=${PWD}/minijail -C minijail clean
 
 .PHONY: test
-test: util_test
-	./util_test
+test:
+	cargo test
 
 .PHONY: smoketest
 smoketest: rootfs
@@ -96,27 +63,23 @@ smoketest: rootfs
 		.
 	touch $@
 
+.omegajail-builder-rootfs-runtime-debug.stamp: .omegajail-builder-rootfs-runtime.stamp
+	docker build \
+		-t omegaup/omegajail-builder-rootfs-runtime-debug \
+		--target=runtime-debug \
+		--file=Dockerfile.rootfs \
+		.
+	touch $@
+
 .PHONY: smoketest-docker
-smoketest-docker: .omegajail-builder-rootfs-runtime.stamp
+smoketest-docker: .omegajail-builder-rootfs-runtime-debug.stamp
 	docker run \
 		--rm \
 		--mount "type=bind,source=$(PWD)/smoketest,target=/src" \
 		--tmpfs "/home:mode=1777,uid=$(shell id -u),gid=$(shell id -g)" \
 		--user "$(shell id -u):$(shell id -g)" \
-		omegaup/omegajail-builder-rootfs-runtime \
+		omegaup/omegajail-builder-rootfs-runtime-debug \
 		/usr/bin/python3 /src/test
-
-util_test.o: util_test.cpp util.h logging.h
-	$(CXX) $(TEST_CFLAGS) $(TEST_CXXFLAGS) -fno-exceptions $< -c -o $@
-
-util_test: util_test.o util.o logging.o gtest-all.o gtest_main.o
-	$(CXX) $(TEST_CFLAGS) $(TEST_CXXFLAGS) -fno-exceptions $^ $(TEST_LDFLAGS) -o $@
-
-gtest-all.o : googletest/googletest/src/gtest-all.cc
-	$(CXX) $(TEST_CFLAGS) $(TEST_CXXFLAGS) -Igoogletest/googletest -fno-exceptions $< -c -o $@
-
-gtest_main.o : googletest/googletest/src/gtest_main.cc
-	$(CXX) $(TEST_CFLAGS) $(TEST_CXXFLAGS) -Igoogletest/googletest -fno-exceptions $< -c -o $@
 
 .omegajail-builder-rootfs-setup.stamp: ${MKROOT_SOURCE_FILES}
 	docker build \
@@ -158,7 +121,7 @@ omegajail-focal-rootfs-x86_64.tar.xz: .omegajail-builder-rootfs-build.stamp
 		/var/lib/omegajail/ && \
 	mv ".$@.tmp" "$@" || rm ".$@.tmp"
 
-.omegajail-builder-distrib.stamp: Dockerfile.distrib Makefile $(wildcard *.h *.cpp tools/omegajail-setup policies/*.frequency policies/*.policy)
+.omegajail-builder-distrib.stamp: Dockerfile.distrib $(wildcard src/*.rs src/jail/*.rs tools/omegajail-setup policies/*.frequency policies/*.policy)
 	docker build \
 		--build-arg OMEGAJAIL_RELEASE=$(OMEGAJAIL_RELEASE) \
 		-t omegaup/omegajail-builder-distrib \

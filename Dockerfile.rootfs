@@ -119,3 +119,11 @@ COPY --from=rootfs-build \
 COPY --from=omegaup/omegajail-builder-distrib /var/lib/omegajail/ /var/lib/omegajail
 RUN mv /var/lib/omegajail/bin/omegajail /var/lib/omegajail/bin/omegajail.wrapped
 COPY ./tools/omegajail-container-wrapper /var/lib/omegajail/bin/omegajail
+
+FROM runtime AS runtime-debug
+RUN apt-get update -y && \
+    apt-get install --no-install-recommends -y \
+      strace \
+      && \
+    apt-get autoremove -y && \
+    apt-get clean

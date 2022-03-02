@@ -21,7 +21,10 @@ jobs:
         run: sudo apt-get install -y libcap-dev util-linux
 
       - name: Build
-        run: make CXX=g++-9 OMEGAJAIL_RELEASE=${{ github.sha }} all util_test
+        run: |
+          make CXX=g++-9 ECHO=echo OMEGAJAIL_RELEASE=${{ github.sha }} all
+          cargo build --bins
+          cargo build --tests
 
       - name: Test
         run: make test
@@ -31,10 +34,10 @@ jobs:
 
       - name: Smoketest
         run: |
-          sudo mkdir -p -m 0775 /sys/fs/cgroup/memory/omegajail
-          sudo chown $(whoami) /sys/fs/cgroup/memory/omegajail
-          sudo chgrp $(whoami) /sys/fs/cgroup/memory/omegajail
-          taskset 0x1 ./smoketest/test --root=./rootfs --strace
+          sudo mkdir -p -m 0775 /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
+          sudo chown $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
+          sudo chgrp $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
+          taskset 0x1 ./smoketest/test --root=./rootfs --strace --cgroup-path=/system.slice/omegaup-runner.service/omegajail
 
       - name: Upload artifacts
         if: ${{ always() }}

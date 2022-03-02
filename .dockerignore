@@ -4,8 +4,6 @@
 # Only allow things that are explicitly referenced from the Dockerfile(s).
 !Makefile
 
-!cxxopts/include/
-
 !minijail/Makefile
 !minijail/common.mk
 !minijail/gen_constants.sh
@@ -47,8 +45,10 @@
 !minijail/util.c
 !minijail/util.h
 
-!*.h
-!*.cpp
+!README.md
+!src/**/*
+!Cargo.toml
+!Cargo.lock
 !tools/Main.runtimeconfig.json
 !tools/Release.rsp
 !tools/java.base.aotcfg

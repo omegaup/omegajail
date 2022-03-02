@@ -72,4 +72,4 @@ set_tid_address: allow
 sigaltstack: allow
 
 # abort
-tgkill: arg0 == 2
+tgkill: arg0 != 1
