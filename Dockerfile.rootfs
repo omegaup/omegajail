@@ -78,7 +78,7 @@ RUN ls -l /usr/bin/ | grep -- '[^9] ->.*-9$' | sed -e 's@^.* \(.\+\) -> \(.\+\)-
     wget https://raw.githubusercontent.com/omegaup/libkarel/v0.0.99/libkarel.py \
         -O /usr/lib/python2.7/libkarel.py && \
     python3.9 -m pip install --target=/usr/lib/python3/dist-packages \
-        libkarel==1.0.2 omegaup==1.5.0
+        libkarel==1.0.2 omegaup==1.5.4 parsy==1.4.0
 
 RUN mkdir /src
 WORKDIR /src
