@@ -599,6 +599,7 @@ def _main() -> None:
             'idna',
             'libkarel',
             'omegaup',
+            'parsy',
             'requests',
             'urllib3',
         }
