@@ -3,13 +3,14 @@ use std::io::{ErrorKind, Read};
 use std::os::unix::net::UnixStream;
 
 use anyhow::{anyhow, bail, Context, Result};
+use nix::errno::Errno;
 use nix::sys::resource::{setrlimit, Resource};
 use nix::sys::signal::{sigprocmask, SigSet, SigmaskHow};
 use nix::unistd::execve;
 
 use crate::jail::options::JailOptions;
 use crate::jail::{write_message, SendSeccompFDEvent};
-use crate::sys::{seccomp_set_mode_filter_with_listener, SendFile};
+use crate::sys::{seccomp_set_mode_filter, seccomp_set_mode_filter_with_listener, SendFile};
 
 pub(crate) fn run(
     mut child_sock: UnixStream,
@@ -103,12 +104,37 @@ fn setup_signal_handlers() -> Result<()> {
 }
 
 fn setup_seccomp_bpf(child_sock: &mut UnixStream, opts: &JailOptions) -> Result<()> {
-    let fd = seccomp_set_mode_filter_with_listener(&opts.seccomp_bpf_filter_contents)
-        .context("seccomp_set_mode_filter_with_listener")?;
-    let write_message_result = write_message(child_sock, SendSeccompFDEvent {});
-    let send_result = child_sock.send_file(fd);
-    write_message_result.context("write parent setup done event")?;
-    send_result.context("send seccomp fd")?;
+    match seccomp_set_mode_filter_with_listener(&opts.seccomp_bpf_filter_notify_contents) {
+        Ok(fd) => {
+            let write_message_result =
+                write_message(child_sock, SendSeccompFDEvent { fd_available: true });
+            let send_result = child_sock.send_file(fd);
+            write_message_result.context("write parent setup done event")?;
+            send_result.context("send seccomp fd")?;
 
-    Ok(())
+            return Ok(());
+        }
+        Err(err) => {
+            if opts.allow_sigsys_fallback {
+                match err.downcast_ref::<Errno>() {
+                    Some(&Errno::ENOSYS) => {
+                        seccomp_set_mode_filter(&opts.seccomp_bpf_filter_sigsys_contents)
+                            .context("seccomp_set_mode_filter")?;
+                        write_message(
+                            child_sock,
+                            SendSeccompFDEvent {
+                                fd_available: false,
+                            },
+                        )
+                        .context("write parent setup done event")?;
+
+                        return Ok(());
+                    }
+                    Some(&_) | None => {}
+                }
+            }
+
+            return Err(err.context("seccomp_set_mode_filter_with_listener"));
+        }
+    };
 }

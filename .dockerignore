@@ -45,16 +45,17 @@
 !minijail/util.c
 !minijail/util.h
 
-!README.md
-!src/**/*
-!Cargo.toml
 !Cargo.lock
+!Cargo.toml
+!README.md
+!policies/*.frequency
+!policies/*.policy
+!policies/base/*.policy
+!src/**/*
 !tools/Main.runtimeconfig.json
 !tools/Release.rsp
 !tools/java.base.aotcfg
 !tools/mkroot
-!tools/omegajail-setup
-!tools/omegajail-container-wrapper
 !tools/omegajail-cgroups-wrapper
-!policies/*.policy
-!policies/*.frequency
+!tools/omegajail-container-wrapper
+!tools/omegajail-setup

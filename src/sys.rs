@@ -3,7 +3,7 @@ use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use std::os::unix::net::UnixStream;
 use std::time::Duration;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Context, Error, Result};
 use nix::errno::Errno;
 use nix::ioctl_readwrite;
 use nix::sched::CloneFlags;
@@ -17,9 +17,9 @@ use serde::{Deserialize, Serialize};
 ///
 /// Returns an [`std::io::Error`] with the stringified error if the result of the function call is
 /// negative, and the result of the function as-is otherwise.
-fn check_err<T: Ord + Default>(num: T) -> Result<T> {
-    if num < T::default() {
-        bail!(std::io::Error::last_os_error().to_string());
+fn check_err(num: libc::c_long) -> Result<libc::c_long> {
+    if num < 0 {
+        return Err(Error::new(Errno::from_i32(num.try_into()?)));
     }
     Ok(num)
 }
@@ -206,6 +206,36 @@ pub(crate) fn set_no_new_privs() -> Result<()> {
 
     check_err(unsafe { libc::syscall(libc::SYS_prctl, PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) })
         .context("prctl(PR_SET_NO_NEW_PRIVS)")?;
+
+    Ok(())
+}
+
+pub(crate) fn seccomp_set_mode_filter(filter: &[u8]) -> Result<()> {
+    const SECCOMP_SET_MODE_FILTER: i32 = 1;
+
+    const SECCOMP_FILTER_FLAG_TSYNC: u64 = 1 << 0;
+    const SECCOMP_FILTER_FLAG_TSYNC_ESRCH: u64 = 1 << 4;
+
+    #[repr(C)]
+    struct SockFprog {
+        len: u16,
+        filter: *const libc::c_void,
+    }
+
+    let fprog = SockFprog {
+        len: (filter.len() / 8).try_into()?,
+        filter: filter.as_ptr() as *const _,
+    };
+
+    check_err(unsafe {
+        libc::syscall(
+            libc::SYS_seccomp,
+            SECCOMP_SET_MODE_FILTER,
+            SECCOMP_FILTER_FLAG_TSYNC
+                | SECCOMP_FILTER_FLAG_TSYNC_ESRCH,
+            &fprog as *const _ as *const libc::c_void,
+        )
+    }).context("seccomp(SECCOMP_SET_MODE_FILTER, SECCOMP_FILTER_FLAG_TSYNC|SECCOMP_FILTER_FLAG_TSYNC_ESRCH)")?;
 
     Ok(())
 }

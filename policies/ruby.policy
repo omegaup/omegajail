@@ -1,4 +1,4 @@
-@include ./omegajail.policy
+@include ./base/omegajail.policy
 @frequency ./ruby.frequency
 
 # Exit
