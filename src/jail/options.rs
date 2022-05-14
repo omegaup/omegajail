@@ -57,7 +57,8 @@ pub(crate) struct JailOptions {
     pub mounts: Vec<MountArgs>,
     pub args: Vec<CString>,
     pub env: Vec<CString>,
-    pub seccomp_bpf_filter_contents: Vec<u8>,
+    pub seccomp_bpf_filter_notify_contents: Vec<u8>,
+    pub seccomp_bpf_filter_sigsys_contents: Vec<u8>,
     pub seccomp_profile_name: String,
     pub meta: Option<PathBuf>,
 
@@ -71,6 +72,7 @@ pub(crate) struct JailOptions {
     pub memory_limit: Option<u64>,
     pub use_cgroups_for_memory_limit: bool,
     pub vm_memory_size_in_bytes: u64,
+    pub allow_sigsys_fallback: bool,
 }
 
 impl JailOptions {
@@ -752,11 +754,18 @@ impl JailOptions {
 
         execve_args.extend(args.extra_args);
 
-        let mut seccomp_bpf_filter_contents = vec![];
-        let bpf_filter_path = root.join(format!("policies/{}.bpf", seccomp_profile_name));
+        let mut seccomp_bpf_filter_notify_contents = vec![];
+        let mut bpf_filter_path = root.join(format!("policies/{}.bpf", seccomp_profile_name));
         File::open(&bpf_filter_path)
             .with_context(|| format!("open {:?}", &bpf_filter_path))?
-            .read_to_end(&mut seccomp_bpf_filter_contents)
+            .read_to_end(&mut seccomp_bpf_filter_notify_contents)
+            .with_context(|| format!("read {:?}", &bpf_filter_path))?;
+
+        let mut seccomp_bpf_filter_sigsys_contents = vec![];
+        bpf_filter_path = root.join(format!("policies/sigsys/{}.bpf", seccomp_profile_name));
+        File::open(&bpf_filter_path)
+            .with_context(|| format!("open {:?}", &bpf_filter_path))?
+            .read_to_end(&mut seccomp_bpf_filter_sigsys_contents)
             .with_context(|| format!("read {:?}", &bpf_filter_path))?;
 
         let (time_limit, wall_time_limit) = match args.time_limit {
@@ -778,7 +787,8 @@ impl JailOptions {
                 .map(|s| CString::new(s.clone()))
                 .try_collect()?,
             env: env.iter().map(|s| CString::new(*s)).try_collect()?,
-            seccomp_bpf_filter_contents: seccomp_bpf_filter_contents,
+            seccomp_bpf_filter_notify_contents: seccomp_bpf_filter_notify_contents,
+            seccomp_bpf_filter_sigsys_contents: seccomp_bpf_filter_sigsys_contents,
             seccomp_profile_name: seccomp_profile_name,
             meta: args.meta.map(|s| PathBuf::from(s)),
 
@@ -799,6 +809,7 @@ impl JailOptions {
                 Some(m) => Some(m),
                 None => None,
             },
+            allow_sigsys_fallback: args.allow_sigsys_fallback,
         })
     }
 }

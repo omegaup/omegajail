@@ -383,7 +383,7 @@ fn wait_child(
             let _ = kill(child, Signal::SIGKILL);
             None
         }
-        Ok(seccomp_fd) => Some(seccomp_fd),
+        Ok(seccomp_fd) => seccomp_fd,
     };
     let override_status = match wait_read_seccomp_notification(child, deadline, seccomp_fd) {
         Err(err) => {
@@ -420,9 +420,14 @@ fn wait_child(
     status
 }
 
-fn wait_receive_seccomp_fd(jail_sock: &mut UnixStream) -> Result<File> {
-    read_message::<SendSeccompFDEvent>(jail_sock).context("wait for seccomp fd message")?;
-    Ok(jail_sock.recv_file().context("receive seccomp fd")?)
+fn wait_receive_seccomp_fd(jail_sock: &mut UnixStream) -> Result<Option<File>> {
+    let event =
+        read_message::<SendSeccompFDEvent>(jail_sock).context("wait for seccomp fd message")?;
+    if event.fd_available {
+        Ok(Some(jail_sock.recv_file().context("receive seccomp fd")?))
+    } else {
+        Ok(None)
+    }
 }
 
 fn wait_read_seccomp_notification(

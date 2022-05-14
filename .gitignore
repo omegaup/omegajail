@@ -1,15 +1,11 @@
 # artifacts
 *.o
-*.bpf
 *.stamp
-java-compile
-omegajail
-stdio-mux
 .mypy_cache/
+out/
 
 # test artifacts
 smoketest/run/
-util_test
 
 # mkroot artifacts
 tools/.remote-file-cache/
@@ -18,5 +14,4 @@ rootfs/
 
 
 # Added by cargo
-
 /target

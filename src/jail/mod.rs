@@ -66,7 +66,9 @@ pub use crate::sys::WaitidStatus as JailResult;
 struct ParentSetupDoneEvent {}
 
 #[derive(Serialize, Deserialize, Debug)]
-struct SendSeccompFDEvent {}
+struct SendSeccompFDEvent {
+    fd_available: bool,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 struct SetupCgroupRequest {}
@@ -409,7 +411,8 @@ mod tests {
             ],
             env: vec![],
             // allows everything _except_ `mount(2)`.
-            seccomp_bpf_filter_contents: base64::decode("IAAAAAQAAAAVAAEAPgAAwAYAAAAAAAAAIAAAAAAAAAAVAAIBpQAAAAYAAAAAAP9/BgAAAAAA/38GAAAAAADAfw==")?,
+            seccomp_bpf_filter_notify_contents: base64::decode("IAAAAAQAAAAVAAEAPgAAwAYAAAAAAAAAIAAAAAAAAAAVAAIBpQAAAAYAAAAAAP9/BgAAAAAA/38GAAAAAADAfw==")?,
+            seccomp_bpf_filter_sigsys_contents: base64::decode("IAAAAAQAAAAVAAEAPgAAwAYAAAAAAAAAIAAAAAAAAAAVAAIBpQAAAAYAAAAAAP9/BgAAAAAA/38GAAAAAADAfw==")?,
             seccomp_profile_name: String::from("test"),
             meta: None,
 
@@ -423,6 +426,7 @@ mod tests {
             memory_limit: Some(32 * 1024 * 1024),
             use_cgroups_for_memory_limit: false,
             vm_memory_size_in_bytes: 0u64,
+            allow_sigsys_fallback: false,
         };
 
         let jail = Jail::new(options)?;

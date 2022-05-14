@@ -1,49 +1,59 @@
-BINARIES := omegajail java-compile
-POLICIES := policies/gcc.bpf policies/cpp.bpf policies/ghc.bpf policies/hs.bpf \
-            policies/javac.bpf policies/java.bpf policies/fpc.bpf policies/pas.bpf \
-            policies/pyc.bpf policies/py.bpf policies/ruby.bpf policies/lua.bpf \
-            policies/csc.bpf policies/cs.bpf policies/js.bpf policies/karel.bpf \
-            policies/cpp-asan.bpf policies/clang.bpf \
-            policies/go.bpf policies/go-build.bpf \
-            policies/rustc.bpf policies/rs.bpf
+BINARIES := out/bin/omegajail out/bin/java-compile
+POLICIES := $(wildcard policies/*.policy)
+POLICY_NOTIFY_BINARIES := $(addprefix out/policies/,$(patsubst %.policy,%.bpf,$(notdir $(POLICIES))))
+POLICY_SIGSYS_BINARIES := $(addprefix out/policies/sigsys/,$(patsubst %.policy,%.bpf,$(notdir $(POLICIES))))
 
-MINIJAIL_SOURCE_FILES := $(addprefix minijail/,\
-	$(cd minijail && git ls-tree --name-only HEAD -- *.c *.c))
 MKROOT_SOURCE_FILES := Dockerfile.rootfs tools/mkroot tools/java.base.aotcfg \
                        tools/Main.runtimeconfig.json tools/Release.rsp
 OMEGAJAIL_RELEASE ?= $(shell git describe --tags)
 DESTDIR ?= /var/lib/omegajail
 
 .PHONY: all
-all: ${BINARIES} ${POLICIES}
+all: $(BINARIES) $(POLICY_NOTIFY_BINARIES) $(POLICY_SIGSYS_BINARIES)
+
+out/bin:
+	mkdir -p "$@"
+
+out/policies:
+	mkdir -p "$@"
+
+out/policies/sigsys: out/policies
+	mkdir -p "$@"
 
 minijail/constants.json:
 	$(MAKE) OUT=${PWD}/minijail -C minijail constants.json
 
-omegajail: $(shell find src/ -name '*.rs')
-	cargo build --release --bin=$@
-	cp target/release/$@ $@
+out/bin/omegajail: $(shell find src/ -name '*.rs') | out/bin
+	cargo build --release --bin=omegajail
+	cp target/release/omegajail $@
 
-java-compile: src/java_compile.rs
-	cargo build --release --bin=$@
-	cp target/release/$@ $@
+out/bin/java-compile: src/java_compile.rs | out/bin
+	cargo build --release --bin=java-compile
+	cp target/release/java-compile $@
 
-policies/%.bpf: policies/%.policy policies/omegajail.policy | minijail/constants.json
+out/policies/%.bpf: policies/%.policy policies/base/omegajail.policy | minijail/constants.json out/policies
 	./minijail/tools/compile_seccomp_policy.py \
 		--use-kill-process \
 		--default-action=user-notify \
 		--arch-json=minijail/constants.json \
 		$< $@
 
+out/policies/sigsys/%.bpf: policies/%.policy policies/base/omegajail.policy | minijail/constants.json out/policies/sigsys
+	./minijail/tools/compile_seccomp_policy.py \
+		--use-kill-process \
+		--arch-json=minijail/constants.json \
+		$< $@
+
 .PHONY: install
-install: ${BINARIES} tools/omegajail-setup ${POLICIES}
-	install -d $(DESTDIR)/bin $(DESTDIR)/policies
-	install -t $(DESTDIR)/bin ${BINARIES} tools/omegajail-setup tools/omegajail-cgroups-wrapper
-	install -t $(DESTDIR)/policies -m 0644 ${POLICIES}
+install: $(BINARIES) $(POLICY_NOTIFY_BINARIES) $(POLICY_SIGSYS_BINARIES) tools/omegajail-setup tools/omegajail-cgroups-wrapper
+	install -d $(DESTDIR)/bin $(DESTDIR)/policies $(DESTDIR)/policies/sigsys
+	install -t $(DESTDIR)/bin $(BINARIES) tools/omegajail-setup tools/omegajail-cgroups-wrapper
+	install -t $(DESTDIR)/policies -m 0644 $(POLICY_NOTIFY_BINARIES)
+	install -t $(DESTDIR)/policies/sigsys -m 0644 $(POLICY_SIGSYS_BINARIES)
 
 .PHONY: clean
 clean:
-	rm -f ${BINARIES} ${POLICIES} *.o
+	rm -rf out/
 	sudo rm -rf rootfs
 	$(MAKE) OUT=${PWD}/minijail -C minijail clean
 
@@ -89,7 +99,7 @@ smoketest-docker: .omegajail-builder-rootfs-runtime-debug.stamp
 		.
 	touch $@
 
-rootfs: .omegajail-builder-rootfs-runtime.stamp .omegajail-builder-rootfs-setup.stamp ${BINARIES} tools/omegajail-setup ${POLICIES}
+rootfs: .omegajail-builder-rootfs-runtime.stamp .omegajail-builder-rootfs-setup.stamp $(BINARIES) tools/omegajail-setup $(POLICY_NOTIFY_BINARIES) $(POLICY_SIGSYS_BINARIES)
 	sudo rm -rf $@ ".$@.tmp"
 	mkdir ".$@.tmp"
 	$(MAKE) DESTDIR=".$@.tmp" install || (sudo rm -rf ".$@.tmp" ; exit 1)

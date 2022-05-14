@@ -141,6 +141,11 @@ pub struct Args {
     #[clap(long, value_name = "SOURCE:TARGET")]
     pub bind: Vec<String>,
 
+    /// Allows downgrading to the SIGSYS-based seccomp filter that doesn't provide correct SYSACLL
+    /// information always
+    #[clap(long)]
+    pub allow_sigsys_fallback: bool,
+
     /// Any additional arguments to the executable
     pub extra_args: Vec<String>,
 }
