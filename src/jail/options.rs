@@ -483,6 +483,22 @@ impl JailOptions {
                     ]);
                     execve_args.extend(compile_sources.iter().map(|s| s.clone()));
                 }
+                args::Language::Julia => {
+                    seccomp_profile_name = String::from("julia");
+                    mounts.push(MountArgs {
+                        source: Some(root.join("root-julia")),
+                        target: rootfs.join("opt/julia"),
+                        fstype: None,
+                        flags: MsFlags::MS_BIND | MsFlags::MS_RDONLY,
+                        data: None,
+                    });
+                    execve_args.extend([
+                        String::from("/opt/go/bin/julia"),
+                        String::from("-e"),
+                        args.compile_target.clone(),
+                    ]);
+                    execve_args.extend(compile_sources.iter().map(|s| s.clone()));
+                }
                 args::Language::JavaScript => {
                     seccomp_profile_name = String::from("js");
                     mounts.push(MountArgs {
