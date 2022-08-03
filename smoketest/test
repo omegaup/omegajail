@@ -41,6 +41,7 @@ _LANGUAGES = [
     'kj',
     'kp',
     'cs',
+    'jl',
 ]
 _EXTENSIONS = {
     'c11-gcc': 'c',

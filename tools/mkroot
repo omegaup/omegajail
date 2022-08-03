@@ -376,6 +376,7 @@ def _main() -> None:
     JS_ROOT = '/opt/nodejs/'
     GO_ROOT = '/opt/go/'
     RUST_ROOT = '/opt/rust/'
+    JULIA_ROOT = '/opt/julia/'
 
     RUBY_FILES = resolver.files_for('ruby', exclude_packages=COMPILER_PACKAGES)
     PYTHON2_FILES = resolver.files_for(
@@ -429,6 +430,7 @@ def _main() -> None:
         root.mkdir(JS_ROOT)
         root.mkdir(RUST_ROOT)
         root.mkdir(GO_ROOT)
+        root.mkdir(JULIA_ROOT)
 
         # Other miscellaneous mountpoints
         root.mkdir('/dev/')
@@ -473,6 +475,8 @@ def _main() -> None:
             if f.startswith(RUBY_ROOT):
                 continue
             root.symlink(f, os.path.join(RUBY_ROOT, f.replace('/', '_')))
+
+        root.symlink('/usr/bin/julia', os.path.join(JULIA_ROOT, 'bin/julia'))
 
     with Chroot(
             os.path.join(args.target, 'root'), '/', link=args.link) as root:
@@ -673,6 +677,9 @@ def _main() -> None:
     with Chroot(os.path.join(args.target, 'root-go'), GO_ROOT,
                 link=args.link) as root:
         root.copyfromhost('/opt/go', relative_to=GO_ROOT, recurse=True)
+    with Chroot(os.path.join(args.target, 'root-julia'), JULIA_ROOT,
+                link=args.link) as root:
+        root.copyfromhost('/opt/julia', relative_to=JULIA_ROOT, recurse=True)
 
     with Chroot(os.path.join(args.target, 'root-rust'), RUST_ROOT,
                 link=args.link) as root:

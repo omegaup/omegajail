@@ -14,6 +14,7 @@ use crate::args;
 const DEFAULT_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 16 * 1024 * 1024;
 const RUBY_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 56 * 1024 * 1024;
 const GO_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 512 * 1024 * 1024;
+const JULIA_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 512 * 1024 * 1024;
 
 // These are obtained by running an "empty" and measuring
 // its memory consumption, as reported by omegajail.
@@ -482,6 +483,22 @@ impl JailOptions {
                     ]);
                     execve_args.extend(compile_sources.iter().map(|s| s.clone()));
                 }
+                args::Language::Julia => {
+                    seccomp_profile_name = String::from("julia");
+                    mounts.push(MountArgs {
+                        source: Some(root.join("root-julia")),
+                        target: rootfs.join("opt/julia"),
+                        fstype: None,
+                        flags: MsFlags::MS_BIND | MsFlags::MS_RDONLY,
+                        data: None,
+                    });
+                    execve_args.extend([
+                        String::from("/opt/go/bin/julia"),
+                        String::from("-e"),
+                        args.compile_target.clone(),
+                    ]);
+                    execve_args.extend(compile_sources.iter().map(|s| s.clone()));
+                }
                 args::Language::JavaScript => {
                     seccomp_profile_name = String::from("js");
                     mounts.push(MountArgs {
@@ -685,6 +702,21 @@ impl JailOptions {
                     extra_memory_size_in_bytes = GO_EXTRA_MEMORY_SIZE_IN_BYTES;
                     seccomp_profile_name = String::from("go");
                     execve_args.extend([format!("./{}", args.run_target)]);
+                }
+                args::Language::Julia => {
+                    extra_memory_size_in_bytes = JULIA_EXTRA_MEMORY_SIZE_IN_BYTES;
+                    seccomp_profile_name = String::from("jl");
+                    mounts.push(MountArgs {
+                        source: Some(root.join("root-julia")),
+                        target: rootfs.join("opt/julia"),
+                        fstype: None,
+                        flags: MsFlags::MS_BIND | MsFlags::MS_RDONLY,
+                        data: None,
+                    });
+                    execve_args.extend([
+                        String::from("/usr/bin/julia"),
+                        format!("{}.jl", args.run_target),
+                    ]);
                 }
                 args::Language::JavaScript => {
                     seccomp_profile_name = String::from("js");
