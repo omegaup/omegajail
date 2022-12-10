@@ -220,6 +220,7 @@ impl JailOptions {
                     seccomp_profile_name = String::from("gcc");
                     execve_args.extend([
                         String::from("/usr/bin/gcc-10"),
+                        String::from("-xc"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c11"),
@@ -232,6 +233,7 @@ impl JailOptions {
                     seccomp_profile_name = String::from("clang");
                     execve_args.extend([
                         String::from("/usr/bin/clang-10"),
+                        String::from("-xc"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c11"),
@@ -245,6 +247,7 @@ impl JailOptions {
                     seccomp_profile_name = String::from("gcc");
                     execve_args.extend([
                         String::from("/usr/bin/g++-10"),
+                        String::from("-xc++"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++03"),
@@ -257,6 +260,7 @@ impl JailOptions {
                     seccomp_profile_name = String::from("clang");
                     execve_args.extend([
                         String::from("/usr/bin/clang++-10"),
+                        String::from("-xc++"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++03"),
@@ -269,6 +273,7 @@ impl JailOptions {
                     seccomp_profile_name = String::from("gcc");
                     execve_args.extend([
                         String::from("/usr/bin/g++-10"),
+                        String::from("-xc++"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++11"),
@@ -281,6 +286,7 @@ impl JailOptions {
                     seccomp_profile_name = String::from("clang");
                     execve_args.extend([
                         String::from("/usr/bin/clang++-10"),
+                        String::from("-xc++"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++11"),
@@ -293,6 +299,7 @@ impl JailOptions {
                     seccomp_profile_name = String::from("gcc");
                     execve_args.extend([
                         String::from("/usr/bin/g++-10"),
+                        String::from("-xc++"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++17"),
@@ -305,6 +312,7 @@ impl JailOptions {
                     seccomp_profile_name = String::from("clang");
                     execve_args.extend([
                         String::from("/usr/bin/clang++-10"),
+                        String::from("-xc++"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++17"),
@@ -317,6 +325,7 @@ impl JailOptions {
                     seccomp_profile_name = String::from("gcc");
                     execve_args.extend([
                         String::from("/usr/bin/g++-10"),
+                        String::from("-xc++"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++20"),
@@ -329,6 +338,7 @@ impl JailOptions {
                     seccomp_profile_name = String::from("clang");
                     execve_args.extend([
                         String::from("/usr/bin/clang++-10"),
+                        String::from("-xc++"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++20"),
