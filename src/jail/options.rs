@@ -14,12 +14,14 @@ use crate::args;
 const DEFAULT_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 16 * 1024 * 1024;
 const RUBY_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 56 * 1024 * 1024;
 const GO_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 512 * 1024 * 1024;
+const NODE_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 89 * 1024 * 1024;
 
 // These are obtained by running an "empty" and measuring
 // its memory consumption, as reported by omegajail.
 const JAVA_VM_MEMORY_SIZE_IN_BYTES: u64 = 47 * 1024 * 1024;
 const CLR_VM_MEMORY_SIZE_IN_BYTES: u64 = 20 * 1024 * 1024;
 const RUBY_VM_MEMORY_SIZE_IN_BYTES: u64 = 12 * 1024 * 1024;
+const NODE_VM_MEMORY_SIZE_IN_BYTES: u64 = 31 * 1024 * 1024;
 
 // This is the result of executing the following Java code:
 //
@@ -494,6 +496,8 @@ impl JailOptions {
                 }
                 args::Language::JavaScript => {
                     seccomp_profile_name = String::from("js");
+                    extra_memory_size_in_bytes = NODE_EXTRA_MEMORY_SIZE_IN_BYTES;
+                    vm_memory_size_in_bytes = NODE_VM_MEMORY_SIZE_IN_BYTES;
                     mounts.push(MountArgs {
                         source: Some(root.join("root-js")),
                         target: rootfs.join("opt/nodejs"),
@@ -509,6 +513,8 @@ impl JailOptions {
                 }
                 args::Language::KarelJava | args::Language::KarelPascal => {
                     seccomp_profile_name = String::from("js");
+                    extra_memory_size_in_bytes = NODE_EXTRA_MEMORY_SIZE_IN_BYTES;
+                    vm_memory_size_in_bytes = NODE_VM_MEMORY_SIZE_IN_BYTES;
                     mounts.push(MountArgs {
                         source: Some(root.join("root-js")),
                         target: rootfs.join("opt/nodejs"),
@@ -698,6 +704,8 @@ impl JailOptions {
                 }
                 args::Language::JavaScript => {
                     seccomp_profile_name = String::from("js");
+                    extra_memory_size_in_bytes = NODE_EXTRA_MEMORY_SIZE_IN_BYTES;
+                    vm_memory_size_in_bytes = NODE_VM_MEMORY_SIZE_IN_BYTES;
                     mounts.push(MountArgs {
                         source: Some(root.join("root-js")),
                         target: rootfs.join("opt/nodejs"),
