@@ -24,11 +24,11 @@ minijail/constants.json:
 	$(MAKE) OUT=${PWD}/minijail -C minijail constants.json
 
 out/bin/omegajail: $(shell find src/ -name '*.rs') | out/bin
-	cargo build --release --bin=omegajail
+	cargo build --release --target x86_64-unknown-linux-musl --bin=omegajail
 	cp target/release/omegajail $@
 
 out/bin/java-compile: src/java_compile.rs | out/bin
-	cargo build --release --bin=java-compile
+	cargo build --release --target x86_64-unknown-linux-musl --bin=java-compile
 	cp target/release/java-compile $@
 
 out/policies/%.bpf: policies/%.policy policies/base/omegajail.policy | minijail/constants.json out/policies
