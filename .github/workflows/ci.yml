@@ -20,11 +20,19 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get install -y libcap-dev util-linux
 
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          target: x86_64-unknown-linux-musl
+
       - name: Build
         run: |
           make CXX=g++-9 ECHO=echo OMEGAJAIL_RELEASE=${{ github.sha }} all
-          cargo build --bins
-          cargo build --tests
+          cargo build --bins --target x86_64-unknown-linux-musl
+          cargo build --tests --target x86_64-unknown-linux-musl
 
       - name: Test
         run: make test
