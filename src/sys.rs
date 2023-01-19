@@ -19,7 +19,14 @@ use serde::{Deserialize, Serialize};
 /// negative, and the result of the function as-is otherwise.
 fn check_err(num: libc::c_long) -> Result<libc::c_long> {
     if num < 0 {
-        return Err(Error::new(Errno::from_i32(num.try_into()?)));
+        match Errno::from_i32(num.try_into()?) {
+            Errno::UnknownErrno => {
+                bail!("unknown errno: {}", num);
+            }
+            err => {
+                return Err(Error::new(err));
+            }
+        }
     }
     Ok(num)
 }
