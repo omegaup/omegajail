@@ -222,131 +222,121 @@ impl JailOptions {
                     seccomp_profile_name = String::from("gcc");
                     execve_args.extend([
                         String::from("/usr/bin/gcc-10"),
-                        String::from("-xc"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c11"),
                         String::from("-O2"),
                     ]);
-                    execve_args.extend(compile_sources.iter().map(|s| s.clone()));
+                    add_sources(&mut execve_args, "-xc", compile_sources);
                     execve_args.push(String::from("-lm"));
                 }
                 args::Language::C11Clang => {
                     seccomp_profile_name = String::from("clang");
                     execve_args.extend([
                         String::from("/usr/bin/clang-10"),
-                        String::from("-xc"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c11"),
                         String::from("-O3"),
                         String::from("-march=native"),
                     ]);
-                    execve_args.extend(compile_sources.iter().map(|s| s.clone()));
+                    add_sources(&mut execve_args, "-xc", compile_sources);
                     execve_args.push(String::from("-lm"));
                 }
                 args::Language::Cpp03GCC => {
                     seccomp_profile_name = String::from("gcc");
                     execve_args.extend([
                         String::from("/usr/bin/g++-10"),
-                        String::from("-xc++"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++03"),
                         String::from("-O2"),
                     ]);
-                    execve_args.extend(compile_sources.iter().map(|s| s.clone()));
+                    add_sources(&mut execve_args, "-xc++", compile_sources);
                     execve_args.push(String::from("-lm"));
                 }
                 args::Language::Cpp03Clang => {
                     seccomp_profile_name = String::from("clang");
                     execve_args.extend([
                         String::from("/usr/bin/clang++-10"),
-                        String::from("-xc++"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++03"),
                         String::from("-O2"),
                     ]);
-                    execve_args.extend(compile_sources.iter().map(|s| s.clone()));
+                    add_sources(&mut execve_args, "-xc++", compile_sources);
                     execve_args.push(String::from("-lm"));
                 }
                 args::Language::Cpp | args::Language::Cpp11 | args::Language::Cpp11GCC => {
                     seccomp_profile_name = String::from("gcc");
                     execve_args.extend([
                         String::from("/usr/bin/g++-10"),
-                        String::from("-xc++"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++11"),
                         String::from("-O2"),
                     ]);
-                    execve_args.extend(compile_sources.iter().map(|s| s.clone()));
+                    add_sources(&mut execve_args, "-xc++", compile_sources);
                     execve_args.push(String::from("-lm"));
                 }
                 args::Language::Cpp11Clang => {
                     seccomp_profile_name = String::from("clang");
                     execve_args.extend([
                         String::from("/usr/bin/clang++-10"),
-                        String::from("-xc++"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++11"),
                         String::from("-O2"),
                     ]);
-                    execve_args.extend(compile_sources.iter().map(|s| s.clone()));
+                    add_sources(&mut execve_args, "-xc++", compile_sources);
                     execve_args.push(String::from("-lm"));
                 }
                 args::Language::Cpp17GCC => {
                     seccomp_profile_name = String::from("gcc");
                     execve_args.extend([
                         String::from("/usr/bin/g++-10"),
-                        String::from("-xc++"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++17"),
                         String::from("-O2"),
                     ]);
-                    execve_args.extend(compile_sources.iter().map(|s| s.clone()));
+                    add_sources(&mut execve_args, "-xc++", compile_sources);
                     execve_args.push(String::from("-lm"));
                 }
                 args::Language::Cpp17Clang => {
                     seccomp_profile_name = String::from("clang");
                     execve_args.extend([
                         String::from("/usr/bin/clang++-10"),
-                        String::from("-xc++"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++17"),
                         String::from("-O2"),
                     ]);
-                    execve_args.extend(compile_sources.iter().map(|s| s.clone()));
+                    add_sources(&mut execve_args, "-xc++", compile_sources);
                     execve_args.push(String::from("-lm"));
                 }
                 args::Language::Cpp20GCC => {
                     seccomp_profile_name = String::from("gcc");
                     execve_args.extend([
                         String::from("/usr/bin/g++-10"),
-                        String::from("-xc++"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++20"),
                         String::from("-O2"),
                     ]);
-                    execve_args.extend(compile_sources.iter().map(|s| s.clone()));
+                    add_sources(&mut execve_args, "-xc++", compile_sources);
                     execve_args.push(String::from("-lm"));
                 }
                 args::Language::Cpp20Clang => {
                     seccomp_profile_name = String::from("clang");
                     execve_args.extend([
                         String::from("/usr/bin/clang++-10"),
-                        String::from("-xc++"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++20"),
                         String::from("-O2"),
                     ]);
-                    execve_args.extend(compile_sources.iter().map(|s| s.clone()));
+                    add_sources(&mut execve_args, "-xc++", compile_sources);
                     execve_args.push(String::from("-lm"));
                 }
                 args::Language::Pascal => {
@@ -829,5 +819,24 @@ impl JailOptions {
             },
             allow_sigsys_fallback: args.allow_sigsys_fallback,
         })
+    }
+}
+
+fn add_sources(execve_args: &mut Vec<String>, lang_flag: &str, compile_sources: &Vec<String>) {
+    let mut needs_flag = true;
+    for s in compile_sources.iter() {
+        if s.ends_with(".S") {
+            execve_args.extend([String::from("-xassembler-with-cpp"), s.clone()]);
+            needs_flag = true;
+        } else if s.ends_with(".s") {
+            execve_args.extend([String::from("-xassembler"), s.clone()]);
+            needs_flag = true;
+        } else {
+            if needs_flag {
+                execve_args.push(String::from(lang_flag));
+                needs_flag = false;
+            }
+            execve_args.push(s.clone());
+        }
     }
 }

@@ -90,7 +90,7 @@ FROM rootfs-setup AS rootfs-build
 RUN /src/mkroot
 
 FROM setup AS runtime
-RUN wget --quiet https://github.com/omegaup/libinteractive/releases/download/v2.0.25/libinteractive.jar \
+RUN wget --quiet https://github.com/omegaup/libinteractive/releases/download/v2.0.29/libinteractive.jar \
     -O /usr/share/java/libinteractive.jar
 
 RUN ln -s /opt/nodejs/bin/node /usr/bin/node && \
