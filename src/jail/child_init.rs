@@ -91,11 +91,13 @@ pub(crate) fn run(mut parent_jail_sock: UnixStream, opts: JailOptions) -> Result
             {
                 write_message(&mut parent_jail_sock, SetupCgroupRequest {})
                     .context("write setup cgroup request")?;
-                let child_pidfd =
-                    pidfd_open(child, 0).with_context(|| anyhow!("pidfd_open({})", child))?;
-                parent_jail_sock
-                    .send_file(child_pidfd)
-                    .context("send child pidfd")?;
+                if !opts.disable_sandboxing {
+                    let child_pidfd =
+                        pidfd_open(child, 0).with_context(|| anyhow!("pidfd_open({})", child))?;
+                    parent_jail_sock
+                        .send_file(child_pidfd)
+                        .context("send child pidfd")?;
+                }
                 read_message::<SetupCgroupResponse>(&mut parent_jail_sock)
                     .context("read setup cgroup response")?;
             }

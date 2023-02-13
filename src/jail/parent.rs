@@ -25,31 +25,35 @@ pub(crate) fn setup_child(
     write_message(parent_sock, ParentSetupDoneEvent {}).context("write parent setup done event")?;
 
     read_message::<SetupCgroupRequest>(parent_sock).context("wait for setup cgroup request")?;
-    let pidfd = parent_sock.recv_file().context("receive seccomp pidfd")?;
-    let cgroups = match (&jail_options.cgroup_path, jail_options.disable_sandboxing) {
-        (Some(cgroup_path_root), false) => {
-            let pid = get_pid_from_pidfd(&pidfd).context("get jailed pid")?;
-            let cgroup_path = cgroup_path_root.join(&jail_options.seccomp_profile_name);
-            let cgroup = CGroup::new(
-                if CGroup::is_cgroup_v2() { "" } else { "memory" },
-                &cgroup_path,
-            )
-            .with_context(|| anyhow!("create cgroup {:?}", &cgroup_path))?;
-            cgroup
-                .add_pid(pid)
-                .with_context(|| anyhow!("add {} to cgroup", pid))?;
-            if jail_options.use_cgroups_for_memory_limit {
-                if let Some(memory_limit) = jail_options.memory_limit {
-                    cgroup.set_memory_limit(memory_limit).with_context(|| {
-                        anyhow!("set pid {}'s memory limit to {}", pid, memory_limit)
-                    })?;
+    let cgroups = if !jail_options.disable_sandboxing {
+        let pidfd = parent_sock.recv_file().context("receive seccomp pidfd")?;
+        match &jail_options.cgroup_path {
+            Some(cgroup_path_root) => {
+                let pid = get_pid_from_pidfd(&pidfd).context("get jailed pid")?;
+                let cgroup_path = cgroup_path_root.join(&jail_options.seccomp_profile_name);
+                let cgroup = CGroup::new(
+                    if CGroup::is_cgroup_v2() { "" } else { "memory" },
+                    &cgroup_path,
+                )
+                .with_context(|| anyhow!("create cgroup {:?}", &cgroup_path))?;
+                cgroup
+                    .add_pid(pid)
+                    .with_context(|| anyhow!("add {} to cgroup", pid))?;
+                if jail_options.use_cgroups_for_memory_limit {
+                    if let Some(memory_limit) = jail_options.memory_limit {
+                        cgroup.set_memory_limit(memory_limit).with_context(|| {
+                            anyhow!("set pid {}'s memory limit to {}", pid, memory_limit)
+                        })?;
+                    }
                 }
+                vec![cgroup]
             }
-            vec![cgroup]
+            None => {
+                vec![]
+            }
         }
-        (None, _) | (_, true) => {
-            vec![]
-        }
+    } else {
+        vec![]
     };
 
     write_message(parent_sock, SetupCgroupResponse {}).context("write setup cgroup response")?;
