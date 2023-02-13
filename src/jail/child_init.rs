@@ -51,10 +51,10 @@ pub(crate) fn run(mut parent_jail_sock: UnixStream, opts: JailOptions) -> Result
         setup_net_namespace().context("setup net namespace")?;
         setup_mount_namespace(&opts).context("setup mount namespace")?;
         drop_privileges().context("drop privileges")?;
+        set_no_new_privs().context("set_no_new_privs")?;
     } else {
         setup_unsandboxed_filesystem(&opts).context("setup filesystem")?;
     }
-    set_no_new_privs().context("set_no_new_privs")?;
 
     let parent_jail_sock_fd = parent_jail_sock.as_raw_fd();
     let first_range_fd = unsafe {
@@ -103,13 +103,7 @@ pub(crate) fn run(mut parent_jail_sock: UnixStream, opts: JailOptions) -> Result
             let deadline = child_start.add(opts.wall_time_limit);
             std::mem::drop(write_pipe);
 
-            let status = wait_child(
-                child,
-                jail_sock,
-                child_start,
-                deadline,
-                opts.vm_memory_size_in_bytes,
-            );
+            let status = wait_child(child, jail_sock, child_start, deadline, &opts);
             write_message(&mut parent_jail_sock, status).context("write status")?;
         }
         ForkResult::Child => {
@@ -375,23 +369,27 @@ fn wait_child(
     mut jail_sock: UnixStream,
     child_start: Instant,
     deadline: Instant,
-    vm_memory_size_in_bytes: u64,
+    opts: &JailOptions,
 ) -> WaitidStatus {
-    let seccomp_fd = match wait_receive_seccomp_fd(&mut jail_sock) {
-        Err(err) => {
-            log::error!("receive seccomp fd: {:#}", err);
-            let _ = kill(child, Signal::SIGKILL);
-            None
+    let override_status = if !opts.disable_sandboxing {
+        let seccomp_fd = match wait_receive_seccomp_fd(&mut jail_sock) {
+            Err(err) => {
+                log::error!("receive seccomp fd: {:#}", err);
+                let _ = kill(child, Signal::SIGKILL);
+                None
+            }
+            Ok(seccomp_fd) => seccomp_fd,
+        };
+        match wait_read_seccomp_notification(child, deadline, seccomp_fd) {
+            Err(err) => {
+                log::error!("read seccomp notification: {:#}", err);
+                let _ = kill(child, Signal::SIGKILL);
+                None
+            }
+            Ok(result) => result,
         }
-        Ok(seccomp_fd) => seccomp_fd,
-    };
-    let override_status = match wait_read_seccomp_notification(child, deadline, seccomp_fd) {
-        Err(err) => {
-            log::error!("read seccomp notification: {:#}", err);
-            let _ = kill(child, Signal::SIGKILL);
-            None
-        }
-        Ok(result) => result,
+    } else {
+        None
     };
 
     let mut status = match waitid(
@@ -412,7 +410,7 @@ fn wait_child(
         Ok(status) => status,
     };
     status.wall_time = Instant::now().duration_since(child_start);
-    status.max_rss = status.max_rss.saturating_sub(vm_memory_size_in_bytes);
+    status.max_rss = status.max_rss.saturating_sub(opts.vm_memory_size_in_bytes);
     if let Some(s) = override_status {
         status.status = s;
     }

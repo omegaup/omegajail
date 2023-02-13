@@ -20,7 +20,9 @@ pub(crate) fn run(
     setup_process_limits(&opts).context("setup net namespace")?;
     setup_signal_handlers().context("setup signal handlers")?;
 
-    setup_seccomp_bpf(&mut child_sock, &opts).context("setup_seccomp_bpf")?;
+    if !opts.disable_sandboxing {
+        setup_seccomp_bpf(&mut child_sock, &opts).context("setup_seccomp_bpf")?;
+    }
     std::mem::drop(child_sock);
 
     // Wait for the read pipe to finish
