@@ -40,6 +40,7 @@ _LANGUAGES = [
     'js',
     'kj',
     'kp',
+    'rk',
     'cs',
 ]
 _EXTENSIONS = {
@@ -57,7 +58,7 @@ _EXTENSIONS = {
     'py2': 'py',
     'py3': 'py',
 }
-_KAREL_LANGUAGES = set(['kj', 'kp'])
+_KAREL_LANGUAGES = set(['kj', 'kp', 'rk'])
 _PWD = os.path.abspath(os.path.dirname(__file__))
 
 
