@@ -34,10 +34,7 @@ jobs:
 
       - name: Smoketest
         run: |
-          sudo mkdir -p -m 0775 /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
-          sudo chown $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
-          sudo chgrp $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
-          taskset 0x1 ./smoketest/test --root=./rootfs --strace --cgroup-path=/system.slice/omegaup-runner.service/omegajail
+          taskset 0x1 ./smoketest/test --root=./rootfs --strace
 
       - name: Upload artifacts
         if: ${{ always() }}
