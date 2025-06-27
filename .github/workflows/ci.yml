@@ -32,6 +32,15 @@ jobs:
       - name: Build rootfs
         run: make OMEGAJAIL_RELEASE=${{ github.sha }} rootfs
 
+      - name: Debug rootfs contents
+        run: |
+          echo "=== Rootfs structure ==="
+          find rootfs -type f | head -20
+          echo "=== Checking for compilers ==="
+          ls -la rootfs/usr/bin/ | grep -E "(gcc|g\+\+|clang|javac|python)" || echo "No compilers found"
+          echo "=== Rootfs size ==="
+          du -sh rootfs/
+
       - name: Smoketest
         run: |
           taskset 0x1 ./smoketest/test --root=./rootfs --strace
