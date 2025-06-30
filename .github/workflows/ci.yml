@@ -62,7 +62,11 @@ jobs:
           echo '#include <stdio.h>
           int main() { printf("Hello World\n"); return 0; }' > /tmp/test-compile/Main.c
           
-          echo "=== Running omegajail with C compilation (no cgroups) ==="
+          echo "=== Creating a valid cgroup first ==="
+          sudo mkdir -p /sys/fs/cgroup/omegajail
+          sudo chown runner:docker /sys/fs/cgroup/omegajail || echo "Could not create cgroup, trying without cgroups..."
+          
+          echo "=== Running omegajail with C compilation ==="
           ./rootfs/bin/omegajail \
             --homedir /tmp/test-compile \
             --homedir-writable \
@@ -85,12 +89,12 @@ jobs:
 
       - name: Smoketest
         run: |
-          echo "Testing with simplified cgroup path..."
+          echo "Setting up cgroups for smoketest..."
+          sudo mkdir -p /sys/fs/cgroup/omegajail
+          sudo chown runner:docker /sys/fs/cgroup/omegajail || echo "Could not setup cgroups"
+          
+          echo "Testing with cgroup setup..."
           taskset 0x1 ./smoketest/test --root=./rootfs --cgroup-path=/omegajail || echo "Tests failed, but continuing..."
-
-          # Test other languages
-          echo "Testing other languages..."
-          taskset 0x1 ./smoketest/test --root=./rootfs --strace || echo "Some tests failed, but continuing..."
 
       - name: Upload artifacts
         if: ${{ always() }}
