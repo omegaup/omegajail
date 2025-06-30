@@ -62,7 +62,7 @@ jobs:
           echo '#include <stdio.h>
           int main() { printf("Hello World\n"); return 0; }' > /tmp/test-compile/Main.c
           
-          echo "=== Running omegajail with C compilation ==="
+          echo "=== Running omegajail with C compilation (no cgroups) ==="
           ./rootfs/bin/omegajail \
             --homedir /tmp/test-compile \
             --homedir-writable \
@@ -73,7 +73,8 @@ jobs:
             --stdout /tmp/test-compile/out.txt \
             --stderr /tmp/test-compile/err.txt \
             --time-limit 30000 \
-            --output-limit 10485100 || echo "Direct omegajail compilation failed"
+            --output-limit 10485100 \
+            --cgroup-path /omegajail || echo "Direct omegajail compilation failed"
           
           echo "=== Output files ==="
           ls -la /tmp/test-compile/
@@ -84,10 +85,8 @@ jobs:
 
       - name: Smoketest
         run: |
-          # The omegajail binary automatically selects the correct rootfs based on --compile flag
-          # Test C/C++ compilation (uses root-compilers)
-          echo "Testing C/C++ compilation..."
-          taskset 0x1 ./smoketest/test --root=./rootfs --strace --languages="c,cpp" || echo "C/C++ tests failed, continuing..."
+          echo "Testing with simplified cgroup path..."
+          taskset 0x1 ./smoketest/test --root=./rootfs --cgroup-path=/omegajail || echo "Tests failed, but continuing..."
 
           # Test other languages
           echo "Testing other languages..."
