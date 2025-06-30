@@ -55,6 +55,33 @@ jobs:
           echo "=== Testing with strace to see what fails ==="
           timeout 10s strace -f ./rootfs/bin/omegajail --help 2>&1 | tail -20 || echo "strace failed"
 
+      - name: Test specific compilation
+        run: |
+          echo "=== Testing specific C compilation ==="
+          mkdir -p /tmp/test-compile
+          echo '#include <stdio.h>
+          int main() { printf("Hello World\n"); return 0; }' > /tmp/test-compile/Main.c
+          
+          echo "=== Running omegajail with C compilation ==="
+          ./rootfs/bin/omegajail \
+            --homedir /tmp/test-compile \
+            --homedir-writable \
+            --root ./rootfs \
+            --compile c \
+            --compile-source Main.c \
+            --compile-target Main \
+            --stdout /tmp/test-compile/out.txt \
+            --stderr /tmp/test-compile/err.txt \
+            --time-limit 30000 \
+            --output-limit 10485100 || echo "Direct omegajail compilation failed"
+          
+          echo "=== Output files ==="
+          ls -la /tmp/test-compile/
+          echo "=== Stdout ==="
+          cat /tmp/test-compile/out.txt 2>/dev/null || echo "No stdout"
+          echo "=== Stderr ==="
+          cat /tmp/test-compile/err.txt 2>/dev/null || echo "No stderr"
+
       - name: Smoketest
         run: |
           # The omegajail binary automatically selects the correct rootfs based on --compile flag
