@@ -115,6 +115,7 @@ COPY --from=rootfs-build \
 COPY --from=rootfs-build \
          /var/lib/omegajail/root-compilers/rust-toolchain.toml \
          /rust-toolchain.toml
+COPY --from=rootfs-build /var/lib/omegajail /var/lib/omegajail
 
 COPY --from=omegaup/omegajail-builder-distrib /var/lib/omegajail/ /var/lib/omegajail
 RUN mv /var/lib/omegajail/bin/omegajail /var/lib/omegajail/bin/omegajail.wrapped
