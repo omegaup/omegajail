@@ -64,17 +64,37 @@ jobs:
           echo "=== Testing with strace to see what fails ==="
           timeout 10s strace -f ./rootfs/bin/omegajail --help 2>&1 | tail -20 || echo "strace failed"
 
+      - name: Setup cgroups for omegajail
+        run: |
+          echo "=== Setting up cgroups v2 for omegajail ==="
+          # Create the base cgroup directory
+          sudo mkdir -p /sys/fs/cgroup/omegajail
+
+          # Enable controllers in the parent cgroup
+          echo "+memory +pids +cpu" | sudo tee /sys/fs/cgroup/cgroup.subtree_control || echo "Could not enable controllers"
+
+          # Set ownership so omegajail can create subcgroups
+          sudo chown -R runner:docker /sys/fs/cgroup/omegajail
+          sudo chmod -R 755 /sys/fs/cgroup/omegajail
+
+          # Create the subtree control file for omegajail cgroup
+          sudo touch /sys/fs/cgroup/omegajail/cgroup.subtree_control
+          sudo chown runner:docker /sys/fs/cgroup/omegajail/cgroup.subtree_control
+
+          # Verify setup
+          echo "=== Cgroup setup verification ==="
+          ls -la /sys/fs/cgroup/omegajail/
+          cat /sys/fs/cgroup/cgroup.subtree_control || echo "Could not read parent subtree_control"
+          echo "=== Current user and groups ==="
+          id
+
       - name: Test specific compilation
         run: |
           echo "=== Testing specific C compilation ==="
           mkdir -p /tmp/test-compile
           echo '#include <stdio.h>
           int main() { printf("Hello World\n"); return 0; }' > /tmp/test-compile/Main.c
-          
-          echo "=== Creating a valid cgroup first ==="
-          sudo mkdir -p /sys/fs/cgroup/omegajail
-          sudo chown runner:docker /sys/fs/cgroup/omegajail || echo "Could not create cgroup, trying without cgroups..."
-          
+
           echo "=== Running omegajail with C compilation ==="
           ./rootfs/bin/omegajail \
             --homedir /tmp/test-compile \
