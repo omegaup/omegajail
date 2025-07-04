@@ -43,10 +43,8 @@ pub enum Language {
     Go,
     #[clap(name = "js")]
     JavaScript,
-    #[clap(name = "kj")]
-    KarelJava,
-    #[clap(name = "kp")]
-    KarelPascal,
+    #[clap(name = "rk")]
+    ReKarel,
 }
 
 /// [`clap`](::clap) arguments for the sandboxing.
