@@ -668,7 +668,7 @@ def _main() -> None:
                 '/opt/nodejs/karel',
                 '/opt/nodejs/LICENSE',
         ):
-            root.copyfromhost(filename, relative_to=JS_ROOT)
+            root.copyfromhost(filename)
 
     with Chroot(os.path.join(args.target, 'root-go'), GO_ROOT,
                 link=args.link) as root:
