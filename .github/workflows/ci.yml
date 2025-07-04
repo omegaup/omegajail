@@ -61,6 +61,28 @@ jobs:
           echo "=== Rootfs sizes ==="
           du -sh rootfs/root*
 
+      - name: Debug mkroot process
+        run: |
+          echo "=== Testing mkroot directly with debug ==="
+          # Crear un rootfs temporal para debug
+          mkdir -p /tmp/debug-rootfs
+
+          # Run setup container to see if karel files are present
+          docker run --rm omegaup/omegajail-builder-rootfs-setup ls -la /opt/nodejs/karel* || echo "Karel not found in setup"
+
+          # Run mkroot with debug
+          docker run --rm \
+            --mount "type=bind,source=/tmp/debug-rootfs,target=/var/lib/omegajail" \
+            omegaup/omegajail-builder-rootfs-setup \
+            bash -c "ls -la /opt/nodejs/karel* && /src/mkroot --verbose" || echo "mkroot failed"
+
+          # Verificar resultado
+          echo "=== Checking if karel was copied by mkroot ==="
+          find /tmp/debug-rootfs -name "karel*" -type f || echo "No karel files copied by mkroot"
+
+          # Cleanup
+          sudo rm -rf /tmp/debug-rootfs
+
       - name: Test omegajail binary
         run: |
           echo "=== Testing omegajail binary directly ==="
