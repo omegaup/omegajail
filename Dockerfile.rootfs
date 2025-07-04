@@ -118,7 +118,6 @@ COPY --from=rootfs-build \
 COPY --from=rootfs-build /var/lib/omegajail /var/lib/omegajail
 
 COPY ./tools/omegajail-container-wrapper /var/lib/omegajail/bin/omegajail
-COPY ./smoketest /smoketest
 
 FROM runtime AS runtime-debug
 RUN apt-get update -y && \
