@@ -43,14 +43,21 @@ jobs:
 
       - name: Debug rootfs contents
         run: |
-          echo "=== Rootfs structure ==="
+          echo "=== Checking if karel files exist in rootfs ==="
+          find rootfs -name "karel*" -type f 2>/dev/null || echo "No karel files found in rootfs"
+
+          echo "=== Checking rootfs structure ==="
+          ls -la rootfs/
+          ls -la rootfs/opt/ 2>/dev/null || echo "No opt directory"
+          ls -la rootfs/opt/nodejs/ 2>/dev/null || echo "No nodejs directory"
+
+          echo "=== Checking if karel exists in build context ==="
+          docker run --rm omegaup/omegajail-builder-rootfs-setup ls -la /opt/nodejs/karel* || echo "Karel not in setup stage"
+
+          echo "=== Checking compiler rootfs ==="
           find rootfs -name "root*" -type d | head -10
           echo "=== Checking for C/C++ compilers in root-compilers ==="
           ls -la rootfs/root-compilers/usr/bin/ | grep -E "(gcc|g\+\+|clang)" || echo "No C/C++ compilers found"
-          echo "=== Checking for Java in root-java ==="
-          ls -la rootfs/root-java/usr/bin/ | grep java || echo "No Java found"
-          echo "=== Checking for Python in root-python3 ==="
-          ls -la rootfs/root-python3/usr/bin/ | grep python || echo "No Python found"
           echo "=== Rootfs sizes ==="
           du -sh rootfs/root*
 
