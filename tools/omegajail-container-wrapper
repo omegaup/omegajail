@@ -56,4 +56,4 @@ for bind_flag in "${bind_flags[@]}"; do
   ln -sf "${bind_source}" "${link_target}"
 done
 
-echo "omegajail binary not available yet - wrapper called with args: ${filtered_args[@]}"
+exec /var/lib/omegajail/bin/omegajail.wrapped --disable-sandboxing "${filtered_args[@]}"
