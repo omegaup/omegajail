@@ -719,7 +719,7 @@ impl JailOptions {
                         data: None,
                     });
                     execve_args.extend([
-                        String::from("/opt/nodejs/karel.wasm"),
+                        String::from("/opt/nodejs/karel"),
                         String::from(format!("{}.kx", &args.run_target)),
                     ]);
                 }
