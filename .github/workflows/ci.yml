@@ -116,6 +116,45 @@ jobs:
           echo "=== Stderr ==="
           cat /tmp/test-compile/err.txt 2>/dev/null || echo "No stderr"
 
+      - name: Debug ReKarel compilation
+        run: |
+          echo "=== Testing ReKarel compilation manually ==="
+          mkdir -p /tmp/rk-test
+          echo 'iniciar-programa
+              inicia-ejecucion
+                  apagate;
+              termina-ejecucion
+          finalizar-programa' > /tmp/rk-test/test.rk
+
+          # Test ReKarel compilation step by step
+          echo "=== Checking karel files exist ==="
+          ls -la rootfs/opt/nodejs/karel*
+
+          echo "=== Testing karel.js directly ==="
+          node rootfs/opt/nodejs/karel.js --help || echo "karel.js help failed"
+
+          echo "=== Testing karel wrapper ==="
+          rootfs/opt/nodejs/karel --help || echo "karel wrapper failed"
+
+          echo "=== Testing ReKarel compilation ==="
+          timeout 10s ./rootfs/bin/omegajail \
+            --homedir /tmp/rk-test \
+            --homedir-writable \
+            --root ./rootfs \
+            --compile rk \
+            --compile-source test.rk \
+            --compile-target test \
+            --stdout /tmp/rk-test/out.txt \
+            --stderr /tmp/rk-test/err.txt \
+            --time-limit 10000 \
+            --output-limit 1048576 \
+            --disable-sandboxing || echo "ReKarel compilation failed"
+
+          echo "=== ReKarel compilation results ==="
+          ls -la /tmp/rk-test/
+          cat /tmp/rk-test/out.txt 2>/dev/null || echo "No stdout"
+          cat /tmp/rk-test/err.txt 2>/dev/null || echo "No stderr"
+
       - name: Smoketest
         run: |
           echo "Testing compilation without sandboxing for CI compatibility..."
