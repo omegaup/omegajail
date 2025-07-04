@@ -43,23 +43,12 @@ jobs:
 
       - name: Debug rootfs contents
         run: |
-          echo "=== Checking if karel files exist in rootfs ==="
+          echo "=== Checking if karel files exist in root-js ==="
           find rootfs -name "karel*" -type f 2>/dev/null || echo "No karel files found in rootfs"
+          ls -la rootfs/root-js/opt/nodejs/karel* 2>/dev/null || echo "No karel files in root-js"
 
-          echo "=== Checking rootfs structure ==="
-          ls -la rootfs/
-          ls -la rootfs/opt/ 2>/dev/null || echo "No opt directory"
-          ls -la rootfs/opt/nodejs/ 2>/dev/null || echo "No nodejs directory"
-
-          echo "=== Checking if karel exists in build context ==="
-          docker run --rm omegaup/omegajail-builder-rootfs-setup ls -la /opt/nodejs/karel* || echo "Karel not in setup stage"
-
-          echo "=== Checking compiler rootfs ==="
-          find rootfs -name "root*" -type d | head -10
-          echo "=== Checking for C/C++ compilers in root-compilers ==="
-          ls -la rootfs/root-compilers/usr/bin/ | grep -E "(gcc|g\+\+|clang)" || echo "No C/C++ compilers found"
-          echo "=== Rootfs sizes ==="
-          du -sh rootfs/root*
+          echo "=== Checking main rootfs structure ==="
+          ls -la rootfs/opt/nodejs/ 2>/dev/null || echo "No nodejs directory in main rootfs"
 
       - name: Debug mkroot process
         run: |
@@ -76,7 +65,7 @@ jobs:
             omegaup/omegajail-builder-rootfs-setup \
             bash -c "ls -la /opt/nodejs/karel* && /src/mkroot --verbose" || echo "mkroot failed"
 
-          # Verificar resultado
+          # Check the result
           echo "=== Checking if karel was copied by mkroot ==="
           find /tmp/debug-rootfs -name "karel*" -type f || echo "No karel files copied by mkroot"
 
