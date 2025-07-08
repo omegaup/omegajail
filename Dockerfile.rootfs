@@ -70,11 +70,11 @@ RUN ls -l /usr/bin/ | grep -- '[^9] ->.*-9$' | sed -e 's@^.* \(.\+\) -> \(.\+\)-
         chmod +x /tmp/rustup-init && \
         RUSTUP_HOME=/opt/rust/rustup CARGO_HOME=/opt/rust/cargo /tmp/rustup-init --no-modify-path --default-host=x86_64-unknown-linux-gnu --default-toolchain=stable --profile=default -y --quiet && \
         rm /tmp/rustup-init && \
-    wget https://github.com/kishtarn555/rekarel-cli/releases/download/2.3.2/commands.min.cjs \
+    wget https://github.com/omegaup/karel.js/releases/download/v0.2.1/karel \
+        -O /opt/nodejs/karel.wasm && \
+    wget https://github.com/omegaup/karel.js/releases/download/v0.2.1/karel.js \
         -O /opt/nodejs/karel.js && \
-    echo '#!/usr/bin/env node' > /opt/nodejs/karel && \
-    echo 'require("./karel.js");' >> /opt/nodejs/karel && \
-    chmod +x /opt/nodejs/karel /opt/nodejs/karel.js && \
+    chmod +x /opt/nodejs/karel.wasm /opt/nodejs/karel.js && \
     wget https://raw.githubusercontent.com/omegaup/libkarel/v0.0.99/libkarel.py \
         -O /usr/lib/python2.7/libkarel.py && \
     python3.9 -m pip install --target=/usr/lib/python3/dist-packages \
