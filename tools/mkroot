@@ -665,7 +665,7 @@ def _main() -> None:
         for filename in (
                 '/opt/nodejs/karel.js',
                 '/opt/nodejs/bin/node',
-                '/opt/nodejs/karel',
+                '/opt/nodejs/karel.wasm',
                 '/opt/nodejs/LICENSE',
         ):
             root.copyfromhost(filename, relative_to=JS_ROOT)
