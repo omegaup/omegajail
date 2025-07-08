@@ -501,7 +501,7 @@ impl JailOptions {
                     ]);
                     execve_args.extend(compile_sources.iter().map(|s| s.clone()));
                 }
-                args::Language::ReKarel => {
+                args::Language::KarelJava | args::Language::KarelPascal => {
                     seccomp_profile_name = String::from("js");
                     extra_memory_size_in_bytes = NODE_EXTRA_MEMORY_SIZE_IN_BYTES;
                     vm_memory_size_in_bytes = NODE_VM_MEMORY_SIZE_IN_BYTES;
@@ -517,7 +517,8 @@ impl JailOptions {
                         String::from("/opt/nodejs/karel.js"),
                         String::from("compile"),
                         String::from(match lang {
-                            args::Language::ReKarel => "ReKarel",
+                            args::Language::KarelJava => "java",
+                            args::Language::KarelPascal => "pascal",
                             _ => panic!("unreachable"),
                         }),
                         String::from("-o"),
@@ -708,7 +709,7 @@ impl JailOptions {
                         format!("{}.js", &args.run_target),
                     ]);
                 }
-                args::Language::ReKarel => {
+                args::Language::KarelPascal | args::Language::KarelJava => {
                     seccomp_profile_name = String::from("karel");
                     mounts.push(MountArgs {
                         source: Some(root.join("root-js")),
