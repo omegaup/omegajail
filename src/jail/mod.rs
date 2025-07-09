@@ -164,7 +164,10 @@ impl Jail {
         } else {
             clone3(&mut CloneArgs {
                 flags: CloneFlags::CLONE_NEWUSER
-                    | CloneFlags::CLONE_NEWPID,
+                    | CloneFlags::CLONE_NEWPID
+                    | CloneFlags::CLONE_NEWIPC
+                    | CloneFlags::CLONE_NEWUTS
+                    | CloneFlags::CLONE_NEWCGROUP,
                 exit_signal: libc::SIGCHLD,
             })
             .context("clone")?
@@ -307,7 +310,6 @@ mod tests {
 
     use anyhow::{anyhow, Context, Result};
     use nix::mount::MsFlags;
-    use nix::sched::CloneFlags;
     use nix::sys::signal::Signal;
     use nix::unistd::Pid;
     use once_cell::sync::Lazy;
@@ -352,28 +354,6 @@ mod tests {
             .canonicalize()
             .unwrap()
     });
-
-    fn is_ubuntu_2204() -> bool {
-        if let Ok(version) = std::fs::read_to_string("/proc/version") {
-            if version.contains("Ubuntu") &&
-            (version.contains("5.15") || version.contains("5.19") || version.contains("6.")) {
-                return true;
-            }
-        }
-
-        if let Ok(release) = std::fs::read_to_string("/etc/os-release") {
-            if release.contains("VERSION_ID=\"22.04\"") {
-                return true;
-            }
-        }
-
-        let apparmor_exists = std::path::Path::new("/sys/kernel/security/apparmor").exists();
-        let userns_enabled = std::fs::read_to_string("/proc/sys/kernel/unprivileged_userns_clone")
-            .map(|s| s.trim() == "1")
-            .unwrap_or(false);
-
-        apparmor_exists && userns_enabled
-    }
 
     fn run_test_case(test_case: TestCase) -> Result<JailResult> {
         let tmp_dir = TempDir::new(&test_case.widget)
@@ -452,24 +432,7 @@ mod tests {
         let jail = Jail::new(options)?;
 
         let result = jail.wait()?;
-        match (&test_case.status, &result.status) {
-            (WaitStatus::Exited(_, expected_code), WaitStatus::Exited(_, actual_code)) => {
-                assert_eq!(expected_code, actual_code,
-                        "Exit codes don't match: expected {}, got {}", expected_code, actual_code);
-            }
-            (WaitStatus::Signaled(_, expected_signal), WaitStatus::Signaled(_, actual_signal)) => {
-                assert_eq!(expected_signal, actual_signal,
-                        "Signals don't match: expected {:?}, got {:?}", expected_signal, actual_signal);
-            }
-            (WaitStatus::Syscalled(_, expected_syscall), WaitStatus::Syscalled(_, actual_syscall)) => {
-                assert_eq!(expected_syscall, actual_syscall,
-                        "Syscalls don't match: expected {:?}, got {:?}", expected_syscall, actual_syscall);
-            }
-            (expected, actual) => {
-                assert_eq!(expected, actual,
-                        "Wait status types don't match: expected {:?}, got {:?}", expected, actual);
-            }
-        }
+        assert_eq!(test_case.status, result.status);
 
         if let Some(expected_stdout) = test_case.stdout {
             let stdout = read_to_string(&stdout_path)?;
@@ -493,57 +456,6 @@ mod tests {
             stderr: Some("stderr\n"),
             ..TestCase::default()
         })?;
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_sandboxing_components() -> Result<()> {
-        init();
-
-        let result1 = test_with_minimal_sandboxing(vec![CloneFlags::CLONE_NEWUSER]);
-        let result2 = test_with_minimal_sandboxing(vec![
-            CloneFlags::CLONE_NEWUSER,
-            CloneFlags::CLONE_NEWPID
-        ]);
-
-        let result3 = test_with_minimal_sandboxing(vec![
-            CloneFlags::CLONE_NEWUSER,
-            CloneFlags::CLONE_NEWPID,
-            CloneFlags::CLONE_NEWNS
-        ]);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_ubuntu_version_compatibility() -> Result<()> {
-        init();
-
-        let is_2204 = is_ubuntu_2204();
-
-        // Mostrar información del sistema
-        if let Ok(version) = std::fs::read_to_string("/proc/version") {
-            println!("Kernel version: {}", version.trim());
-        }
-
-        if let Ok(release) = std::fs::read_to_string("/etc/os-release") {
-            for line in release.lines() {
-                if line.starts_with("VERSION=") || line.starts_with("VERSION_ID=") {
-                    println!("OS {}", line);
-                }
-            }
-        }
-
-        if let Ok(userns) = std::fs::read_to_string("/proc/sys/kernel/unprivileged_userns_clone") {
-            println!("unprivileged_userns_clone: {}", userns.trim());
-        }
-
-        if let Ok(max_ns) = std::fs::read_to_string("/proc/sys/user/max_user_namespaces") {
-            println!("max_user_namespaces: {}", max_ns.trim());
-        }
-
-        let apparmor_exists = std::path::Path::new("/sys/kernel/security/apparmor").exists();
 
         Ok(())
     }
