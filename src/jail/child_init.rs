@@ -37,6 +37,8 @@ const NONE: Option<&'static [u8]> = None;
 pub(crate) fn run(mut parent_jail_sock: UnixStream, opts: JailOptions) -> Result<()> {
     set_cpu_affinity().context("set cpu affinity")?;
 
+    check_ubuntu2204_compatibility().context("ubuntu 22.04 compatibility check")?;
+
     read_message::<ParentSetupDoneEvent>(&mut parent_jail_sock)
         .context("wait for parent setup done")?;
 
@@ -49,7 +51,15 @@ pub(crate) fn run(mut parent_jail_sock: UnixStream, opts: JailOptions) -> Result
 
     if !opts.disable_sandboxing {
         setup_net_namespace().context("setup net namespace")?;
-        setup_mount_namespace(&opts).context("setup mount namespace")?;
+
+        if std::env::var("container").is_ok() || std::path::Path::new("/.dockerenv").exists() {
+            setup_mount_namespace_container_debug(&opts).context("setup mount namespace")?;
+        } else if is_ubuntu_2204() {
+            setup_mount_namespace_ubuntu2204(&opts).context("setup mount namespace")?;
+        } else {
+            setup_mount_namespace(&opts).context("setup mount namespace")?;
+        }
+
         drop_privileges().context("drop privileges")?;
         set_no_new_privs().context("set_no_new_privs")?;
     } else {
@@ -154,9 +164,52 @@ fn set_cpu_affinity() -> Result<()> {
 
 fn setup_net_namespace() -> Result<()> {
     unshare(CloneFlags::CLONE_NEWNET).context("unshare(CLONE_NEWNET)")?;
-    sethostname("omegajail").context("sethostname(omegajail)")?;
+    if !(std::env::var("container").is_ok() || std::path::Path::new("/.dockerenv").exists()) {
+        sethostname("omegajail").context("sethostname(omegajail)")?;
+    }
 
     Ok(())
+}
+
+fn check_ubuntu2204_compatibility() -> Result<()> {
+    let unprivileged_userns = std::fs::read_to_string("/proc/sys/kernel/unprivileged_userns_clone")
+        .context("read unprivileged_userns_clone")?;
+    if unprivileged_userns.trim() != "1" {
+        return Err(anyhow!("Unprivileged user namespaces not enabled (found: {})", unprivileged_userns.trim()));
+    }
+
+    if let Ok(max_namespaces) = std::fs::read_to_string("/proc/sys/user/max_user_namespaces") {
+        let max: u32 = max_namespaces.trim().parse()
+            .context("parse max_user_namespaces")?;
+        if max < 1 {
+            return Err(anyhow!("Max user namespaces is 0"));
+        }
+    }
+
+    if std::env::var("container").is_err() &&
+       std::path::Path::new("/sys/kernel/security/apparmor").exists() {
+    }
+
+    Ok(())
+}
+
+fn is_ubuntu_2204() -> bool {
+    if let Ok(version) = std::fs::read_to_string("/proc/version") {
+        if version.contains("Ubuntu") && version.contains("5.15") {
+            return true;
+        }
+    }
+
+    if let Ok(release) = std::fs::read_to_string("/etc/os-release") {
+        if release.contains("Ubuntu") && release.contains("22.04") {
+            return true;
+        }
+    }
+
+    std::path::Path::new("/sys/kernel/security/apparmor").exists() &&
+    std::fs::read_to_string("/proc/sys/kernel/unprivileged_userns_clone")
+        .map(|s| s.trim() == "1")
+        .unwrap_or(false)
 }
 
 fn setup_mount_namespace(opts: &JailOptions) -> Result<()> {
@@ -283,6 +336,151 @@ fn setup_mount_namespace(opts: &JailOptions) -> Result<()> {
         }
     }
     umount2("/mnt/stdio", MntFlags::MNT_DETACH).context("unmount /mnt/stdio")?;
+
+    Ok(())
+}
+
+fn setup_mount_namespace_ubuntu2204(opts: &JailOptions) -> Result<()> {
+    unshare(CloneFlags::CLONE_NEWNS).context("unshare(CLONE_NEWNS)")?;
+    let mount_flags = if std::env::var("container").is_ok() || std::path::Path::new("/.dockerenv").exists() {
+        MsFlags::MS_REC | MsFlags::MS_PRIVATE
+    } else {
+        MsFlags::MS_REC | MsFlags::MS_PRIVATE | MsFlags::MS_SLAVE
+    };
+
+    mount(NONE, "/", NONE, mount_flags, NONE)
+        .context("mount / as private")?;
+
+    for (i, mount_args) in opts.mounts.iter().enumerate() {
+        if !mount_args.target.exists() {
+            if !mount_args.flags.contains(MsFlags::MS_BIND) {
+                create_dir_all(&mount_args.target)
+                    .with_context(|| format!("create bind target {:?}", &mount_args.target))?;
+            } else {
+                let source_path = mount_args
+                    .source
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("source for mount {:?} not provided", &mount_args))?;
+                if metadata(source_path)?.is_dir() {
+                    create_dir_all(&mount_args.target)
+                        .with_context(|| format!("create bind target {:?}", &mount_args.target))?;
+                } else {
+                    if let Some(target_parent) = mount_args.target.parent() {
+                        create_dir_all(&target_parent)
+                            .with_context(|| format!("create bind target {:?}", &target_parent))?;
+                    }
+                    File::create(&mount_args.target)
+                        .with_context(|| format!("create bind target {:?}", &mount_args.target))?;
+                }
+            }
+        }
+        mount(
+            mount_args.source.as_ref(),
+            &mount_args.target,
+            mount_args.fstype.as_deref(),
+            mount_args.flags,
+            mount_args.data.as_deref(),
+        )
+        .with_context(|| format!("mount({:?})", &mount_args))?;
+    }
+
+    let oldroot = File::options()
+        .read(true)
+        .custom_flags(OFlag::O_DIRECTORY.bits())
+        .open("/")
+        .context("open old root")?;
+    let newroot = File::options()
+        .read(true)
+        .custom_flags(OFlag::O_DIRECTORY.bits())
+        .open(&opts.rootfs)
+        .context("open new root")?;
+    mount(
+        Some(&opts.rootfs),
+        &opts.rootfs,
+        NONE,
+        MsFlags::MS_BIND | MsFlags::MS_REC,
+        NONE,
+    )
+    .with_context(|| format!("remount rootfs {:?}", &opts.rootfs))?;
+
+    chdir(&opts.rootfs).with_context(|| format!("chdir rootfs {:?}", &opts.rootfs))?;
+    pivot_root(".", ".").context("pivot_root(\".\", \".\")")?;
+
+    fchdir(oldroot.as_raw_fd()).context("fchdir old rootfs")?;
+    mount(NONE, ".", NONE, MsFlags::MS_PRIVATE | MsFlags::MS_REC, NONE)
+        .context("remount old rootfs as private")?;
+    umount2(".", MntFlags::MNT_DETACH).context("unmount old rootfs")?;
+    fchdir(newroot.as_raw_fd()).context("fchdir new rootfs")?;
+    chroot("/").context("chroot(\"/\")")?;
+    chdir("/").context("chdir(\"/\")")?;
+    mount(
+        NONE,
+        "/",
+        NONE,
+        MsFlags::MS_REMOUNT | MsFlags::MS_BIND | MsFlags::MS_RDONLY,
+        NONE,
+    )
+    .context("remount / as read-only")?;
+    mount(
+        NONE,
+        "/tmp",
+        Some("tmpfs"),
+        MsFlags::MS_NOSUID | MsFlags::MS_NODEV | MsFlags::MS_NOEXEC,
+        Some("size=67108864,mode=1777"),
+    )
+    .context("mount /tmp")?;
+    chdir("/home").context("chdir(\"/home\")")?;
+
+    match opts.stdin {
+        Stdio::Mounted(_) | Stdio::DevNull(_) => {
+            let f = File::open("/mnt/stdio/stdin").context("open /mnt/stdio/stdin")?;
+            dup2(f.as_raw_fd(), libc::STDIN_FILENO).context("dup2 stdin")?;
+        }
+        Stdio::FileDescriptor(libc::STDIN_FILENO) => {}
+        Stdio::FileDescriptor(fd) => {
+            dup2(fd, libc::STDIN_FILENO).context("dup2 stdin")?;
+            close(fd).context("close stdin")?;
+        }
+    }
+    match opts.stdout {
+        Stdio::Mounted(_) | Stdio::DevNull(_) => {
+            let f = File::options()
+                .write(true)
+                .open("/mnt/stdio/stdout")
+                .context("open /mnt/stdio/stdout")?;
+            dup2(f.as_raw_fd(), libc::STDOUT_FILENO).context("dup2 stdout")?;
+        }
+        Stdio::FileDescriptor(libc::STDOUT_FILENO) => {}
+        Stdio::FileDescriptor(fd) => {
+            dup2(fd, libc::STDOUT_FILENO).context("dup2 stdout")?;
+            close(fd).context("close stdout")?;
+        }
+    }
+    match opts.stderr {
+        Stdio::Mounted(_) | Stdio::DevNull(_) => {
+            let f = File::options()
+                .append(true)
+                .open("/mnt/stdio/stderr")
+                .context("open /mnt/stdio/stderr")?;
+            dup2(f.as_raw_fd(), libc::STDERR_FILENO).context("dup2 stderr")?;
+        }
+        Stdio::FileDescriptor(libc::STDERR_FILENO) => {}
+        Stdio::FileDescriptor(fd) => {
+            dup2(fd, libc::STDERR_FILENO).context("dup2 stderr")?;
+            close(fd).context("close stderr")?;
+        }
+    }
+    umount2("/mnt/stdio", MntFlags::MNT_DETACH).context("unmount /mnt/stdio")?;
+
+    Ok(())
+}
+
+fn setup_mount_namespace_container_debug(opts: &JailOptions) -> Result<()> {
+    unshare(CloneFlags::CLONE_NEWNS).context("unshare(CLONE_NEWNS)")?;
+    mount(NONE, "/", NONE, MsFlags::MS_REC | MsFlags::MS_PRIVATE, NONE)
+        .context("mount / as private")?;
+
+    chdir(&opts.homedir).with_context(|| anyhow!("chdir({:?})", opts.homedir))?;
 
     Ok(())
 }
