@@ -27,11 +27,11 @@ jobs:
       - name: Build
         run: |
           make CXX=g++-9 ECHO=echo OMEGAJAIL_RELEASE=${{ github.sha }} all
-          cargo build --bins
-          cargo build --tests
+          make OMEGAJAIL_RELEASE=${{ github.sha }} cargo-build --bins
+          make OMEGAJAIL_RELEASE=${{ github.sha }} cargo-build --tests
 
       - name: Test
-        run: make test
+        run: make OMEGAJAIL_RELEASE=${{ github.sha }} test
 
       - name: Build rootfs
         run: make OMEGAJAIL_RELEASE=${{ github.sha }} rootfs
