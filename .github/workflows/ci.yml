@@ -9,58 +9,47 @@ on:
 jobs:
 
   ci:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:20.04
+      options: --privileged --cgroupns=host
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0
 
-      - name: Check cgroup version
-        run: |
-          echo "Filesystem type of /sys/fs/cgroup:"
-          stat -fc %T /sys/fs/cgroup
-  
-          echo "Contents of /sys/fs/cgroup:"
-          ls -l /sys/fs/cgroup
-          
-      - name: Debug cgroup capabilities
-        run: |
-          ls -l /sys/fs/cgroup/
-          cat /proc/self/cgroup
-          capsh --print
-
       - name: Install dependencies
-        run: sudo apt-get install -y libcap-dev util-linux
+        run: |
+          apt-get update
+          apt-get install -y libcap-dev util-linux build-essential curl git
+          # Install specific g++-9 if needed
+          apt-get install -y g++-9 make
+          # Install Rust/Cargo
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          echo 'source $HOME/.cargo/env' >> $HOME/.bashrc
+          export PATH="$HOME/.cargo/bin:$PATH"
 
       - name: Build
         run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
           make CXX=g++-9 ECHO=echo OMEGAJAIL_RELEASE=${{ github.sha }} all
           cargo build --bins
           cargo build --tests
 
       - name: Test
-        run: timeout 5m cargo test --verbose -- --nocapture
+        run: make test
 
       - name: Build rootfs
         run: make OMEGAJAIL_RELEASE=${{ github.sha }} rootfs
 
       - name: Smoketest
         run: |
-          # cgroup v2 path
-          CGROUP_PATH="/sys/fs/cgroup/omegaup-runner.service-omegajail.scope"
-
-          # create the cgroup directory
-          sudo mkdir -p "$CGROUP_PATH"
-          sudo chown $(whoami) "$CGROUP_PATH"
-          sudo chgrp $(whoami) "$CGROUP_PATH"
-
-          # run test pointing to new path
-          taskset 0x1 ./smoketest/test \
-            --root=./rootfs \
-            --strace \
-            --cgroup-path=/omegaup-runner.service-omegajail.scope
+          mkdir -p -m 0775 /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
+          chown $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
+          chgrp $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
+          taskset 0x1 ./smoketest/test --root=./rootfs --strace --cgroup-path=/system.slice/omegaup-runner.service/omegajail
 
       - name: Upload artifacts
         if: ${{ always() }}
@@ -70,13 +59,27 @@ jobs:
           path: smoketest/run/
 
   smoketest-docker:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:20.04
+      options: --privileged --cgroupns=host
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0
+
+      - name: Install Docker
+        run: |
+          apt-get update
+          apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+          apt-get update
+          apt-get install -y docker-ce docker-ce-cli containerd.io
+          # Install make and other build dependencies
+          apt-get install -y make build-essential
 
       - name: Build container
         run: |
