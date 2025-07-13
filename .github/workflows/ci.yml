@@ -10,42 +10,39 @@ jobs:
 
   ci:
     runs-on: ubuntu-22.04
-
+  
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v2
         with:
           submodules: recursive
           fetch-depth: 0
-
+  
       - name: Build container
         run: |
           make OMEGAJAIL_RELEASE=${{ github.sha }} .omegajail-builder-rootfs-runtime.stamp
-
-      - name: Install dependencies
-        run: sudo apt-get install -y libcap-dev util-linux
-
-      - name: Build
+  
+      - name: CI inside Docker
         run: |
-          make CXX=g++-9 ECHO=echo OMEGAJAIL_RELEASE=${{ github.sha }} all
-          make OMEGAJAIL_RELEASE=${{ github.sha }} cargo-build --bins
-          make OMEGAJAIL_RELEASE=${{ github.sha }} cargo-build --tests
-
-      - name: Test
-        run: make OMEGAJAIL_RELEASE=${{ github.sha }} test
-
-      - name: Build rootfs
-        run: make OMEGAJAIL_RELEASE=${{ github.sha }} rootfs
-
-      - name: Smoketest
-        run: |
-          sudo mkdir -p -m 0775 /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
-          sudo chown $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
-          sudo chgrp $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
-          taskset 0x1 ./smoketest/test --root=./rootfs --strace --cgroup-path=/system.slice/omegaup-runner.service/omegajail
-
+          docker run --rm \
+            -v "$PWD:/workspace" \
+            -w /workspace \
+            <your-built-image-name> \
+            bash -c '
+              set -e
+              make CXX=g++-9 ECHO=echo OMEGAJAIL_RELEASE=${GITHUB_SHA} all
+              cargo build --bins
+              cargo build --tests
+              make test
+              make OMEGAJAIL_RELEASE=${GITHUB_SHA} rootfs
+              sudo mkdir -p -m 0775 /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
+              sudo chown $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
+              sudo chgrp $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
+              taskset 0x1 ./smoketest/test --root=./rootfs --strace --cgroup-path=/system.slice/omegaup-runner.service/omegajail
+            '
+  
       - name: Upload artifacts
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v2
         with:
           name: test-logs
           path: smoketest/run/
