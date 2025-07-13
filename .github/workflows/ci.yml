@@ -7,18 +7,22 @@ on:
       - main
 
 jobs:
-
   ci:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0
 
       - name: Install dependencies
-        run: sudo apt-get install -y libcap-dev util-linux
+        run: sudo apt-get update && sudo apt-get install -y libcap-dev util-linux g++-9 cgroup-tools
+
+      - name: Set up Rust
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Build
         run: |
@@ -34,26 +38,37 @@ jobs:
 
       - name: Smoketest
         run: |
-          sudo mkdir -p -m 0775 /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
-          sudo chown $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
-          sudo chgrp $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
+          # Adapted for cgroups v2 on Ubuntu 22.04
+          sudo mkdir -p -m 0775 /sys/fs/cgroup/system.slice/omegaup-runner.service/omegajail
+          # Enable memory controller in the parent cgroup if not already enabled
+          echo "+memory" | sudo tee /sys/fs/cgroup/system.slice/omegaup-runner.service/cgroup.subtree_control || true
+          sudo chown $(whoami) /sys/fs/cgroup/system.slice/omegaup-runner.service/omegajail
+          sudo chgrp $(whoami) /sys/fs/cgroup/system.slice/omegaup-runner.service/omegajail
           taskset 0x1 ./smoketest/test --root=./rootfs --strace --cgroup-path=/system.slice/omegaup-runner.service/omegajail
 
       - name: Upload artifacts
         if: ${{ always() }}
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: test-logs
           path: smoketest/run/
 
   smoketest-docker:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y g++-9
+
+      - name: Set up Rust
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Build container
         run: |
@@ -65,7 +80,7 @@ jobs:
 
       - name: Upload artifacts
         if: ${{ always() }}
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: test-logs-docker
           path: smoketest/run/
