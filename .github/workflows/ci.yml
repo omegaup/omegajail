@@ -41,7 +41,7 @@ jobs:
           cargo build --tests
 
       - name: Test
-        run: timeout 5m make test || echo "Tests timed out, continuing..."
+        run: timeout 5m cargo test --verbose -- --nocapture
 
       - name: Build rootfs
         run: make OMEGAJAIL_RELEASE=${{ github.sha }} rootfs
