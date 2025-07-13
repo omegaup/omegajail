@@ -16,6 +16,14 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
+
+      - name: Check cgroup version
+        run: |
+          echo "Filesystem type of /sys/fs/cgroup:"
+          stat -fc %T /sys/fs/cgroup
+  
+          echo "Contents of /sys/fs/cgroup:"
+          ls -l /sys/fs/cgroup
           
       - name: Debug cgroup capabilities
         run: |
