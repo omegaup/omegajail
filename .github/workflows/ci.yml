@@ -16,6 +16,12 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
+          
+      - name: Debug cgroup capabilities
+        run: |
+          ls -l /sys/fs/cgroup/
+          cat /proc/self/cgroup
+          capsh --print
 
       - name: Install dependencies
         run: sudo apt-get install -y libcap-dev util-linux
