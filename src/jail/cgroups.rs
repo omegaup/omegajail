@@ -1,5 +1,5 @@
 use std::fmt::Debug;
-use std::fs::{create_dir, remove_dir, write};
+use std::fs::{create_dir, create_dir_all, remove_dir, write};
 use std::io::ErrorKind;
 use std::ops::Drop;
 use std::path::{Path, PathBuf};
@@ -32,6 +32,12 @@ impl CGroup {
         );
         let v2 = subsystem.as_ref() == Path::new("");
         if !root.exists() {
+            // Create parent directories recursively if they don't exist
+            if let Some(parent_path) = root.parent() {
+                if !parent_path.exists() {
+                    create_dir_all(parent_path).with_context(|| anyhow!("create_dir_all({:?})", parent_path))?;
+                }
+            }
             create_dir(&root).with_context(|| anyhow!("create_dir({:?})", &root))?;
             if v2 {
                 let subtree_control = root.join("cgroup.subtree_control");

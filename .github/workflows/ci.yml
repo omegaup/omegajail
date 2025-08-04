@@ -91,6 +91,16 @@ jobs:
           int main() { printf("Hello World\n"); return 0; }' > /tmp/test-compile/Main.c
 
           echo "=== Running omegajail with C compilation ==="
+          # Ensure /mnt/stdio exists in rootfs with correct permissions
+          sudo mkdir -p ./rootfs/mnt/stdio
+          sudo chmod 1777 ./rootfs/mnt/stdio
+
+          # Verify gcc is present in rootfs
+          if [ ! -x ./rootfs/usr/bin/gcc ]; then
+            echo "ERROR: gcc is not present at ./rootfs/usr/bin/gcc. Compilation will fail."
+            ls -l ./rootfs/usr/bin/ || true
+          fi
+
           ./rootfs/bin/omegajail \
             --homedir /tmp/test-compile \
             --homedir-writable \

@@ -28,6 +28,7 @@ RUN apt-get update -y && \
       fp-units-fcl-3.0.4 \
       g++-10 \
       gcc-10 \
+      gcc \
       ghc \
       git \
       libc6-dev \
@@ -73,11 +74,11 @@ RUN ls -l /usr/bin/ | grep -- '[^9] ->.*-9$' | sed -e 's@^.* \(.\+\) -> \(.\+\)-
         chmod +x /tmp/rustup-init && \
         RUSTUP_HOME=/opt/rust/rustup CARGO_HOME=/opt/rust/cargo /tmp/rustup-init --no-modify-path --default-host=x86_64-unknown-linux-gnu --default-toolchain=stable --profile=default -y --quiet && \
         rm /tmp/rustup-init && \
-    wget https://github.com/omegaup/karel.js/releases/download/v0.2.1/karel \
-        -O /opt/nodejs/karel.wasm && \
-    wget https://github.com/omegaup/karel.js/releases/download/v0.2.1/karel.js \
-        -O /opt/nodejs/karel.js && \
-    chmod +x /opt/nodejs/karel.wasm /opt/nodejs/karel.js && \
+    wget https://github.com/kishtarn555/rekarel-cli/releases/download/2.3.2/commands.min.cjs \
+        -O /opt/nodejs/commands.min.cjs && \
+    echo '#!/usr/bin/env node' > /opt/nodejs/karel && \
+    echo 'require("./commands.min.cjs");' >> /opt/nodejs/karel && \
+    chmod +x /opt/nodejs/karel /opt/nodejs/commands.min.cjs && \
     wget https://raw.githubusercontent.com/omegaup/libkarel/v0.0.99/libkarel.py \
         -O /usr/lib/python2.7/libkarel.py && \
     python3.9 -m pip install --target=/usr/lib/python3/dist-packages \
@@ -118,6 +119,9 @@ COPY --from=rootfs-build \
 COPY --from=rootfs-build \
          /var/lib/omegajail/root-compilers/rust-toolchain.toml \
          /rust-toolchain.toml
+COPY --from=rootfs-build \
+         /var/lib/omegajail/root-js \
+         /var/lib/omegajail/root-js
 
 COPY --from=omegaup/omegajail-builder-distrib /var/lib/omegajail/ /var/lib/omegajail
 RUN mv /var/lib/omegajail/bin/omegajail /var/lib/omegajail/bin/omegajail.wrapped

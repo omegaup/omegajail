@@ -224,6 +224,10 @@ fn setup_mount_namespace(opts: &JailOptions) -> Result<()> {
     fchdir(newroot.as_raw_fd()).context("fchdir new rootfs")?;
     chroot("/").context("chroot(\"/\")")?;
     chdir("/").context("chdir(\"/\")")?;
+
+    // Create /tmp directory if it doesn't exist before remounting as read-only
+    create_dir_all("/tmp").context("create /tmp directory")?;
+
     mount(
         NONE,
         "/",

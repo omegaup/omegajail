@@ -66,7 +66,7 @@ smoketest: rootfs
 	./smoketest/test --root=./rootfs
 
 .omegajail-builder-rootfs-runtime.stamp: .omegajail-builder-rootfs-setup.stamp .omegajail-builder-distrib.stamp
-	docker build \
+	DOCKER_BUILDKIT=1 docker build \
 		-t omegaup/omegajail-builder-rootfs-runtime \
 		--target=runtime \
 		--file=Dockerfile.rootfs \
@@ -74,7 +74,7 @@ smoketest: rootfs
 	touch $@
 
 .omegajail-builder-rootfs-runtime-debug.stamp: .omegajail-builder-rootfs-runtime.stamp
-	docker build \
+	DOCKER_BUILDKIT=1 docker build \
 		-t omegaup/omegajail-builder-rootfs-runtime-debug \
 		--target=runtime-debug \
 		--file=Dockerfile.rootfs \
@@ -92,7 +92,7 @@ smoketest-docker: .omegajail-builder-rootfs-runtime-debug.stamp
 		/usr/bin/python3 /src/test
 
 .omegajail-builder-rootfs-setup.stamp: ${MKROOT_SOURCE_FILES}
-	docker build \
+	DOCKER_BUILDKIT=1 docker build \
 		-t omegaup/omegajail-builder-rootfs-setup \
 		--file Dockerfile.rootfs \
 		--target rootfs-setup \
@@ -110,7 +110,7 @@ rootfs: .omegajail-builder-rootfs-runtime.stamp .omegajail-builder-rootfs-setup.
 	mv ".$@.tmp" "$@" || (sudo rm -rf ".$@.tmp" ; exit 1)
 
 .omegajail-builder-rootfs-build.stamp: ${MKROOT_SOURCE_FILES}
-	docker build \
+	DOCKER_BUILDKIT=1 docker build \
 		-t omegaup/omegajail-builder-rootfs-build \
 		--file Dockerfile.rootfs \
 		--target rootfs-build \
@@ -132,7 +132,7 @@ omegajail-focal-rootfs-x86_64.tar.xz: .omegajail-builder-rootfs-build.stamp
 	mv ".$@.tmp" "$@" || rm ".$@.tmp"
 
 .omegajail-builder-distrib.stamp: Dockerfile.distrib $(wildcard src/*.rs src/jail/*.rs tools/omegajail-setup policies/*.frequency policies/*.policy)
-	docker build \
+	DOCKER_BUILDKIT=1 docker build \
 		--build-arg OMEGAJAIL_RELEASE=$(OMEGAJAIL_RELEASE) \
 		-t omegaup/omegajail-builder-distrib \
 		--file Dockerfile.distrib \

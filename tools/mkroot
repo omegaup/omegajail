@@ -663,9 +663,8 @@ def _main() -> None:
     with Chroot(os.path.join(args.target, 'root-js'), JS_ROOT,
                 link=args.link) as root:
         for filename in (
-                '/opt/nodejs/karel.js',
+                '/opt/nodejs/commands.min.cjs',
                 '/opt/nodejs/bin/node',
-                '/opt/nodejs/karel.wasm',
                 '/opt/nodejs/LICENSE',
         ):
             root.copyfromhost(filename, relative_to=JS_ROOT)
