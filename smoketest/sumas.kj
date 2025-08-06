@@ -1,4 +1,4 @@
-class program() {
+class program {
     program() {
         // toma todos los zumbadores de la celda de la derecha.
         turnleft();

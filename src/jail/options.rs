@@ -639,7 +639,7 @@ impl JailOptions {
                                 "-XX:AOTLibrary=/usr/lib/jvm/java.base.so,./{}.so",
                                 args.run_target,
                             ),
-                            format!("{}.kj", args.run_target),
+                            args.run_target.clone(),
                         ]);
                     }
                 }
