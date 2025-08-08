@@ -666,6 +666,7 @@ def _main() -> None:
                 '/opt/nodejs/commands.min.cjs',
                 '/opt/nodejs/bin/node',
                 '/opt/nodejs/LICENSE',
+                '/opt/nodejs/karel.wasm',
         ):
             root.copyfromhost(filename, relative_to=JS_ROOT)
 

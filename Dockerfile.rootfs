@@ -116,8 +116,6 @@ RUN ls -l /usr/bin/ | grep -- '[^9] ->.*-9$' | sed -e 's@^.* \(.\+\) -> \(.\+\)-
     echo 'require('\''/opt/nodejs/commands.min.cjs'\'');' >> /usr/bin/rekarel-wrapper.js && \
     echo 'EOF' >> /usr/bin/rekarel-wrapper.js && \
     chmod +x /usr/bin/rekarel-wrapper.js && \
-    mkdir -p /usr/lib/node_modules/@rekarel/cli && \
-    cp /opt/nodejs/commands.min.cjs /usr/lib/node_modules/@rekarel/cli/ && \
     ln -sf /opt/nodejs/bin/node /usr/bin/node && \
     wget https://raw.githubusercontent.com/omegaup/libkarel/v0.0.99/libkarel.py \
         -O /usr/lib/python2.7/libkarel.py && \
