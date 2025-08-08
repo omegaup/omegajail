@@ -79,10 +79,6 @@ RUN ls -l /usr/bin/ | grep -- '[^9] ->.*-9$' | sed -e 's@^.* \(.\+\) -> \(.\+\)-
     echo '#!/usr/bin/env node' > /opt/nodejs/karel && \
     echo 'require("./commands.min.cjs");' >> /opt/nodejs/karel && \
     chmod +x /opt/nodejs/karel /opt/nodejs/commands.min.cjs && \
-    # We should not create a symbolic link from karel.wasm to commands.min.cjs
-    # We need to download the actual karel.wasm binary file
-    wget https://github.com/kishtarn555/rekarel-cli/releases/download/2.3.2/commands.min.cjs \
-        -O /opt/nodejs/karel.wasm && \
     mkdir -p /usr/bin && \
     echo '#!/bin/bash' > /usr/bin/rekarel-wrapper.js && \
     echo 'exec /opt/nodejs/bin/node - "$@" << '\''EOF'\''' >> /usr/bin/rekarel-wrapper.js && \
@@ -116,6 +112,7 @@ RUN ls -l /usr/bin/ | grep -- '[^9] ->.*-9$' | sed -e 's@^.* \(.\+\) -> \(.\+\)-
     echo 'require('\''/opt/nodejs/commands.min.cjs'\'');' >> /usr/bin/rekarel-wrapper.js && \
     echo 'EOF' >> /usr/bin/rekarel-wrapper.js && \
     chmod +x /usr/bin/rekarel-wrapper.js && \
+    ln -sf /usr/bin/rekarel-wrapper.js /opt/nodejs/karel.wasm && \
     ln -sf /opt/nodejs/bin/node /usr/bin/node && \
     wget https://raw.githubusercontent.com/omegaup/libkarel/v0.0.99/libkarel.py \
         -O /usr/lib/python2.7/libkarel.py && \
