@@ -79,6 +79,46 @@ RUN ls -l /usr/bin/ | grep -- '[^9] ->.*-9$' | sed -e 's@^.* \(.\+\) -> \(.\+\)-
     echo '#!/usr/bin/env node' > /opt/nodejs/karel && \
     echo 'require("./commands.min.cjs");' >> /opt/nodejs/karel && \
     chmod +x /opt/nodejs/karel /opt/nodejs/commands.min.cjs && \
+    # We should not create a symbolic link from karel.wasm to commands.min.cjs
+    # We need to download the actual karel.wasm binary file
+    wget https://github.com/kishtarn555/rekarel-cli/releases/download/2.3.2/commands.min.cjs \
+        -O /opt/nodejs/karel.wasm && \
+    mkdir -p /usr/bin && \
+    echo '#!/bin/bash' > /usr/bin/rekarel-wrapper.js && \
+    echo 'exec /opt/nodejs/bin/node - "$@" << '\''EOF'\''' >> /usr/bin/rekarel-wrapper.js && \
+    echo '' >> /usr/bin/rekarel-wrapper.js && \
+    echo '// Event polyfill for Node.js environment' >> /usr/bin/rekarel-wrapper.js && \
+    echo 'if (typeof Event === '\''undefined'\'') {' >> /usr/bin/rekarel-wrapper.js && \
+    echo '    global.Event = class Event {' >> /usr/bin/rekarel-wrapper.js && \
+    echo '        constructor(type, eventInitDict = {}) {' >> /usr/bin/rekarel-wrapper.js && \
+    echo '            this.type = type;' >> /usr/bin/rekarel-wrapper.js && \
+    echo '            this.bubbles = eventInitDict.bubbles || false;' >> /usr/bin/rekarel-wrapper.js && \
+    echo '            this.cancelable = eventInitDict.cancelable || false;' >> /usr/bin/rekarel-wrapper.js && \
+    echo '            this.composed = eventInitDict.composed || false;' >> /usr/bin/rekarel-wrapper.js && \
+    echo '            this.detail = eventInitDict.detail;' >> /usr/bin/rekarel-wrapper.js && \
+    echo '            this.target = null;' >> /usr/bin/rekarel-wrapper.js && \
+    echo '            this.currentTarget = null;' >> /usr/bin/rekarel-wrapper.js && \
+    echo '            this.eventPhase = 0;' >> /usr/bin/rekarel-wrapper.js && \
+    echo '            this.defaultPrevented = false;' >> /usr/bin/rekarel-wrapper.js && \
+    echo '            this.timeStamp = Date.now();' >> /usr/bin/rekarel-wrapper.js && \
+    echo '        }' >> /usr/bin/rekarel-wrapper.js && \
+    echo '        ' >> /usr/bin/rekarel-wrapper.js && \
+    echo '        preventDefault() {' >> /usr/bin/rekarel-wrapper.js && \
+    echo '            this.defaultPrevented = true;' >> /usr/bin/rekarel-wrapper.js && \
+    echo '        }' >> /usr/bin/rekarel-wrapper.js && \
+    echo '        ' >> /usr/bin/rekarel-wrapper.js && \
+    echo '        stopPropagation() {}' >> /usr/bin/rekarel-wrapper.js && \
+    echo '        stopImmediatePropagation() {}' >> /usr/bin/rekarel-wrapper.js && \
+    echo '    };' >> /usr/bin/rekarel-wrapper.js && \
+    echo '}' >> /usr/bin/rekarel-wrapper.js && \
+    echo '' >> /usr/bin/rekarel-wrapper.js && \
+    echo '// Execute ReKarel CLI' >> /usr/bin/rekarel-wrapper.js && \
+    echo 'require('\''/opt/nodejs/commands.min.cjs'\'');' >> /usr/bin/rekarel-wrapper.js && \
+    echo 'EOF' >> /usr/bin/rekarel-wrapper.js && \
+    chmod +x /usr/bin/rekarel-wrapper.js && \
+    mkdir -p /usr/lib/node_modules/@rekarel/cli && \
+    cp /opt/nodejs/commands.min.cjs /usr/lib/node_modules/@rekarel/cli/ && \
+    ln -sf /opt/nodejs/bin/node /usr/bin/node && \
     wget https://raw.githubusercontent.com/omegaup/libkarel/v0.0.99/libkarel.py \
         -O /usr/lib/python2.7/libkarel.py && \
     python3.9 -m pip install --target=/usr/lib/python3/dist-packages \
@@ -97,9 +137,9 @@ FROM setup AS runtime
 RUN wget --quiet https://github.com/omegaup/libinteractive/releases/download/v2.0.29/libinteractive.jar \
     -O /usr/share/java/libinteractive.jar
 
-RUN ln -s /opt/nodejs/bin/node /usr/bin/node && \
-    ln -s /opt/nodejs/lib/node_modules /usr/lib/node_modules && \
-    ln -s /opt/rust/rustup /etc/rustup && \
+RUN if [ ! -e /usr/bin/node ]; then ln -s /opt/nodejs/bin/node /usr/bin/node; fi && \
+    if [ ! -e /usr/lib/node_modules ]; then ln -s /opt/nodejs/lib/node_modules /usr/lib/node_modules; fi && \
+    if [ ! -e /etc/rustup ]; then ln -s /opt/rust/rustup /etc/rustup; fi && \
     mkdir -p /var/lib/omegajail/root/dev/ && \
     cp /dev/null /var/lib/omegajail/root/dev/null
 
