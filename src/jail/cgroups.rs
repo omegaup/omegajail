@@ -41,10 +41,8 @@ impl CGroup {
             create_dir(&root).with_context(|| anyhow!("create_dir({:?})", &root))?;
             if v2 {
                 let subtree_control = root.join("cgroup.subtree_control");
-                // Try to enable memory controller, but don't fail if it's not available
-                if let Err(err) = write(&subtree_control, b"+memory\n") {
-                    eprintln!("Warning: Could not enable memory controller in cgroup {:?}: {}", subtree_control, err);
-                }
+                write(&subtree_control, b"+memory\n")
+                    .with_context(|| anyhow!("write +memory to {:?}", &subtree_control))?;
             }
         }
         let mut rng = thread_rng();
