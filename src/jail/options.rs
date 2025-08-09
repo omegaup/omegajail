@@ -513,10 +513,9 @@ impl JailOptions {
                     seccomp_profile_name = String::from("js");
                     extra_memory_size_in_bytes = KAREL_EXTRA_MEMORY_SIZE_IN_BYTES;
                     vm_memory_size_in_bytes = KAREL_VM_MEMORY_SIZE_IN_BYTES;
-                    // Using Rekarel CLI with correct syntax
+                    // Using Rekarel CLI with correct syntax via wrapper
                     execve_args.extend([
-                        String::from("/usr/bin/node"),
-                        String::from("/opt/nodejs/commands.min.cjs"),
+                        String::from("/opt/nodejs/karel.wasm"),
                         String::from("compile"),
                         String::from("-l"),
                         String::from(match lang {
@@ -526,7 +525,7 @@ impl JailOptions {
                             _ => panic!("unreachable"),
                         }),
                         String::from("-o"),
-                        args.compile_target.clone(),
+                        String::from("Main.kx"),
                     ]);
                     execve_args.extend(compile_sources.iter().map(|s| s.clone()));
                 }
@@ -725,14 +724,13 @@ impl JailOptions {
                         data: None,
                     });
                     execve_args.extend([
-                        String::from("/usr/bin/node"),
-                        String::from("/opt/nodejs/commands.min.cjs"),
+                        String::from("/opt/nodejs/karel.wasm"),
                         String::from("run"),
                         String::from("-i"),
                         String::from("/dev/stdin"),
                         String::from("-o"),
                         String::from("/dev/stdout"),
-                        format!("{}.kj", args.run_target),
+                        String::from("Main.kx"),
                     ]);
                 }
                 args::Language::CSharp => {

@@ -81,43 +81,15 @@ RUN ls -l /usr/bin/ | grep -- '[^9] ->.*-9$' | sed -e 's@^.* \(.\+\) -> \(.\+\)-
     chmod +x /opt/nodejs/karel /opt/nodejs/commands.min.cjs && \
     mkdir -p /usr/bin && \
     echo '#!/bin/bash' > /usr/bin/rekarel-wrapper.js && \
-    echo 'exec /opt/nodejs/bin/node - "$@" << '\''EOF'\''' >> /usr/bin/rekarel-wrapper.js && \
-    echo '' >> /usr/bin/rekarel-wrapper.js && \
-    echo '// Event polyfill for Node.js environment' >> /usr/bin/rekarel-wrapper.js && \
-    echo 'if (typeof Event === '\''undefined'\'') {' >> /usr/bin/rekarel-wrapper.js && \
-    echo '    global.Event = class Event {' >> /usr/bin/rekarel-wrapper.js && \
-    echo '        constructor(type, eventInitDict = {}) {' >> /usr/bin/rekarel-wrapper.js && \
-    echo '            this.type = type;' >> /usr/bin/rekarel-wrapper.js && \
-    echo '            this.bubbles = eventInitDict.bubbles || false;' >> /usr/bin/rekarel-wrapper.js && \
-    echo '            this.cancelable = eventInitDict.cancelable || false;' >> /usr/bin/rekarel-wrapper.js && \
-    echo '            this.composed = eventInitDict.composed || false;' >> /usr/bin/rekarel-wrapper.js && \
-    echo '            this.detail = eventInitDict.detail;' >> /usr/bin/rekarel-wrapper.js && \
-    echo '            this.target = null;' >> /usr/bin/rekarel-wrapper.js && \
-    echo '            this.currentTarget = null;' >> /usr/bin/rekarel-wrapper.js && \
-    echo '            this.eventPhase = 0;' >> /usr/bin/rekarel-wrapper.js && \
-    echo '            this.defaultPrevented = false;' >> /usr/bin/rekarel-wrapper.js && \
-    echo '            this.timeStamp = Date.now();' >> /usr/bin/rekarel-wrapper.js && \
-    echo '        }' >> /usr/bin/rekarel-wrapper.js && \
-    echo '        ' >> /usr/bin/rekarel-wrapper.js && \
-    echo '        preventDefault() {' >> /usr/bin/rekarel-wrapper.js && \
-    echo '            this.defaultPrevented = true;' >> /usr/bin/rekarel-wrapper.js && \
-    echo '        }' >> /usr/bin/rekarel-wrapper.js && \
-    echo '        ' >> /usr/bin/rekarel-wrapper.js && \
-    echo '        stopPropagation() {}' >> /usr/bin/rekarel-wrapper.js && \
-    echo '        stopImmediatePropagation() {}' >> /usr/bin/rekarel-wrapper.js && \
-    echo '    };' >> /usr/bin/rekarel-wrapper.js && \
-    echo '}' >> /usr/bin/rekarel-wrapper.js && \
-    echo '' >> /usr/bin/rekarel-wrapper.js && \
-    echo '// Execute ReKarel CLI' >> /usr/bin/rekarel-wrapper.js && \
-    echo 'require('\''/opt/nodejs/commands.min.cjs'\'');' >> /usr/bin/rekarel-wrapper.js && \
-    echo 'EOF' >> /usr/bin/rekarel-wrapper.js && \
+    echo 'exec /opt/nodejs/bin/node /opt/nodejs/commands.min.cjs "$@"' >> /usr/bin/rekarel-wrapper.js && \
     chmod +x /usr/bin/rekarel-wrapper.js && \
-    ln -sf /usr/bin/rekarel-wrapper.js /opt/nodejs/karel.wasm && \
+    cp /usr/bin/rekarel-wrapper.js /opt/nodejs/karel.wasm && \
+    chmod +x /opt/nodejs/karel.wasm && \
     ln -sf /opt/nodejs/bin/node /usr/bin/node && \
-    wget https://raw.githubusercontent.com/omegaup/libkarel/v0.0.99/libkarel.py \
+    wget https://raw.githubusercontent.com/omegaup/libkarel/v1.1.2/libkarel/libkarel.py \
         -O /usr/lib/python2.7/libkarel.py && \
     python3.9 -m pip install --target=/usr/lib/python3/dist-packages \
-        libkarel==1.1.1 omegaup==2.0.18 parsy==1.4.0
+        libkarel==1.1.2 omegaup==2.0.18 parsy==1.4.0
 
 RUN mkdir /src
 WORKDIR /src
