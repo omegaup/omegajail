@@ -15,3 +15,19 @@ rootfs/
 
 # Added by cargo
 /target
+
+# Local Karel/ReKarel ad-hoc test artifacts
+# single files frequently created during local experiments
+simple_world.*
+*world*.xml
+ultra_simple.kj
+
+# generic test file prefixes
+test_*.kj
+test_*.kp
+test_*.java
+test_*.js
+test_*.txt
+
+# helper scripts not meant for commit
+tools/run-ci-selection.sh

@@ -40,7 +40,7 @@ const JAVA_MIN_HEAP_SIZE_IN_BYTES: u64 = 18 * 1024 * 1024;
 
 pub(crate) enum Stdio {
     Mounted(PathBuf),
-    DevNull(()),
+    DevNull(PathBuf),
     FileDescriptor(RawFd),
 }
 
@@ -149,7 +149,7 @@ impl JailOptions {
                 data: None,
             });
 
-            Stdio::DevNull(())
+            Stdio::DevNull(source)
         } else {
             Stdio::FileDescriptor(libc::STDIN_FILENO)
         };
@@ -177,7 +177,7 @@ impl JailOptions {
                 data: None,
             });
 
-            Stdio::DevNull(())
+            Stdio::DevNull(source)
         } else {
             Stdio::FileDescriptor(libc::STDOUT_FILENO)
         };
@@ -209,7 +209,7 @@ impl JailOptions {
                 data: None,
             });
 
-            Stdio::DevNull(())
+            Stdio::DevNull(source)
         } else {
             Stdio::FileDescriptor(libc::STDERR_FILENO)
         };
