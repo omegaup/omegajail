@@ -798,7 +798,11 @@ impl JailOptions {
             disable_sandboxing: args.disable_sandboxing,
             homedir: PathBuf::from(args.homedir),
             rootfs: rootfs,
-            cgroup_path: Some(PathBuf::from(args.cgroup_path)),
+            cgroup_path: if is_running_in_ci() {
+                None  // Disable cgroups in CI environments
+            } else {
+                Some(PathBuf::from(args.cgroup_path))
+            },
             mounts: mounts,
             args: execve_args
                 .iter()
@@ -834,7 +838,7 @@ impl JailOptions {
 
 /// Detects if the process is running in a CI environment where seccomp
 /// user-notify may not work properly due to containerization issues
-fn is_running_in_ci() -> bool {
+pub fn is_running_in_ci() -> bool {
     // Check common CI environment variables
     std::env::var("CI").is_ok()
         || std::env::var("GITHUB_ACTIONS").is_ok()
