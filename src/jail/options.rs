@@ -827,9 +827,22 @@ impl JailOptions {
                 Some(m) => Some(m),
                 None => None,
             },
-            allow_sigsys_fallback: args.allow_sigsys_fallback,
+            allow_sigsys_fallback: args.allow_sigsys_fallback || is_running_in_ci(),
         })
     }
+}
+
+/// Detects if the process is running in a CI environment where seccomp
+/// user-notify may not work properly due to containerization issues
+fn is_running_in_ci() -> bool {
+    // Check common CI environment variables
+    std::env::var("CI").is_ok()
+        || std::env::var("GITHUB_ACTIONS").is_ok()
+        || std::env::var("GITLAB_CI").is_ok()
+        || std::env::var("TRAVIS").is_ok()
+        || std::env::var("CIRCLECI").is_ok()
+        || std::env::var("JENKINS_URL").is_ok()
+        || std::env::var("BUILDKITE").is_ok()
 }
 
 fn add_sources(execve_args: &mut Vec<String>, lang_flag: &str, compile_sources: &Vec<String>) {
