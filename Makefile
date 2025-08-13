@@ -85,8 +85,8 @@ smoketest: rootfs
 smoketest-docker: .omegajail-builder-rootfs-runtime-debug.stamp
 	docker run \
 		--rm \
-        --interactive \
-        --tty \
+		--interactive \
+		--tty \
 		--mount "type=bind,source=$(PWD)/smoketest,target=/src" \
 		--tmpfs "/home:mode=1777,uid=$(shell id -u),gid=$(shell id -g)" \
 		--user "$(shell id -u):$(shell id -g)" \
