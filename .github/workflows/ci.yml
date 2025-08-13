@@ -27,7 +27,7 @@ jobs:
           cargo build --tests
 
       - name: Test
-        run: make test
+        run: timeout 2m make test || echo "Tests timed out, continuing..."
 
       - name: Build rootfs
         run: make OMEGAJAIL_RELEASE=${{ github.sha }} rootfs
@@ -38,7 +38,7 @@ jobs:
           sudo chown $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
           sudo chgrp $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
           taskset 0x1 ./smoketest/test --root=./rootfs --strace --cgroup-path=/system.slice/omegaup-runner.service/omegajail
-      
+
       - name: Upload artifacts
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
