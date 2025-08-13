@@ -29,77 +29,37 @@ jobs:
       - name: Test
         run: timeout 5m make test || echo "Tests timed out, continuing..."
 
-      - name: Check disk space
-        run: |
-          df -h
-
       - name: Build rootfs
         run: make OMEGAJAIL_RELEASE=${{ github.sha }} rootfs
 
-      - name: Debug rootfs contents
-        run: |
-          echo "=== Rootfs structure ==="
-          find rootfs -name "root*" -type d | head -10
-          echo "=== Checking for C/C++ compilers in root-compilers ==="
-          ls -la rootfs/root-compilers/usr/bin/ | grep -E "(gcc|g\+\+|clang)" || echo "No C/C++ compilers found"
-          echo "=== Checking for Java in root-java ==="
-          ls -la rootfs/root-java/usr/bin/ | grep java || echo "No Java found"
-          echo "=== Checking for Python in root-python3 ==="
-          ls -la rootfs/root-python3/usr/bin/ | grep python || echo "No Python found"
-          echo "=== Rootfs sizes ==="
-          du -sh rootfs/root*
-
-      - name: Test omegajail binary
-        run: |
-          echo "=== Testing omegajail binary directly ==="
-          ls -la rootfs/bin/omegajail
-          file rootfs/bin/omegajail
-          echo "=== Testing simple omegajail command ==="
-          ./rootfs/bin/omegajail --help || echo "omegajail binary failed"
-          echo "=== Testing with strace to see what fails ==="
-          timeout 10s strace -f ./rootfs/bin/omegajail --help 2>&1 | tail -20 || echo "strace failed"
-
       - name: Setup cgroups for omegajail
         run: |
-          echo "=== Setting up cgroups v2 for omegajail ==="
           # Create the base cgroup directory
           sudo mkdir -p /sys/fs/cgroup/omegajail
 
           # Enable controllers in the parent cgroup
           echo "+memory +pids +cpu" | sudo tee /sys/fs/cgroup/cgroup.subtree_control || echo "Could not enable controllers"
 
-          # Set ownership so omegajail can create subcgroups
+          # Set proper permissions for subcgroup creation
+          sudo chgrp -R docker /sys/fs/cgroup/omegajail
+          sudo chmod -R g+w /sys/fs/cgroup/omegajail
+          sudo chmod g+w /sys/fs/cgroup/omegajail
+
+          # Enable controllers in the omegajail cgroup
+          echo "+memory +pids +cpu" | sudo tee /sys/fs/cgroup/omegajail/cgroup.subtree_control || echo "Could not enable omegajail controllers"
+
+          # Ensure the runner user owns the cgroup directory
           sudo chown -R runner:docker /sys/fs/cgroup/omegajail
-          sudo chmod -R 755 /sys/fs/cgroup/omegajail
-
-          # Create the subtree control file for omegajail cgroup
-          sudo touch /sys/fs/cgroup/omegajail/cgroup.subtree_control
-          sudo chown runner:docker /sys/fs/cgroup/omegajail/cgroup.subtree_control
-
-          # Verify setup
-          echo "=== Cgroup setup verification ==="
-          ls -la /sys/fs/cgroup/omegajail/
-          cat /sys/fs/cgroup/cgroup.subtree_control || echo "Could not read parent subtree_control"
-          echo "=== Current user and groups ==="
-          id
 
       - name: Test specific compilation
         run: |
-          echo "=== Testing specific C compilation ==="
           mkdir -p /tmp/test-compile
           echo '#include <stdio.h>
           int main() { printf("Hello World\n"); return 0; }' > /tmp/test-compile/Main.c
 
-          echo "=== Running omegajail with C compilation ==="
           # Ensure /mnt/stdio exists in rootfs with correct permissions
           sudo mkdir -p ./rootfs/mnt/stdio
           sudo chmod 1777 ./rootfs/mnt/stdio
-
-          # Verify gcc is present in rootfs
-          if [ ! -x ./rootfs/usr/bin/gcc ]; then
-            echo "ERROR: gcc is not present at ./rootfs/usr/bin/gcc. Compilation will fail."
-            ls -l ./rootfs/usr/bin/ || true
-          fi
 
           ./rootfs/bin/omegajail \
             --homedir /tmp/test-compile \
@@ -114,42 +74,9 @@ jobs:
             --output-limit 10485100 \
             --cgroup-path /omegajail || echo "Direct omegajail compilation failed"
 
-          echo "=== Output files ==="
-          ls -la /tmp/test-compile/
-          echo "=== Stdout ==="
-          cat /tmp/test-compile/out.txt 2>/dev/null || echo "No stdout"
-          echo "=== Stderr ==="
-          cat /tmp/test-compile/err.txt 2>/dev/null || echo "No stderr"
-
       - name: Smoketest
         run: |
-          echo "Testing compilation without sandboxing for CI compatibility..."
-          # Test simple compilation first
-          mkdir -p /tmp/simple-test
-          echo '#include <stdio.h>
-          int main() { printf("Hello from CI!\n"); return 0; }' > /tmp/simple-test/test.c
-
-          # Try compilation with sandboxing disabled for CI
-          timeout 30s ./rootfs/bin/omegajail \
-            --homedir /tmp/simple-test \
-            --homedir-writable \
-            --root ./rootfs \
-            --compile c \
-            --compile-source test.c \
-            --compile-target test \
-            --stdout /tmp/simple-test/out.txt \
-            --stderr /tmp/simple-test/err.txt \
-            --time-limit 10000 \
-            --output-limit 1048576 \
-            --disable-sandboxing || echo "Simple compilation failed"
-
-          echo "=== Simple compilation results ==="
-          ls -la /tmp/simple-test/
-          cat /tmp/simple-test/out.txt 2>/dev/null || echo "No stdout"
-          cat /tmp/simple-test/err.txt 2>/dev/null || echo "No stderr"
-
-          echo "Running limited smoketest..."
-          echo "Skipping full smoketest due to CI sandbox restrictions - basic compilation test above validates functionality"
+          taskset 0x1 ./smoketest/test --root=./rootfs --strace --cgroup-path=/omegajail
 
       - name: Upload artifacts
         if: ${{ always() }}
