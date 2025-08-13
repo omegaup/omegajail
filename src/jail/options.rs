@@ -798,11 +798,7 @@ impl JailOptions {
             disable_sandboxing: args.disable_sandboxing,
             homedir: PathBuf::from(args.homedir),
             rootfs: rootfs,
-            cgroup_path: if is_running_in_ci() {
-                None  // Disable cgroups in CI environments
-            } else {
-                Some(PathBuf::from(args.cgroup_path))
-            },
+            cgroup_path: Some(PathBuf::from(args.cgroup_path)),
             mounts: mounts,
             args: execve_args
                 .iter()
@@ -831,22 +827,9 @@ impl JailOptions {
                 Some(m) => Some(m),
                 None => None,
             },
-            allow_sigsys_fallback: args.allow_sigsys_fallback || is_running_in_ci(),
+            allow_sigsys_fallback: args.allow_sigsys_fallback,
         })
     }
-}
-
-/// Detects if the process is running in a CI environment where seccomp
-/// user-notify may not work properly due to containerization issues
-pub fn is_running_in_ci() -> bool {
-    // Check common CI environment variables
-    std::env::var("CI").is_ok()
-        || std::env::var("GITHUB_ACTIONS").is_ok()
-        || std::env::var("GITLAB_CI").is_ok()
-        || std::env::var("TRAVIS").is_ok()
-        || std::env::var("CIRCLECI").is_ok()
-        || std::env::var("JENKINS_URL").is_ok()
-        || std::env::var("BUILDKITE").is_ok()
 }
 
 fn add_sources(execve_args: &mut Vec<String>, lang_flag: &str, compile_sources: &Vec<String>) {

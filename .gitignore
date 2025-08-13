@@ -29,8 +29,6 @@ test_*.java
 test_*.js
 test_*.txt
 
-# helper scripts not meant for commit
-tools/run-ci-selection.sh
 # Compiled seccomp policies (generated from .policy files)
 *.bpf
 out/policies/

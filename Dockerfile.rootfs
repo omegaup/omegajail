@@ -28,7 +28,6 @@ RUN apt-get update -y && \
       fp-units-fcl-3.0.4 \
       g++-10 \
       gcc-10 \
-      gcc \
       ghc \
       git \
       libc6-dev \
@@ -53,9 +52,6 @@ RUN apt-get update -y && \
       && \
     apt-get autoremove -y && \
     apt-get clean
-
-RUN dotnet --list-sdks
-RUN ls -l /usr/share/dotnet/packs || echo "No packs found"
 
 RUN ls -l /usr/bin/ | grep -- '[^9] ->.*-9$' | sed -e 's@^.* \(.\+\) -> \(.\+\)-9$@ln -sf \2-10 /usr/bin/\1@' | bash && \
     mkdir -p /opt/nodejs && \
