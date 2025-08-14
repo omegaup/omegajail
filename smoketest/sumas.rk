@@ -1,5 +1,18 @@
+import rekarel.globals;
 class program {
-    program() {
+    // Esta función muestra el uso básico de Karel
+    void girar180() {
+        turnleft();
+        turnleft();
+        return;
+    }
+
+    // Esta función revisa si hay zumbadores y regresa un valor booleano
+    bool hayZumbadores() {
+        return nextToABeeper();
+    }
+
+    program () {
         // toma todos los zumbadores de la celda de la derecha.
         turnleft();
         turnleft();
