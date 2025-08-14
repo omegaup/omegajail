@@ -40,6 +40,7 @@ const JAVA_MIN_HEAP_SIZE_IN_BYTES: u64 = 18 * 1024 * 1024;
 
 pub(crate) enum Stdio {
     Mounted(PathBuf),
+    #[allow(dead_code)]
     DevNull(PathBuf),
     FileDescriptor(RawFd),
 }
@@ -215,7 +216,7 @@ impl JailOptions {
         };
 
         let mut execve_args = Vec::<String>::new();
-        let mut env: Vec<&str> = vec!["HOME=/home", "LANG=en_US.UTF-8", "PATH=/usr/bin"];
+        let env: Vec<&str> = vec!["HOME=/home", "LANG=en_US.UTF-8", "PATH=/usr/bin"];
         let mut seccomp_profile_name = String::new();
         let mut extra_memory_size_in_bytes = DEFAULT_EXTRA_MEMORY_SIZE_IN_BYTES;
         let mut vm_memory_size_in_bytes = 0u64;

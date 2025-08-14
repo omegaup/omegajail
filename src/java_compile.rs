@@ -1,11 +1,9 @@
-use std::env;
-use std::ffi::CString;
 use std::process::Command;
 
 use anyhow::{anyhow, bail, Context, Result};
 use clap::{ArgEnum, Parser};
-use nix::unistd::execve;
 
+#[allow(dead_code)]
 fn trim_extension<S1: AsRef<str>, S2: AsRef<str>>(filename: S1, extension: S2) -> String {
     filename
         .as_ref()
