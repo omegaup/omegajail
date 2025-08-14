@@ -92,6 +92,12 @@ def _omegajail_compile(
     os.link(
         os.path.join(_PWD, 'sumas.{}'.format(lang)),
         dest)
+    if lang == 'cs':
+        csproj_dest = os.path.join(lang_dir, 'Main.csproj')
+        if os.path.exists(os.path.join(_PWD, 'Main.csproj')):
+            if os.path.exists(csproj_dest):
+                os.remove(csproj_dest)
+            os.link(os.path.join(_PWD, 'Main.csproj'), csproj_dest)
     if strace:
         args = [
             'strace', '-f', '-o',
@@ -126,9 +132,6 @@ def _omegajail_compile(
         '--cgroup-path',
         cgroup_path,
     ]
-    if lang == 'cs':
-        os.symlink('/usr/share/dotnet/Main.runtimeconfig.json',
-                   os.path.join(lang_dir, 'Main.runtimeconfig.json'))
     return _check_call(args)
 
 
