@@ -36,11 +36,15 @@ jobs:
       - name: Rust tests in Docker
         run: |
           # Run Rust tests inside the Docker container
+          # Create a temporary directory for Rust cache
+          mkdir -p ${{ github.workspace }}/tmp-rustup
           docker run \
             --rm \
             --mount "type=bind,source=${{ github.workspace }},target=/omegajail" \
+            --mount "type=bind,source=${{ github.workspace }}/tmp-rustup,target=/tmp-rustup" \
             --workdir "/omegajail" \
-            --user "$(id -u):$(id -g)" \
+            --env "RUSTUP_HOME=/tmp-rustup/rustup" \
+            --env "CARGO_HOME=/tmp-rustup/cargo" \
             omegaup/omegajail-builder-rootfs-runtime-debug \
             bash -c "PATH=/opt/rust/cargo/bin:\$PATH cargo test"
 
