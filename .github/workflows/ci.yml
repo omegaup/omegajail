@@ -26,13 +26,7 @@ jobs:
         run: |
           make CXX=g++-11 ECHO=echo OMEGAJAIL_RELEASE=${{ github.sha }} all
           cargo build --bins
-          cargo build --tests
-
-      - name: Test
-        run: |
-          # Skip problematic tests in Ubuntu 22.04
-          export OMEGAJAIL_SKIP_PROBLEMATIC_TESTS=true
-          timeout 2m make test
+          # Rust tests are no longer executed here
 
       - name: Build rootfs
         run: make OMEGAJAIL_RELEASE=${{ github.sha }} rootfs
@@ -67,7 +61,21 @@ jobs:
 
       - name: Build container
         run: |
-          make OMEGAJAIL_RELEASE=${{ github.sha }} .omegajail-builder-rootfs-runtime.stamp
+          # First build the distribution image
+          make OMEGAJAIL_RELEASE=${{ github.sha }} .omegajail-builder-distrib.stamp
+          # Then build the runtime debug image
+          make OMEGAJAIL_RELEASE=${{ github.sha }} .omegajail-builder-rootfs-runtime-debug.stamp
+
+      - name: Rust tests in Docker
+        run: |
+          # Run Rust tests inside the Docker container
+          docker run \
+            --rm \
+            --mount "type=bind,source=$(PWD),target=/omegajail" \
+            --workdir "/omegajail" \
+            --user "$(id -u):$(id -g)" \
+            omegaup/omegajail-builder-rootfs-runtime-debug \
+            bash -c "PATH=/opt/rust/cargo/bin:\$PATH cargo test"
 
       - name: Smoketest (Docker)
         run: |
