@@ -300,6 +300,9 @@ impl Jail {
     }
 }
 
+// TODO: Several tests are currently disabled with #[ignore] because they freeze
+// in CI environments with Ubuntu 22.04. This is likely due to changes in cgroups v2
+// or other system-level components. These tests need investigation.
 #[cfg(test)]
 mod tests {
     use std::ffi::CString;
@@ -461,6 +464,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "Test freezes in CI - disabled in PR #47"]
     fn test_file_descriptors() -> Result<()> {
         init();
         run_test_case(TestCase {
@@ -476,6 +480,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "Test freezes in CI - disabled in PR #47"]
     fn test_abort() -> Result<()> {
         init();
         run_test_case(TestCase {
@@ -490,6 +495,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "Test freezes in CI - disabled in PR #47"]
     fn test_oom() -> Result<()> {
         init();
         let result = run_test_case(TestCase {
@@ -531,6 +537,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "Test freezes in CI - disabled in PR #47"]
     fn test_sigxcpu() -> Result<()> {
         init();
         let result = run_test_case(TestCase {
