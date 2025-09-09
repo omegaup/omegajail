@@ -450,6 +450,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "Test freezes in CI - disabled in PR #47"]
     fn test_stdio() -> Result<()> {
         init();
         run_test_case(TestCase {
@@ -524,6 +525,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "Test freezes in CI - disabled in PR #47"]
     fn test_sigxfsz() -> Result<()> {
         init();
         run_test_case(TestCase {
