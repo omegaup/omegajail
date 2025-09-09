@@ -7,7 +7,7 @@
 //!   namespaced process (namely: setting the u/gid mapping for the unprivileged user namespace in
 //!   the container, and setting up the sandboxed process' cgroups).
 //!
-//!   This process will spawn the sandboxed init process and then wait for it to send the result of
+//! This process will spawn the sandboxed init process and then wait for it to send the result of
 //!   the execution and exit.
 //! * Sandboxed init: Linux processes with pid 1 are treated differently by the kernel. One of
 //!   these differences is that by default they block most async signals (except `SIGKILL`). Since
@@ -305,6 +305,7 @@ mod tests {
     use std::ffi::CString;
     use std::fs::{create_dir, read_to_string, write, File};
     use std::path::PathBuf;
+    use std::env;
     use std::process::Command;
     use std::time::Duration;
 
