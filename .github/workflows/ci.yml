@@ -46,7 +46,6 @@ jobs:
             --workdir "/omegajail" \
             --env "RUSTUP_HOME=/tmp-rustup/rustup" \
             --env "CARGO_HOME=/tmp-rustup/cargo" \
-            --env "OMEGAJAIL_SKIP_PROBLEMATIC_TESTS=true" \
             omegaup/omegajail-builder-rootfs-runtime-debug \
             bash -c "PATH=/opt/rust/cargo/bin:\$PATH cargo test"
 

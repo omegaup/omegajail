@@ -7,7 +7,16 @@
 //!   namespaced process (namely: setting the u/gid mapping for the unprivileged user namespace in
 //!   the container, and setting up the sandboxed process' cgroups).
 //!
-//!   This process will spawn the sandboxed init process and then wait for it to send the result of
+//!   This process will spawn the sandboxed init process        #[test]
+    fn test_sleep() -> Result<()> {
+        init();
+        run_test_case(TestCase {st]
+    fn test_oom() -> Result<()> {
+        init();
+        run_test_case(TestCase {hen wa    #[test]
+    fn test_sigxcpu() -> Result<()> {
+        init();
+        run_test_case(TestCase {r it to send the result of
 //!   the execution and exit.
 //! * Sandboxed init: Linux processes with pid 1 are treated differently by the kernel. One of
 //!   these differences is that by default they block most async signals (except `SIGKILL`). Since
@@ -447,15 +456,8 @@ mod tests {
         Ok(result)
     }
 
-    // Función auxiliar para determinar si se deben omitir los tests problemáticos
-    fn should_skip_problematic_tests() -> bool {
-        // En Ubuntu 22.04, omitir los tests que causan problemas con cgroups v2
-        env::var("OMEGAJAIL_SKIP_PROBLEMATIC_TESTS").unwrap_or_else(|_| "false".to_string()) == "true"
-    }
-
     #[test]
     fn test_stdio() -> Result<()> {
-        if should_skip_problematic_tests() { return Ok(()); }
         init();
         run_test_case(TestCase {
             widget: "stdio",
@@ -470,7 +472,6 @@ mod tests {
 
     #[test]
     fn test_file_descriptors() -> Result<()> {
-        if should_skip_problematic_tests() { return Ok(()); }
         init();
         run_test_case(TestCase {
             widget: "file-descriptors",
@@ -486,7 +487,6 @@ mod tests {
 
     #[test]
     fn test_abort() -> Result<()> {
-        if should_skip_problematic_tests() { return Ok(()); }
         init();
         run_test_case(TestCase {
             widget: "abort",
@@ -517,7 +517,6 @@ mod tests {
 
     #[test]
     fn test_syscall() -> Result<()> {
-        if should_skip_problematic_tests() { return Ok(()); }
         init();
         run_test_case(TestCase {
             widget: "syscall",
@@ -531,7 +530,6 @@ mod tests {
 
     #[test]
     fn test_sigxfsz() -> Result<()> {
-        if should_skip_problematic_tests() { return Ok(()); }
         init();
         run_test_case(TestCase {
             widget: "sigxfsz",
