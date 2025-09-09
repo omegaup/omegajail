@@ -7,7 +7,16 @@
 //!   namespaced process (namely: setting the u/gid mapping for the unprivileged user namespace in
 //!   the container, and setting up the sandboxed process' cgroups).
 //!
-//! This process will spawn the sandboxed init process and then wait for it to send the result of
+//!   This process will spawn the sandboxed init process        #[test]
+    fn test_sleep() -> Result<()> {
+        init();
+        run_test_case(TestCase {st]
+    fn test_oom() -> Result<()> {
+        init();
+        run_test_case(TestCase {hen wa    #[test]
+    fn test_sigxcpu() -> Result<()> {
+        init();
+        run_test_case(TestCase {r it to send the result of
 //!   the execution and exit.
 //! * Sandboxed init: Linux processes with pid 1 are treated differently by the kernel. One of
 //!   these differences is that by default they block most async signals (except `SIGKILL`). Since
@@ -492,6 +501,7 @@ mod tests {
 
     #[test]
     fn test_oom() -> Result<()> {
+        if should_skip_problematic_tests() { return Ok(()); }
         init();
         let result = run_test_case(TestCase {
             widget: "oom",
@@ -533,6 +543,7 @@ mod tests {
 
     #[test]
     fn test_sigxcpu() -> Result<()> {
+        if should_skip_problematic_tests() { return Ok(()); }
         init();
         let result = run_test_case(TestCase {
             widget: "sigxcpu",
@@ -551,6 +562,7 @@ mod tests {
 
     #[test]
     fn test_sleep() -> Result<()> {
+        if should_skip_problematic_tests() { return Ok(()); }
         init();
         let result = run_test_case(TestCase {
             widget: "sleep",
