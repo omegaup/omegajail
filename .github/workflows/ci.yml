@@ -22,7 +22,7 @@ jobs:
 
       - name: Build
         run: |
-          make CXX=g++-9 ECHO=echo OMEGAJAIL_RELEASE=${{ github.sha }} all
+          make CXX=g++-11 ECHO=echo OMEGAJAIL_RELEASE=${{ github.sha }} all
           cargo build --bins
           cargo build --tests
 
@@ -41,7 +41,7 @@ jobs:
 
       - name: Upload artifacts
         if: ${{ always() }}
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: test-logs
           path: smoketest/run/
@@ -65,7 +65,7 @@ jobs:
 
       - name: Upload artifacts
         if: ${{ always() }}
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: test-logs-docker
           path: smoketest/run/

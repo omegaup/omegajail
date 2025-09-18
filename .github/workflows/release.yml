@@ -39,36 +39,20 @@ jobs:
         run: make OMEGAJAIL_RELEASE=${{ steps.bump-version.outputs.tag }} .omegajail-builder-rootfs-runtime.stamp
 
       - name: Create Release
-        id: create-release
-        uses: actions/create-release@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ steps.bump-version.outputs.tag }}
-          release_name: ${{ steps.bump-version.outputs.tag }}
-          draft: false
-          prerelease: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create ${{ steps.bump-version.outputs.tag }} \
+            --title "${{ steps.bump-version.outputs.tag }}" \
+            --generate-notes \
+            ./omegajail-jammy-distrib-x86_64.tar.xz
 
-      - name: Upload omegajail-jammy-distrib-x86_64.tar.xz Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create-release.outputs.upload_url }}
-          asset_path: ./omegajail-jammy-distrib-x86_64.tar.xz
-          asset_name: omegajail-jammy-distrib-x86_64.tar.xz
-          asset_content_type: application/octet-stream
-
-      - name: Upload omegajail-jammy-rootfs-x86_64.tar.xz Release Asset
+      - name: Upload rootfs asset to release
         if: ${{ steps.bump-version.outputs.part == 'major' || steps.bump-version.outputs.part == 'minor' }}
-        uses: actions/upload-release-asset@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create-release.outputs.upload_url }}
-          asset_path: ./omegajail-jammy-rootfs-x86_64.tar.xz
-          asset_name: omegajail-jammy-rootfs-x86_64.tar.xz
-          asset_content_type: application/octet-stream
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ steps.bump-version.outputs.tag }} ./omegajail-jammy-rootfs-x86_64.tar.xz
 
       - name: Publish omegaup/omegajail-builder-rootfs-runtime container package
         if: ${{ steps.bump-version.outputs.part == 'major' || steps.bump-version.outputs.part == 'minor' }}
