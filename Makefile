@@ -151,3 +151,29 @@ omegajail-focal-distrib-x86_64.tar.xz: .omegajail-builder-distrib.stamp
 		/var/lib/omegajail/bin \
 		/var/lib/omegajail/policies && \
 	mv ".$@.tmp" "$@" || rm ".$@.tmp"
+
+# Ubuntu 22.04 (jammy) targets
+omegajail-jammy-rootfs-x86_64.tar.xz: .omegajail-builder-rootfs-build.stamp
+	rm -f $@
+	touch ".$@.tmp"
+	docker run \
+		--rm \
+		--mount "type=bind,source=${PWD}/.$@.tmp,target=/src/$@" \
+		--env "XZ_DEFAULTS=-T 0" \
+		omegaup/omegajail-builder-rootfs-build \
+		/bin/tar cJf "/src/$@" \
+		/var/lib/omegajail && \
+	mv ".$@.tmp" "$@" || rm ".$@.tmp"
+
+omegajail-jammy-distrib-x86_64.tar.xz: .omegajail-builder-distrib.stamp
+	rm -f $@
+	touch ".$@.tmp"
+	docker run \
+		--rm \
+		--mount "type=bind,source=${PWD}/.$@.tmp,target=/src/$@" \
+		--env "XZ_DEFAULTS=-T 0" \
+		omegaup/omegajail-builder-distrib \
+		/bin/tar cJf "/src/$@" \
+		/var/lib/omegajail/bin \
+		/var/lib/omegajail/policies && \
+	mv ".$@.tmp" "$@" || rm ".$@.tmp"
