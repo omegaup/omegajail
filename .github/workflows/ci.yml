@@ -23,7 +23,7 @@ jobs:
       - name: Install dependencies
         run: |
           apt-get update
-          apt-get install -y make libcap-dev util-linux
+          apt-get install -y make libcap-dev util-linux python3
 
       - name: Install Rust
         run: |
