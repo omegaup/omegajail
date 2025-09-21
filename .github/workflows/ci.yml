@@ -25,6 +25,14 @@ jobs:
           apt-get update
           apt-get install -y make libcap-dev util-linux
 
+      - name: Install Rust
+        run: |
+          apt-get update
+          apt-get install -y curl
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          export PATH="$HOME/.cargo/bin:$PATH"
+          echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> $GITHUB_ENV
+
       - name: Build
         run: |
           make CXX=g++-9 ECHO=echo OMEGAJAIL_RELEASE=${{ github.sha }} all
