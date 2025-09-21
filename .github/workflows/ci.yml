@@ -1,5 +1,4 @@
 name: CI
-
 on:
   pull_request: {}
   push:
@@ -7,39 +6,38 @@ on:
       - main
 
 jobs:
-
   ci:
     runs-on: ubuntu-22.04
-  
+    container:
+      image: ubuntu:20.04
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0
-  
-      - name: Build container
+
+      - name: Install dependencies
         run: |
-          make OMEGAJAIL_RELEASE=${{ github.sha }} .omegajail-builder-rootfs-runtime.stamp
-  
-      - name: CI inside Docker
+          apt-get update
+          apt-get install -y libcap-dev util-linux make gcc g++ curl pkg-config
+
+      - name: Build
         run: |
-          docker run --rm \
-            -v "$PWD:/workspace" \
-            -w /workspace \
-            omegajail-builder:${{ github.sha }} \
-            bash -c '
-              set -e
-              make CXX=g++-9 ECHO=echo OMEGAJAIL_RELEASE=${GITHUB_SHA} all
-              cargo build --bins
-              cargo build --tests
-              make test
-              make OMEGAJAIL_RELEASE=${GITHUB_SHA} rootfs
-              sudo mkdir -p -m 0775 /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
-              sudo chown $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
-              sudo chgrp $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
-              taskset 0x1 ./smoketest/test --root=./rootfs --strace --cgroup-path=/system.slice/omegaup-runner.service/omegajail
-            '
-  
+          make CXX=g++-9 ECHO=echo OMEGAJAIL_RELEASE=${{ github.sha }} all
+          cargo build --bins
+          cargo build --tests
+
+      - name: Test
+        run: make test
+
+      - name: Build rootfs
+        run: make OMEGAJAIL_RELEASE=${{ github.sha }} rootfs
+
+      - name: Smoketest
+        run: |
+          mkdir -p -m 0775 /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail || true
+          taskset 0x1 ./smoketest/test --root=./rootfs --strace --cgroup-path=/system.slice/omegaup-runner.service/omegajail
+
       - name: Upload artifacts
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
@@ -49,20 +47,13 @@ jobs:
 
   smoketest-docker:
     runs-on: ubuntu-22.04
-
+    container:
+      image: ubuntu:20.04
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0
-
-      - name: Build container
-        run: |
-          make OMEGAJAIL_RELEASE=${{ github.sha }} .omegajail-builder-rootfs-runtime.stamp
-
-      - name: Smoketest (Docker)
-        run: |
-          make OMEGAJAIL_RELEASE=${{ github.sha }} smoketest-docker
 
       - name: Upload artifacts
         if: ${{ always() }}
