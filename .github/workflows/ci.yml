@@ -5,50 +5,57 @@ on:
   push:
     branches:
       - main
-
 jobs:
-
-  ci:
-    runs-on: ubuntu-22.04 # Changed to ubuntu-22.04 as requested
-
+  ci-in-vm:
+    runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4 # Updated to v4
+      - uses: actions/checkout@v2
+
+      - name: Setup Lima VM (AlmaLinux 8, cgroups v1)
+        uses: lima-vm/lima-actions/setup@v1
+        id: lima-actions-setup
+
+      - name: Cache Lima VM
+        uses: actions/cache@v3
         with:
-          submodules: recursive
-          fetch-depth: 0
+          path: ~/.cache/lima
+          key: lima-${{ steps.lima-actions-setup.outputs.version }}
 
-      - name: Install dependencies
-        # Added apt-get update before install, which is good practice.
-        # Note: g++-9 may require manual installation on 22.04.
-        run: sudo apt-get update && sudo apt-get install -y libcap-dev util-linux
-
-      - name: Build
+      - name: Start Lima VM
         run: |
-          make CXX=g++-9 ECHO=echo OMEGAJAIL_RELEASE=${{ github.sha }} all
-          cargo build --bins
-          cargo build --tests
+          limactl start --name=omegajail-cgv1 --cpus=2 --memory=4 --containerd=none template://almalinux-8
 
-      - name: Test
-        run: make test
-
-      - name: Build rootfs
-        run: make OMEGAJAIL_RELEASE=${{ github.sha }} rootfs
-
-      - name: Smoketest
+      - name: Copy repo into VM
         run: |
-          # The cgroup setup commands might need adjustment due to changes
-          # in the cgroup hierarchy between Ubuntu versions.
-          sudo mkdir -p -m 0775 /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
-          sudo chown $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
-          sudo chgrp $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
-          taskset 0x1 ./smoketest/test --root=./rootfs --strace --cgroup-path=/system.slice/omegaup-runner.service/omegajail
+          limactl shell omegajail-cgv1 -- mkdir -p ~/omegajail
+          rsync -av --exclude='.git' ./ ~/omegajail/
+
+      - name: Run CI inside VM
+        run: |
+          limactl shell omegajail-cgv1 -- bash -c '
+            cd ~/omegajail &&
+            sudo yum install -y libcap-devel util-linux make cargo &&
+            make CXX=g++-9 ECHO=echo OMEGAJAIL_RELEASE=${GITHUB_SHA} all &&
+            cargo build --bins &&
+            cargo build --tests &&
+            make test &&
+            make OMEGAJAIL_RELEASE=${GITHUB_SHA} rootfs &&
+            sudo mkdir -p -m 0775 /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail &&
+            sudo chown $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail &&
+            sudo chgrp $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail &&
+            taskset 0x1 ./smoketest/test --root=./rootfs --strace --cgroup-path=/system.slice/omegaup-runner.service/omegajail
+          '
+
+      - name: Retrieve artifacts from VM
+        run: |
+          limactl shell omegajail-cgv1 -- tar czf /tmp/artifacts.tar.gz -C ~/omegajail smoketest/run
+          limactl copy omegajail-cgv1:/tmp/artifacts.tar.gz .
 
       - name: Upload artifacts
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4 # Updated to v4
+        uses: actions/upload-artifact@v4
         with:
           name: test-logs
-          path: smoketest/run/
+          path: artifacts.tar.gz
 
   smoketest-docker:
     runs-on: ubuntu-22.04 # Changed to ubuntu-22.04 as requested
