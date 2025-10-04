@@ -5,63 +5,93 @@ on:
   push:
     branches:
       - main
-jobs:
-  ci-in-vm:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v2
 
-      - name: Setup Lima VM (AlmaLinux 8, cgroups v1)
+jobs:
+
+  ci-in-vm: # Renamed job to indicate it runs in a VM
+    runs-on: ubuntu-22.04 # Host runner remains on a supported version (22.04)
+
+    steps:
+      - uses: actions/checkout@v4 # Updated to latest version
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      # ----------------------------------------------------------------------
+      # LIMA VM SETUP (Ubuntu 20.04 Guest)
+      # ----------------------------------------------------------------------
+      - name: Setup Lima VM
         uses: lima-vm/lima-actions/setup@v1
         id: lima-actions-setup
 
       - name: Cache Lima VM
-        uses: actions/cache@v3
+        uses: actions/cache@v4 # Updated to latest version
         with:
           path: ~/.cache/lima
-          key: lima-${{ steps.lima-actions-setup.outputs.version }}
+          # Cache key uses Lima version and the VM template to ensure a fresh build on changes
+          key: lima-ubuntu-20.04-${{ steps.lima-actions-setup.outputs.version }}
 
-      - name: Start Lima VM
+      - name: Start Lima VM (Ubuntu 20.04, cgroups v1)
         run: |
-          limactl start --name=omegajail-cgv1 --cpus=2 --memory=4 --containerd=none template://almalinux-8
+          # Use the template://ubuntu-20.04 to ensure the specific OS is used
+          limactl start --name=omegajail-vm --cpus=2 --memory=4 --containerd=none template://ubuntu-20.04
 
       - name: Copy repo into VM
         run: |
-          limactl shell omegajail-cgv1 -- mkdir -p ~/omegajail
+          limactl shell omegajail-vm -- mkdir -p ~/omegajail
+          # Use rsync to copy the repo into the VM, excluding unnecessary files
           rsync -av --exclude='.git' ./ ~/omegajail/
 
-      - name: Run CI inside VM
+      # ----------------------------------------------------------------------
+      # RUN CI INSIDE UBUNTU 20.04 VM
+      # ----------------------------------------------------------------------
+      - name: Run CI inside Ubuntu 20.04 VM
         run: |
-          limactl shell omegajail-cgv1 -- bash -c '
+          # Use limactl shell to execute all build/test commands inside the VM
+          limactl shell omegajail-vm -- bash -c '
             cd ~/omegajail &&
-            sudo yum install -y libcap-devel util-linux make cargo &&
+
+            # Install dependencies using apt-get (for Ubuntu)
+            sudo apt-get update &&
+            sudo apt-get install -y libcap-dev util-linux g++-9 make cargo &&
+
+            # Build steps
             make CXX=g++-9 ECHO=echo OMEGAJAIL_RELEASE=${GITHUB_SHA} all &&
             cargo build --bins &&
             cargo build --tests &&
+
+            # Test steps
             make test &&
             make OMEGAJAIL_RELEASE=${GITHUB_SHA} rootfs &&
+
+            # Smoketest (cgroups v1 setup)
             sudo mkdir -p -m 0775 /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail &&
             sudo chown $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail &&
             sudo chgrp $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail &&
             taskset 0x1 ./smoketest/test --root=./rootfs --strace --cgroup-path=/system.slice/omegaup-runner.service/omegajail
           '
 
+      # ----------------------------------------------------------------------
+      # ARTIFACT RETRIEVAL AND UPLOAD
+      # ----------------------------------------------------------------------
       - name: Retrieve artifacts from VM
         run: |
-          limactl shell omegajail-cgv1 -- tar czf /tmp/artifacts.tar.gz -C ~/omegajail smoketest/run
-          limactl copy omegajail-cgv1:/tmp/artifacts.tar.gz .
+          # Package test logs and copy them back to the host runner
+          limactl shell omegajail-vm -- tar czf /tmp/artifacts.tar.gz -C ~/omegajail smoketest/run
+          limactl copy omegajail-vm:/tmp/artifacts.tar.gz .
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4 # Updated to latest version
         with:
           name: test-logs
           path: artifacts.tar.gz
 
+  # The Docker smoketest job is kept separate as it might not need Lima
   smoketest-docker:
-    runs-on: ubuntu-22.04 # Changed to ubuntu-22.04 as requested
+    runs-on: ubuntu-22.04 # Host runner remains on a supported version
 
     steps:
-      - uses: actions/checkout@v4 # Updated to v4
+      - uses: actions/checkout@v4 # Updated to latest version
         with:
           submodules: recursive
           fetch-depth: 0
@@ -76,7 +106,7 @@ jobs:
 
       - name: Upload artifacts
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4 # Updated to v4
+        uses: actions/upload-artifact@v4 # Updated to latest version
         with:
           name: test-logs-docker
           path: smoketest/run/
