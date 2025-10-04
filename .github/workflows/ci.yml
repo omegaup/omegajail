@@ -43,7 +43,7 @@ jobs:
           
           # 2. Copy the contents of the *current host directory* (.) to the *VM directory*
           # The -r flag is for recursive copy.
-          limactl copy -r . omegajail-vm:/tmp/omegajail
+          limactl cp -r . omegajail-vm:/tmp/omegajail
           
           # NOTE: The subsequent CI step (Run CI inside VM) is correct because 
           # it changes directory (cd /tmp/omegajail) before attempting to run 'make'.
