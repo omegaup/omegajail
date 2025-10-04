@@ -18,7 +18,7 @@ jobs:
           fetch-depth: 0
 
       # ----------------------------------------------------------------------
-      # LIMA VM SETUP (Ubuntu 20.04 Guest)
+      # LIMA VM SETUP (AlmaLinux 8 Guest)
       # ----------------------------------------------------------------------
       - name: Setup Lima VM
         uses: lima-vm/lima-actions/setup@v1
@@ -28,41 +28,43 @@ jobs:
         uses: actions/cache@v4 # Updated to latest version
         with:
           path: ~/.cache/lima
-          # Cache key uses Lima version and the VM template to ensure a fresh build on changes
-          key: lima-ubuntu-20.04-${{ steps.lima-actions-setup.outputs.version }}
+          # --- UPDATED: Cache key now uses almalinux-8 ---
+          key: lima-almalinux-8-${{ steps.lima-actions-setup.outputs.version }}
 
-      - name: Start Lima VM (Ubuntu 20.04, cgroups v1)
+      - name: Start Lima VM (AlmaLinux 8, cgroups v1)
         run: |
-          # Use the template://ubuntu-20.04 to ensure the specific OS is used
-          limactl start --name=omegajail-vm --cpus=2 --memory=4 --containerd=none template://ubuntu-20.04
+          # --- UPDATED: Use the template://almalinux-8 ---
+          limactl start --name=omegajail-vm --cpus=2 --memory=4 --containerd=none template://almalinux-8
 
       - name: Copy repo into VM
         run: |
           # 1. Create the writable directory inside the VM
           limactl shell omegajail-vm -- mkdir -p /tmp/omegajail
           
-          # 2. Copy the contents of the *current host directory* (.) to the *VM directory*
-          # The -r flag is for recursive copy.
+          # 2. Copy the contents of the *current host directory* to the *VM directory*
+          # Using the tarball method for reliable transfer
           tar czf - . | limactl shell omegajail-vm -- tar xzf - -C /tmp/omegajail
-          
-          # NOTE: The subsequent CI step (Run CI inside VM) is correct because 
-          # it changes directory (cd /tmp/omegajail) before attempting to run 'make'.
 
       # ----------------------------------------------------------------------
-      # RUN CI INSIDE UBUNTU 20.04 VM
+      # RUN CI INSIDE ALMALINUX 8 VM
       # ----------------------------------------------------------------------
-      - name: Run CI inside Ubuntu 20.04 VM
+      - name: Run CI inside AlmaLinux 8 VM
         run: |
           # Use limactl shell to execute all build/test commands inside the VM
           limactl shell omegajail-vm -- bash -c '
             cd /tmp/omegajail &&
 
-            # Install dependencies using apt-get (for Ubuntu)
-            sudo apt-get update &&
-            sudo apt-get install -y libcap-dev util-linux g++-9 make cargo &&
+            # --- UPDATED: Install dependencies using dnf/yum (for AlmaLinux) ---
+            sudo dnf update -y &&
+            sudo dnf install -y libcap-devel util-linux gcc-toolset-9 make cargo &&
+            
+            # NOTE: gcc-toolset-9 provides g++-9, which is needed by omegajail.
+            # We explicitly use it here to ensure the correct compiler version is picked up.
+            source /opt/rh/gcc-toolset-9/enable &&
 
             # Build steps
-            make CXX=g++-9 ECHO=echo OMEGAJAIL_RELEASE=${GITHUB_SHA} all &&
+            # --- UPDATED: Explicitly call g++ from the toolset ---
+            make CXX=/opt/rh/gcc-toolset-9/root/usr/bin/g++ ECHO=echo OMEGAJAIL_RELEASE=${GITHUB_SHA} all &&
             cargo build --bins &&
             cargo build --tests &&
 
@@ -71,6 +73,7 @@ jobs:
             make OMEGAJAIL_RELEASE=${GITHUB_SHA} rootfs &&
 
             # Smoketest (cgroups v1 setup)
+            # This is the original cgroups v1 setup, often more reliable on RHEL-based systems like Alma
             sudo mkdir -p -m 0775 /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail &&
             sudo chown $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail &&
             sudo chgrp $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail &&
@@ -78,7 +81,7 @@ jobs:
           '
 
       # ----------------------------------------------------------------------
-      # ARTIFACT RETRIEVAL AND UPLOAD
+      # ARTIFACT RETRIEVAL AND UPLOAD (Unchanged)
       # ----------------------------------------------------------------------
       - name: Retrieve artifacts from VM
         run: |
