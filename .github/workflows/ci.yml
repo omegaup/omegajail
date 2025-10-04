@@ -39,14 +39,14 @@ jobs:
       - name: Copy repo into VM
         run: |
           # 1. Create the writable directory inside the VM
-          limactl shell omegajail-vm -- mkdir -p ~/omegajail
+          limactl shell omegajail-vm -- mkdir -p /tmp/omegajail
           
           # 2. Copy the contents of the *current host directory* (.) to the *VM directory*
           # The -r flag is for recursive copy.
-          tar czf - . | limactl shell omegajail-vm -- tar xzf - -C ~/omegajail
+          tar czf - . | limactl shell omegajail-vm -- tar xzf - -C /tmp/omegajail
           
           # NOTE: The subsequent CI step (Run CI inside VM) is correct because 
-          # it changes directory (cd ~/omegajail) before attempting to run 'make'.
+          # it changes directory (cd /tmp/omegajail) before attempting to run 'make'.
 
       # ----------------------------------------------------------------------
       # RUN CI INSIDE UBUNTU 20.04 VM
@@ -55,7 +55,7 @@ jobs:
         run: |
           # Use limactl shell to execute all build/test commands inside the VM
           limactl shell omegajail-vm -- bash -c '
-            cd ~/omegajail &&
+            cd /tmp/omegajail &&
 
             # Install dependencies using apt-get (for Ubuntu)
             sudo apt-get update &&
@@ -83,8 +83,8 @@ jobs:
       - name: Retrieve artifacts from VM
         run: |
           # Package test logs from the /tmp location and copy them back to the host runner
-          limactl shell omegajail-vm -- tar czf ~/artifacts.tar.gz -C ~/omegajail smoketest/run
-          limactl copy omegajail-vm:~/artifacts.tar.gz .
+          limactl shell omegajail-vm -- tar czf /tmp/artifacts.tar.gz -C /tmp/omegajail smoketest/run
+          limactl copy omegajail-vm:/tmp/artifacts.tar.gz .
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4 # Updated to latest version
