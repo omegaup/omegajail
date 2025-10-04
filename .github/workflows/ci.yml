@@ -56,7 +56,7 @@ jobs:
 
             # --- UPDATED: Install dependencies using dnf/yum (for AlmaLinux) ---
             sudo dnf update -y &&
-            sudo dnf install -y libcap-devel util-linux gcc-toolset-9 make cargo &&
+            sudo dnf install -y libcap-devel util-linux gcc-toolset-9 make cargo glibc-devel libstdc++-devel &&
             
             # NOTE: gcc-toolset-9 provides g++-9, which is needed by omegajail.
             # We explicitly use it here to ensure the correct compiler version is picked up.
