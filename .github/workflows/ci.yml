@@ -52,32 +52,35 @@ jobs:
         run: |
           # Use limactl shell to execute all build/test commands inside the VM
           limactl shell omegajail-vm -- bash -c '
+            # Set the compiler path variables once
+            GCC_BIN=/opt/rh/gcc-toolset-9/root/usr/bin
+            
             cd /tmp/omegajail &&
 
-            # --- UPDATED: Install dependencies using dnf/yum (for AlmaLinux) ---
-            sudo dnf update -y &&
-            sudo dnf install -y libcap-devel util-linux gcc-toolset-9 make cargo glibc-devel libstdc++-devel &&
+            # Install dependencies. Use "scl enable" for a persistent environment.
+            # Running this entire block through "scl enable" ensures the PATH and LD_LIBRARY_PATH
+            # are correctly set for all subsequent commands (make, cargo, etc.).
             
-            # NOTE: gcc-toolset-9 provides g++-9, which is needed by omegajail.
-            # We explicitly use it here to ensure the correct compiler version is picked up.
-            source /opt/rh/gcc-toolset-9/enable &&
+            scl enable gcc-toolset-9 -- "bash -c \"
+              # Install dependencies using dnf/yum (for AlmaLinux)
+              sudo dnf update -y
+              sudo dnf install -y libcap-devel util-linux gcc-toolset-9 make cargo glibc-devel libstdc++-devel
+              
+              # Build steps
+              make CC=${GCC_BIN}/gcc CXX=${GCC_BIN}/g++ ECHO=echo OMEGAJAIL_RELEASE=${GITHUB_SHA} all &&
+              cargo build --bins &&
+              cargo build --tests &&
 
-            # Build steps
-            # --- UPDATED: Explicitly call g++ from the toolset ---
-            make CXX=/opt/rh/gcc-toolset-9/root/usr/bin/g++ ECHO=echo OMEGAJAIL_RELEASE=${GITHUB_SHA} all &&
-            cargo build --bins &&
-            cargo build --tests &&
+              # Test steps
+              make test &&
+              make OMEGAJAIL_RELEASE=${GITHUB_SHA} rootfs &&
 
-            # Test steps
-            make test &&
-            make OMEGAJAIL_RELEASE=${GITHUB_SHA} rootfs &&
-
-            # Smoketest (cgroups v1 setup)
-            # This is the original cgroups v1 setup, often more reliable on RHEL-based systems like Alma
-            sudo mkdir -p -m 0775 /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail &&
-            sudo chown $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail &&
-            sudo chgrp $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail &&
-            taskset 0x1 ./smoketest/test --root=./rootfs --strace --cgroup-path=/system.slice/omegaup-runner.service/omegajail
+              # Smoketest (cgroups v1 setup)
+              sudo mkdir -p -m 0775 /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail &&
+              sudo chown \$(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail &&
+              sudo chgrp \$(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail &&
+              taskset 0x1 ./smoketest/test --root=./rootfs --strace --cgroup-path=/system.slice/omegaup-runner.service/omegajail
+            \""
           '
 
       # ----------------------------------------------------------------------
