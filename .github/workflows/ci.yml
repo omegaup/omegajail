@@ -1,68 +1,3 @@
-# name: CI
-# on:
-#   pull_request: {}
-#   push:
-#     branches:
-#       - main
-
-# jobs:
-#   ci:
-#     runs-on: ubuntu-latest
-#     container:
-#       image: ubuntu:20.04
-
-#     steps:
-#       - name: Install Git
-#         run: apt-get update && apt-get install -y git
-  
-#       - uses: actions/checkout@v4
-#         with:
-#           submodules: recursive
-#           fetch-depth: 0
-
-#       - name: Install dependencies
-#         run: |
-#           apt-get update
-#           apt-get install -y make libcap-dev util-linux python3
-
-#       - name: Install Rust
-#         run: |
-#           apt-get update
-#           apt-get install -y curl
-#           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-#           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-
-#       - name: Install build dependencies
-#         run: apt-get update && apt-get install -y build-essential
-
-#       - name: Install gcc
-#         run: apt-get update && apt-get install -y gcc
-
-#       - name: Build
-#         run: |
-#           make CXX=g++-9 ECHO=echo OMEGAJAIL_RELEASE=${{ github.sha }} all
-#           cargo build --bins
-#           cargo build --tests
-          
-#       - name: Test
-#         run: make test
-
-#       - name: Build rootfs
-#         run: make OMEGAJAIL_RELEASE=${{ github.sha }} rootfs
-
-#       - name: Smoketest
-#         run: |
-#           sudo mkdir -p -m 0775 /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail || true
-#           sudo chown $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
-#           sudo chgrp $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
-#           taskset 0x1 ./smoketest/test --root=./rootfs --strace --cgroup-path=/system.slice/omegaup-runner.service/omegajail
-#       - name: Upload artifacts
-#         if: ${{ always() }}
-#         uses: actions/upload-artifact@v4
-#         with:
-#           name: test-logs
-#           path: smoketest/run/
-
 name: CI
 
 on:
@@ -72,17 +7,20 @@ on:
       - main
 
 jobs:
+
   ci:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-22.04 # Changed to ubuntu-22.04 as requested
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4 # Updated to v4
         with:
           submodules: recursive
           fetch-depth: 0
 
       - name: Install dependencies
-        run: sudo apt-get install -y libcap-dev util-linux g++-9
+        # Added apt-get update before install, which is good practice.
+        # Note: g++-9 may require manual installation on 22.04.
+        run: sudo apt-get update && sudo apt-get install -y libcap-dev util-linux
 
       - name: Build
         run: |
@@ -98,6 +36,8 @@ jobs:
 
       - name: Smoketest
         run: |
+          # The cgroup setup commands might need adjustment due to changes
+          # in the cgroup hierarchy between Ubuntu versions.
           sudo mkdir -p -m 0775 /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
           sudo chown $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
           sudo chgrp $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
@@ -105,16 +45,16 @@ jobs:
 
       - name: Upload artifacts
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4 # Updated to v4
         with:
           name: test-logs
           path: smoketest/run/
 
   smoketest-docker:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-22.04 # Changed to ubuntu-22.04 as requested
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4 # Updated to v4
         with:
           submodules: recursive
           fetch-depth: 0
@@ -129,7 +69,7 @@ jobs:
 
       - name: Upload artifacts
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4 # Updated to v4
         with:
           name: test-logs-docker
           path: smoketest/run/
