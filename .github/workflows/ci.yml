@@ -64,7 +64,7 @@ jobs:
             scl enable gcc-toolset-9 -- "bash -c \"
               # Install dependencies using dnf/yum (for AlmaLinux)
               sudo dnf update -y
-              sudo dnf install -y libcap-devel util-linux gcc-toolset-9 make cargo glibc-devel libstdc++-devel
+              sudo dnf install -y libcap-devel util-linux gcc-toolset-9 make cargo glibc-devel libstdc++-devel scl-utils
               
               # Build steps
               make CC=${GCC_BIN}/gcc CXX=${GCC_BIN}/g++ ECHO=echo OMEGAJAIL_RELEASE=${GITHUB_SHA} all &&
