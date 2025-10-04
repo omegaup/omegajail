@@ -38,9 +38,10 @@ jobs:
 
       - name: Copy repo into VM
         run: |
-          limactl shell omegajail-vm -- mkdir -p ~/omegajail
-          # Use rsync to copy the repo into the VM, excluding unnecessary files
-          rsync -av --exclude='.git' ./ ~/omegajail/
+          # Use /tmp/omegajail, which is guaranteed to be writable inside the VM
+          limactl shell omegajail-vm -- mkdir -p /tmp/omegajail
+          # Copy files to the writable /tmp location
+          rsync -av --exclude='.git' ./ /tmp/omegajail/
 
       # ----------------------------------------------------------------------
       # RUN CI INSIDE UBUNTU 20.04 VM
@@ -49,7 +50,7 @@ jobs:
         run: |
           # Use limactl shell to execute all build/test commands inside the VM
           limactl shell omegajail-vm -- bash -c '
-            cd ~/omegajail &&
+            cd /tmp/omegajail &&
 
             # Install dependencies using apt-get (for Ubuntu)
             sudo apt-get update &&
@@ -76,8 +77,8 @@ jobs:
       # ----------------------------------------------------------------------
       - name: Retrieve artifacts from VM
         run: |
-          # Package test logs and copy them back to the host runner
-          limactl shell omegajail-vm -- tar czf /tmp/artifacts.tar.gz -C ~/omegajail smoketest/run
+          # Package test logs from the /tmp location and copy them back to the host runner
+          limactl shell omegajail-vm -- tar czf /tmp/artifacts.tar.gz -C /tmp/omegajail smoketest/run
           limactl copy omegajail-vm:/tmp/artifacts.tar.gz .
 
       - name: Upload artifacts
