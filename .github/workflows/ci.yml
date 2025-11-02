@@ -34,7 +34,7 @@ jobs:
         run: |
           sudo apt-get install -y docker.io
           # Add the current user to the docker group
-          sudo usermod -aG docker $USER
+          #sudo usermod -aG docker $USER
 
       - name: Build
         run: |
@@ -45,7 +45,7 @@ jobs:
         run: make test
 
       - name: Build rootfs
-        run: make OMEGAJAIL_RELEASE=${{ github.sha }} rootfs
+        run: sudo make OMEGAJAIL_RELEASE=${{ github.sha }} rootfs
 
       - name: Smoketest
         run: |
