@@ -30,6 +30,12 @@ jobs:
           # Add cargo to the GitHub Actions path for subsequent steps
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
+      - name: Install Docker
+        run: |
+          sudo apt-get install -y docker.io
+          # Add the current user to the docker group
+          sudo usermod -aG docker $USER
+
       - name: Build
         run: |
           make CXX=g++-9 ECHO=echo OMEGAJAIL_RELEASE=${{ github.sha }} all
