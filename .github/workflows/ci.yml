@@ -7,27 +7,16 @@ on:
       - main
 
 jobs:
+
   ci:
-    runs-on: self-hosted,cgroups-v1
+    runs-on: self-hosted
 
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0
-          
-  - name: Install dependencies
-    run: |
-      sudo apt-get update
-      # Install make, g++, and other C/C++ build tools
-      sudo apt-get install -y build-essential g++-9 libcap-dev util-linux curl
 
-  - name: Install Rust
-    run: |
-      # Install rustc and cargo
-      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-      # Add cargo to the GitHub Actions path for subsequent steps
-      echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - name: Install dependencies
         run: sudo apt-get install -y libcap-dev util-linux
 
@@ -36,7 +25,6 @@ jobs:
           make CXX=g++-9 ECHO=echo OMEGAJAIL_RELEASE=${{ github.sha }} all
           cargo build --bins
           cargo build --tests
-
       - name: Test
         run: make test
 
@@ -49,7 +37,6 @@ jobs:
           sudo chown $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
           sudo chgrp $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
           taskset 0x1 ./smoketest/test --root=./rootfs --strace --cgroup-path=/system.slice/omegaup-runner.service/omegajail
-
       - name: Upload artifacts
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
@@ -69,11 +56,9 @@ jobs:
       - name: Build container
         run: |
           make OMEGAJAIL_RELEASE=${{ github.sha }} .omegajail-builder-rootfs-runtime.stamp
-
       - name: Smoketest (Docker)
         run: |
           make OMEGAJAIL_RELEASE=${{ github.sha }} smoketest-docker
-
       - name: Upload artifacts
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
