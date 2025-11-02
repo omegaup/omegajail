@@ -18,7 +18,17 @@ jobs:
           fetch-depth: 0
 
       - name: Install dependencies
-        run: sudo apt-get install -y libcap-dev util-linux
+        run: |
+          sudo apt-get update
+          # Install make, g++, and other C/C++ build tools
+          sudo apt-get install -y build-essential g++-9 libcap-dev util-linux curl
+    
+      - name: Install Rust
+        run: |
+          # Install rustc and cargo
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          # Add cargo to the GitHub Actions path for subsequent steps
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Build
         run: |
