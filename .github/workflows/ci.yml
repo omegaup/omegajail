@@ -8,102 +8,49 @@ on:
 
 jobs:
 
-  ci-in-vm: # Renamed job to indicate it runs in a VM
-    runs-on: ubuntu-22.04 # Host runner remains on a supported version (22.04)
+  ci:
+    runs-on: self-hosted
 
     steps:
-      - uses: actions/checkout@v4 # Updated to latest version
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0
 
-      # ----------------------------------------------------------------------
-      # LIMA VM SETUP (AlmaLinux 8 Guest)
-      # ----------------------------------------------------------------------
-      - name: Setup Lima VM
-        uses: lima-vm/lima-actions/setup@v1
-        id: lima-actions-setup
+      - name: Install dependencies
+        run: sudo apt-get install -y libcap-dev util-linux
 
-      - name: Cache Lima VM
-        uses: actions/cache@v4 # Updated to latest version
-        with:
-          path: ~/.cache/lima
-          # --- UPDATED: Cache key now uses almalinux-8 ---
-          key: lima-almalinux-8-${{ steps.lima-actions-setup.outputs.version }}
-
-      - name: Start Lima VM (AlmaLinux 8, cgroups v1)
+      - name: Build
         run: |
-          # --- UPDATED: Use the template://almalinux-8 ---
-          limactl start --name=omegajail-vm --cpus=2 --memory=4 --containerd=none template://almalinux-8
+          make CXX=g++-9 ECHO=echo OMEGAJAIL_RELEASE=${{ github.sha }} all
+          cargo build --bins
+          cargo build --tests
 
-      - name: Copy repo into VM
+      - name: Test
+        run: make test
+
+      - name: Build rootfs
+        run: make OMEGAJAIL_RELEASE=${{ github.sha }} rootfs
+
+      - name: Smoketest
         run: |
-          # 1. Create the writable directory inside the VM
-          limactl shell omegajail-vm -- mkdir -p /tmp/omegajail
-          
-          # 2. Copy the contents of the *current host directory* to the *VM directory*
-          # Using the tarball method for reliable transfer
-          tar czf - . | limactl shell omegajail-vm -- tar xzf - -C /tmp/omegajail
-
-      # ----------------------------------------------------------------------
-      # RUN CI INSIDE ALMALINUX 8 VM
-      # ----------------------------------------------------------------------
-      - name: Run CI inside AlmaLinux 8 VM
-        run: |
-          # Use limactl shell to execute all build/test commands inside the VM
-          limactl shell omegajail-vm -- bash -c '
-            # Set the compiler path variables once
-            GCC_BIN=/opt/rh/gcc-toolset-9/root/usr/bin
-            
-            cd /tmp/omegajail &&
-
-            # Install dependencies. Use "scl enable" for a persistent environment.
-            # Running this entire block through "scl enable" ensures the PATH and LD_LIBRARY_PATH
-            # are correctly set for all subsequent commands (make, cargo, etc.).
-            
-            scl enable gcc-toolset-9 -- "bash -c \"
-              # Install dependencies using dnf/yum (for AlmaLinux)
-              sudo dnf update -y
-              sudo dnf install -y libcap-devel util-linux gcc-toolset-9 make cargo glibc-devel libstdc++-devel scl-utils
-              
-              # Build steps
-              make CC=${GCC_BIN}/gcc CXX=${GCC_BIN}/g++ ECHO=echo OMEGAJAIL_RELEASE=${GITHUB_SHA} all &&
-              cargo build --bins &&
-              cargo build --tests &&
-
-              # Test steps
-              make test &&
-              make OMEGAJAIL_RELEASE=${GITHUB_SHA} rootfs &&
-
-              # Smoketest (cgroups v1 setup)
-              sudo mkdir -p -m 0775 /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail &&
-              sudo chown \$(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail &&
-              sudo chgrp \$(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail &&
-              taskset 0x1 ./smoketest/test --root=./rootfs --strace --cgroup-path=/system.slice/omegaup-runner.service/omegajail
-            \""
-          '
-
-      # ----------------------------------------------------------------------
-      # ARTIFACT RETRIEVAL AND UPLOAD (Unchanged)
-      # ----------------------------------------------------------------------
-      - name: Retrieve artifacts from VM
-        run: |
-          # Package test logs from the /tmp location and copy them back to the host runner
-          limactl shell omegajail-vm -- tar czf /tmp/artifacts.tar.gz -C /tmp/omegajail smoketest/run
-          limactl copy omegajail-vm:/tmp/artifacts.tar.gz .
+          sudo mkdir -p -m 0775 /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
+          sudo chown $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
+          sudo chgrp $(whoami) /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
+          taskset 0x1 ./smoketest/test --root=./rootfs --strace --cgroup-path=/system.slice/omegaup-runner.service/omegajail
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4 # Updated to latest version
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
         with:
           name: test-logs
-          path: artifacts.tar.gz
+          path: smoketest/run/
 
-  # The Docker smoketest job is kept separate as it might not need Lima
   smoketest-docker:
-    runs-on: ubuntu-22.04 # Host runner remains on a supported version
+    runs-on: self-hosted
 
     steps:
-      - uses: actions/checkout@v4 # Updated to latest version
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0
@@ -118,7 +65,7 @@ jobs:
 
       - name: Upload artifacts
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4 # Updated to latest version
+        uses: actions/upload-artifact@v4
         with:
           name: test-logs-docker
           path: smoketest/run/
