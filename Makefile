@@ -85,7 +85,7 @@ smoketest: rootfs
 smoketest-docker: .omegajail-builder-rootfs-runtime-debug.stamp
 	docker run \
 		--rm \
-		--mount "type=bind,source=$(PWD)/smoketest,target=/src" \
+		--mount "type=bind,source=$(CURDIR)/smoketest,target=/src" \
 		--tmpfs "/home:mode=1777,uid=$(shell id -u),gid=$(shell id -g)" \
 		--user "$(shell id -u):$(shell id -g)" \
 		omegaup/omegajail-builder-rootfs-runtime-debug \
@@ -105,7 +105,7 @@ rootfs: .omegajail-builder-rootfs-runtime.stamp .omegajail-builder-rootfs-setup.
 	$(MAKE) DESTDIR=".$@.tmp" install || (sudo rm -rf ".$@.tmp" ; exit 1)
 	docker run \
 		--rm \
-		--mount "type=bind,source=${PWD}/.$@.tmp,target=/var/lib/omegajail" \
+		--mount "type=bind,source=${CURDIR}/.$@.tmp,target=/var/lib/omegajail" \
 		omegaup/omegajail-builder-rootfs-setup /src/mkroot --no-link && \
 	mv ".$@.tmp" "$@" || (sudo rm -rf ".$@.tmp" ; exit 1)
 
@@ -122,7 +122,7 @@ omegajail-focal-rootfs-x86_64.tar.xz: .omegajail-builder-rootfs-build.stamp
 	touch ".$@.tmp"
 	docker run \
 		--rm \
-		--mount "type=bind,source=${PWD}/.$@.tmp,target=/src/$@" \
+		--mount "type=bind,source=${CURDIR}/.$@.tmp,target=/src/$@" \
 		--env "XZ_DEFAULTS=-T 0" \
 		omegaup/omegajail-builder-rootfs-build \
 		/bin/tar cJf "/src/$@" \
@@ -144,7 +144,7 @@ omegajail-focal-distrib-x86_64.tar.xz: .omegajail-builder-distrib.stamp
 	touch ".$@.tmp"
 	docker run \
 		--rm \
-		--mount "type=bind,source=${PWD}/.$@.tmp,target=/src/$@" \
+		--mount "type=bind,source=${CURDIR}/.$@.tmp,target=/src/$@" \
 		--env "XZ_DEFAULTS=-T 0" \
 		omegaup/omegajail-builder-distrib \
 		/bin/tar cJf "/src/$@" \
