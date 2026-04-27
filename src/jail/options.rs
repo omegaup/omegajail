@@ -510,11 +510,10 @@ impl JailOptions {
                     ]);
                     execve_args.extend(compile_sources.iter().map(|s| s.clone()));
                 }
-                args::Language::KarelJava | args::Language::KarelPascal | args::Language::KarelRK => {
+                args::Language::KarelJava | args::Language::KarelPascal => {
                     seccomp_profile_name = String::from("js");
                     extra_memory_size_in_bytes = KAREL_EXTRA_MEMORY_SIZE_IN_BYTES;
                     vm_memory_size_in_bytes = KAREL_VM_MEMORY_SIZE_IN_BYTES;
-                    // Using Rekarel CLI with correct syntax via wrapper
                     execve_args.extend([
                         String::from("/opt/nodejs/karel.wasm"),
                         String::from("compile"),
@@ -522,9 +521,21 @@ impl JailOptions {
                         String::from(match lang {
                             args::Language::KarelJava => "java",
                             args::Language::KarelPascal => "pascal",
-                            args::Language::KarelRK => "java", // Por defecto usamos java para .rk
                             _ => panic!("unreachable"),
                         }),
+                        String::from("-o"),
+                        String::from("Main.kx"),
+                    ]);
+                    execve_args.extend(compile_sources.iter().map(|s| s.clone()));
+                }
+                args::Language::KarelRK => {
+                    seccomp_profile_name = String::from("js");
+                    extra_memory_size_in_bytes = KAREL_EXTRA_MEMORY_SIZE_IN_BYTES;
+                    vm_memory_size_in_bytes = KAREL_VM_MEMORY_SIZE_IN_BYTES;
+                    // ReKarel auto-detecta el lenguaje, no necesita -l
+                    execve_args.extend([
+                        String::from("/opt/nodejs/karel.wasm"),
+                        String::from("compile"),
                         String::from("-o"),
                         String::from("Main.kx"),
                     ]);
@@ -705,7 +716,7 @@ impl JailOptions {
                         format!("{}.js", &args.run_target),
                     ]);
                 }
-                args::Language::KarelPascal | args::Language::KarelJava | args::Language::KarelRK => {
+                args::Language::KarelPascal | args::Language::KarelJava => {
                     seccomp_profile_name = String::from("karel");
                     extra_memory_size_in_bytes = KAREL_EXTRA_MEMORY_SIZE_IN_BYTES;
                     vm_memory_size_in_bytes = KAREL_VM_MEMORY_SIZE_IN_BYTES;
@@ -723,6 +734,15 @@ impl JailOptions {
                         String::from("/dev/stdin"),
                         String::from("-o"),
                         String::from("/dev/stdout"),
+                        String::from("Main.kx"),
+                    ]);
+                }
+                args::Language::KarelRK => {
+                    seccomp_profile_name = String::from("karel");
+                    extra_memory_size_in_bytes = KAREL_EXTRA_MEMORY_SIZE_IN_BYTES;
+                    vm_memory_size_in_bytes = KAREL_VM_MEMORY_SIZE_IN_BYTES;
+                    execve_args.extend([
+                        String::from("/usr/local/bin/karel"),
                         String::from("Main.kx"),
                     ]);
                 }

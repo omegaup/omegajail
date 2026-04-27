@@ -90,6 +90,10 @@ RUN ls -l /usr/bin/ | grep -- '[^0] ->.*-10$' | sed -e 's@^.* \(.\+\) -> \(.\+\)
     chmod +x /usr/bin/rekarel-wrapper.js && \
     cp /usr/bin/rekarel-wrapper.js /opt/nodejs/karel.wasm && \
     chmod +x /opt/nodejs/karel.wasm && \
+    git clone --depth=1 https://github.com/kishtarn555/rekarel-cpp-interpreter /tmp/rekarel-cpp && \
+    make -C /tmp/rekarel-cpp && \
+    install -m 755 /tmp/rekarel-cpp/karel /usr/local/bin/karel && \
+    rm -rf /tmp/rekarel-cpp && \
     ln -sf /opt/nodejs/bin/node /usr/bin/node && \
     wget https://raw.githubusercontent.com/omegaup/libkarel/v1.1.2/libkarel/libkarel.py \
         -O /usr/lib/python2.7/libkarel.py && \

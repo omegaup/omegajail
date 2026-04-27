@@ -491,6 +491,8 @@ def _main() -> None:
         root.mkdir('/tmp/')
 
         root.symlink('/usr/bin/lua', 'lua5.3')
+        # ReKarel C++ interpreter
+        root.copyfromhost('/usr/local/bin/karel')
 
     with Chroot(
             os.path.join(args.target, 'root-compilers'), '/',
