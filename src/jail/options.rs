@@ -15,6 +15,7 @@ const DEFAULT_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 16 * 1024 * 1024;
 const RUBY_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 56 * 1024 * 1024;
 const GO_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 512 * 1024 * 1024;
 const NODE_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 89 * 1024 * 1024;
+const KAREL_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 150 * 1024 * 1024;
 
 // These are obtained by running an "empty" and measuring
 // its memory consumption, as reported by omegajail.
@@ -22,6 +23,7 @@ const JAVA_VM_MEMORY_SIZE_IN_BYTES: u64 = 47 * 1024 * 1024;
 const CLR_VM_MEMORY_SIZE_IN_BYTES: u64 = 20 * 1024 * 1024;
 const RUBY_VM_MEMORY_SIZE_IN_BYTES: u64 = 12 * 1024 * 1024;
 const NODE_VM_MEMORY_SIZE_IN_BYTES: u64 = 31 * 1024 * 1024;
+const KAREL_VM_MEMORY_SIZE_IN_BYTES: u64 = 64 * 1024 * 1024;
 
 // This is the result of executing the following Java code:
 //
@@ -38,6 +40,7 @@ const JAVA_MIN_HEAP_SIZE_IN_BYTES: u64 = 18 * 1024 * 1024;
 
 pub(crate) enum Stdio {
     Mounted(PathBuf),
+    #[allow(dead_code)]
     DevNull(PathBuf),
     FileDescriptor(RawFd),
 }
@@ -84,7 +87,13 @@ impl JailOptions {
         );
         let mut mounts = Vec::<MountArgs>::new();
         let rootfs = if args.compile.is_some() {
-            root.join("root-compilers")
+            match args.compile {
+                Some(args::Language::KarelJava) | Some(args::Language::KarelPascal) | Some(args::Language::KarelRK) => {
+                    // Karel needs the full rootfs due to Node.js dependencies
+                    root.join("root")
+                }
+                _ => root.join("root-compilers")
+            }
         } else {
             root.join("root")
         };
@@ -207,7 +216,7 @@ impl JailOptions {
         };
 
         let mut execve_args = Vec::<String>::new();
-        let mut env: Vec<&str> = vec!["HOME=/home", "LANG=en_US.UTF-8", "PATH=/usr/bin"];
+        let env: Vec<&str> = vec!["HOME=/home", "LANG=en_US.UTF-8", "PATH=/usr/bin"];
         let mut seccomp_profile_name = String::new();
         let mut extra_memory_size_in_bytes = DEFAULT_EXTRA_MEMORY_SIZE_IN_BYTES;
         let mut vm_memory_size_in_bytes = 0u64;
@@ -221,7 +230,7 @@ impl JailOptions {
                 args::Language::C | args::Language::C11GCC => {
                     seccomp_profile_name = String::from("gcc");
                     execve_args.extend([
-                        String::from("/usr/bin/gcc-10"),
+                        String::from("/usr/bin/gcc-11"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c11"),
@@ -233,7 +242,7 @@ impl JailOptions {
                 args::Language::C11Clang => {
                     seccomp_profile_name = String::from("clang");
                     execve_args.extend([
-                        String::from("/usr/bin/clang-10"),
+                        String::from("/usr/bin/clang-14"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c11"),
@@ -246,7 +255,7 @@ impl JailOptions {
                 args::Language::Cpp03GCC => {
                     seccomp_profile_name = String::from("gcc");
                     execve_args.extend([
-                        String::from("/usr/bin/g++-10"),
+                        String::from("/usr/bin/g++-11"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++03"),
@@ -258,7 +267,7 @@ impl JailOptions {
                 args::Language::Cpp03Clang => {
                     seccomp_profile_name = String::from("clang");
                     execve_args.extend([
-                        String::from("/usr/bin/clang++-10"),
+                        String::from("/usr/bin/clang++-14"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++03"),
@@ -270,7 +279,7 @@ impl JailOptions {
                 args::Language::Cpp | args::Language::Cpp11 | args::Language::Cpp11GCC => {
                     seccomp_profile_name = String::from("gcc");
                     execve_args.extend([
-                        String::from("/usr/bin/g++-10"),
+                        String::from("/usr/bin/g++-11"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++11"),
@@ -282,7 +291,7 @@ impl JailOptions {
                 args::Language::Cpp11Clang => {
                     seccomp_profile_name = String::from("clang");
                     execve_args.extend([
-                        String::from("/usr/bin/clang++-10"),
+                        String::from("/usr/bin/clang++-14"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++11"),
@@ -294,7 +303,7 @@ impl JailOptions {
                 args::Language::Cpp17GCC => {
                     seccomp_profile_name = String::from("gcc");
                     execve_args.extend([
-                        String::from("/usr/bin/g++-10"),
+                        String::from("/usr/bin/g++-11"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++17"),
@@ -306,7 +315,7 @@ impl JailOptions {
                 args::Language::Cpp17Clang => {
                     seccomp_profile_name = String::from("clang");
                     execve_args.extend([
-                        String::from("/usr/bin/clang++-10"),
+                        String::from("/usr/bin/clang++-14"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++17"),
@@ -318,7 +327,7 @@ impl JailOptions {
                 args::Language::Cpp20GCC => {
                     seccomp_profile_name = String::from("gcc");
                     execve_args.extend([
-                        String::from("/usr/bin/g++-10"),
+                        String::from("/usr/bin/g++-11"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++20"),
@@ -330,7 +339,7 @@ impl JailOptions {
                 args::Language::Cpp20Clang => {
                     seccomp_profile_name = String::from("clang");
                     execve_args.extend([
-                        String::from("/usr/bin/clang++-10"),
+                        String::from("/usr/bin/clang++-14"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++20"),
@@ -432,7 +441,7 @@ impl JailOptions {
                         data: None,
                     });
                     execve_args.extend([
-                        String::from("/usr/bin/python3.9"),
+                        String::from("/usr/bin/python3.10"),
                         String::from("-m"),
                         String::from("py_compile"),
                     ]);
@@ -503,59 +512,63 @@ impl JailOptions {
                 }
                 args::Language::KarelJava | args::Language::KarelPascal => {
                     seccomp_profile_name = String::from("js");
-                    extra_memory_size_in_bytes = NODE_EXTRA_MEMORY_SIZE_IN_BYTES;
-                    vm_memory_size_in_bytes = NODE_VM_MEMORY_SIZE_IN_BYTES;
-                    mounts.push(MountArgs {
-                        source: Some(root.join("root-js")),
-                        target: rootfs.join("opt/nodejs"),
-                        fstype: None,
-                        flags: MsFlags::MS_BIND | MsFlags::MS_RDONLY,
-                        data: None,
-                    });
+                    extra_memory_size_in_bytes = KAREL_EXTRA_MEMORY_SIZE_IN_BYTES;
+                    vm_memory_size_in_bytes = KAREL_VM_MEMORY_SIZE_IN_BYTES;
                     execve_args.extend([
-                        String::from("/opt/nodejs/bin/node"),
-                        String::from("/opt/nodejs/karel.js"),
+                        String::from("/opt/nodejs/karel.wasm"),
                         String::from("compile"),
+                        String::from("-l"),
                         String::from(match lang {
                             args::Language::KarelJava => "java",
                             args::Language::KarelPascal => "pascal",
                             _ => panic!("unreachable"),
                         }),
                         String::from("-o"),
-                        format!("{}.kx", &args.compile_target),
+                        String::from("Main.kx"),
+                    ]);
+                    execve_args.extend(compile_sources.iter().map(|s| s.clone()));
+                }
+                args::Language::KarelRK => {
+                    seccomp_profile_name = String::from("js");
+                    extra_memory_size_in_bytes = KAREL_EXTRA_MEMORY_SIZE_IN_BYTES;
+                    vm_memory_size_in_bytes = KAREL_VM_MEMORY_SIZE_IN_BYTES;
+                    // ReKarel auto-detecta el lenguaje, no necesita -l
+                    execve_args.extend([
+                        String::from("/opt/nodejs/karel.wasm"),
+                        String::from("compile"),
+                        String::from("-o"),
+                        String::from("Main.kx"),
                     ]);
                     execve_args.extend(compile_sources.iter().map(|s| s.clone()));
                 }
                 args::Language::CSharp => {
                     seccomp_profile_name = String::from("csc");
                     mounts.push(MountArgs {
-                        source: Some(root.join("root-dotnet")),
-                        target: rootfs.join("usr/share/dotnet"),
+                        source: Some(PathBuf::from("/usr/bin/mono")),
+                        target: rootfs.join("usr/bin/mono"),
+                        fstype: None,
+                        flags: MsFlags::MS_BIND | MsFlags::MS_RDONLY,
+                        data: None,
+                    });
+                    mounts.push(MountArgs {
+                        source: Some(PathBuf::from("/usr/bin/mcs")),
+                        target: rootfs.join("usr/bin/mcs"),
+                        fstype: None,
+                        flags: MsFlags::MS_BIND | MsFlags::MS_RDONLY,
+                        data: None,
+                    });
+                    mounts.push(MountArgs {
+                        source: Some(PathBuf::from("/usr/lib/mono")),
+                        target: rootfs.join("usr/lib/mono"),
                         fstype: None,
                         flags: MsFlags::MS_BIND | MsFlags::MS_RDONLY,
                         data: None,
                     });
                     execve_args.extend([
-                        String::from("/usr/share/dotnet/dotnet"),
-                        String::from("/usr/share/dotnet/sdk/6.0.101/Roslyn/bincore/csc.dll"),
-                        String::from("-noconfig"),
-                        String::from("@/usr/share/dotnet/Release.rsp"),
-                        format!(
-                            "-out:{}.dll",
-                            PathBuf::from(
-                                compile_sources
-                                    .first()
-                                    .ok_or(anyhow!("empty --compile-source"))?
-                            )
-                            .parent()
-                            .context("invalid --compile-source")?
-                            .join(args.compile_target.clone())
-                            .to_str()
-                            .ok_or(anyhow!("could not convert path to string"))?,
-                        ),
-                        String::from("-target:exe"),
+                        String::from("/usr/bin/mcs"),
+                        String::from("-out:Main.exe"),
+                        format!("{}", compile_sources.first().unwrap().to_string()),
                     ]);
-                    execve_args.extend(compile_sources.iter().map(|s| s.clone()));
                 }
             }
         } else if let Some(lang) = args.run {
@@ -612,7 +625,7 @@ impl JailOptions {
                     execve_args.extend([
                         String::from("/usr/bin/java"),
                         String::from("-Xshare:on"),
-                        String::from("-XX:+UnlockExperimentalVMOptions"),
+                        // String::from("-XX:+UnlockExperimentalVMOptions"), // Removed as it's for AOT features
                         String::from("-XX:+UseSerialGC"),
                     ]);
                     if let Some(memory_limit) = &args.memory_limit {
@@ -623,18 +636,12 @@ impl JailOptions {
                     }
                     if lang == args::Language::Kotlin {
                         execve_args.extend([
-                            format!("-XX:AOTLibrary=/usr/lib/jvm/java.base.so,/usr/lib/jvm/kotlin-stdlib.jar.so,./{}.so",
-                       args.run_target),
                             String::from("-cp"),
                             String::from("/usr/lib/jvm/kotlinc/lib/kotlin-stdlib.jar:."),
                             format!("{}Kt", &args.run_target),
                         ]);
                     } else {
                         execve_args.extend([
-                            format!(
-                                "-XX:AOTLibrary=/usr/lib/jvm/java.base.so,./{}.so",
-                                args.run_target,
-                            ),
                             args.run_target.clone(),
                         ]);
                     }
@@ -663,7 +670,7 @@ impl JailOptions {
                         data: None,
                     });
                     execve_args.extend([
-                        String::from("/usr/bin/python3.9"),
+                        String::from("/usr/bin/python3.10"),
                         format!("{}.py", args.run_target),
                     ]);
                 }
@@ -711,6 +718,8 @@ impl JailOptions {
                 }
                 args::Language::KarelPascal | args::Language::KarelJava => {
                     seccomp_profile_name = String::from("karel");
+                    extra_memory_size_in_bytes = KAREL_EXTRA_MEMORY_SIZE_IN_BYTES;
+                    vm_memory_size_in_bytes = KAREL_VM_MEMORY_SIZE_IN_BYTES;
                     mounts.push(MountArgs {
                         source: Some(root.join("root-js")),
                         target: rootfs.join("opt/nodejs"),
@@ -720,7 +729,21 @@ impl JailOptions {
                     });
                     execve_args.extend([
                         String::from("/opt/nodejs/karel.wasm"),
-                        String::from(format!("{}.kx", &args.run_target)),
+                        String::from("run"),
+                        String::from("-i"),
+                        String::from("/dev/stdin"),
+                        String::from("-o"),
+                        String::from("/dev/stdout"),
+                        String::from("Main.kx"),
+                    ]);
+                }
+                args::Language::KarelRK => {
+                    seccomp_profile_name = String::from("karel");
+                    extra_memory_size_in_bytes = KAREL_EXTRA_MEMORY_SIZE_IN_BYTES;
+                    vm_memory_size_in_bytes = KAREL_VM_MEMORY_SIZE_IN_BYTES;
+                    execve_args.extend([
+                        String::from("/usr/local/bin/karel"),
+                        String::from("Main.kx"),
                     ]);
                 }
                 args::Language::CSharp => {
@@ -729,17 +752,23 @@ impl JailOptions {
                     vm_memory_size_in_bytes = CLR_VM_MEMORY_SIZE_IN_BYTES;
                     seccomp_profile_name = String::from("cs");
                     mounts.push(MountArgs {
-                        source: Some(root.join("root-dotnet")),
-                        target: rootfs.join("usr/share/dotnet"),
+                        source: Some(PathBuf::from("/usr/bin/mono")),
+                        target: rootfs.join("usr/bin/mono"),
+                        fstype: None,
+                        flags: MsFlags::MS_BIND | MsFlags::MS_RDONLY,
+                        data: None,
+                    });
+                    mounts.push(MountArgs {
+                        source: Some(PathBuf::from("/usr/lib/mono")),
+                        target: rootfs.join("usr/lib/mono"),
                         fstype: None,
                         flags: MsFlags::MS_BIND | MsFlags::MS_RDONLY,
                         data: None,
                     });
                     execve_args.extend([
-                        String::from("/usr/share/dotnet/dotnet"),
-                        format!("{}.dll", &args.run_target),
+                        String::from("/usr/bin/mono"),
+                        format!("{}.exe", &args.run_target),
                     ]);
-                    env.push("DOTNET_CLI_TELEMETRY_OPTOUT=1");
                 }
             }
         }

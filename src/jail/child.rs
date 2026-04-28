@@ -106,6 +106,20 @@ fn setup_signal_handlers() -> Result<()> {
 }
 
 fn setup_seccomp_bpf(child_sock: &mut UnixStream, opts: &JailOptions) -> Result<()> {
+    // Use SIGSYS fallback if explicitly enabled
+    if opts.allow_sigsys_fallback {
+        seccomp_set_mode_filter(&opts.seccomp_bpf_filter_sigsys_contents)
+            .context("seccomp_set_mode_filter")?;
+        write_message(
+            child_sock,
+            SendSeccompFDEvent {
+                fd_available: false,
+            },
+        )
+        .context("write parent setup done event")?;
+        return Ok(());
+    }
+
     match seccomp_set_mode_filter_with_listener(&opts.seccomp_bpf_filter_notify_contents) {
         Ok(fd) => {
             let write_message_result =

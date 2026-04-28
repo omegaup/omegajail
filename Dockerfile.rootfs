@@ -1,4 +1,4 @@
-FROM ubuntu:focal AS setup
+FROM ubuntu:jammy AS setup
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update -y && \
@@ -8,28 +8,21 @@ RUN apt-get update -y && \
     apt-get autoremove -y && \
     apt-get clean
 
-RUN wget https://packages.microsoft.com/config/ubuntu/20.04/packages-microsoft-prod.deb \
+RUN wget https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb \
       -O packages-microsoft-prod.deb && \
     dpkg -i packages-microsoft-prod.deb && \
     rm packages-microsoft-prod.deb
 
 RUN apt-get update -y && \
     apt-get install --no-install-recommends -y \
-      aspnetcore-runtime-6.0=6.0.1-1 \
-      aspnetcore-targeting-pack-6.0=6.0.0-1 \
-      clang-10 \
-      dotnet-host=6.0.1-1 \
-      dotnet-hostfxr-6.0=6.0.1-1 \
-      dotnet-runtime-6.0=6.0.1-1 \
-      dotnet-runtime-deps-6.0=6.0.1-1 \
-      dotnet-sdk-6.0=6.0.101-1 \
-      dotnet-targeting-pack-6.0=6.0.1-1 \
-      fp-compiler-3.0.4 \
-      fp-units-fcl-3.0.4 \
-      g++-10 \
-      gcc-10 \
+      clang-14 \
+      fp-compiler-3.2.2 \
+      fp-units-fcl-3.2.2 \
+      g++-11 \
+      gcc-11 \
       ghc \
       git \
+      libexpat1-dev \
       libc6-dev \
       libcap-dev \
       libcap2 \
@@ -37,23 +30,40 @@ RUN apt-get update -y && \
       locales \
       lua5.3 \
       make \
-      openjdk-16-jdk \
-      openjdk-16-jdk-headless \
-      openjdk-16-jre \
-      openjdk-16-jre-headless \
       python2.7 \
       python3-apt \
       python3-pip \
-      python3.9 \
-      ruby2.7 \
+      python3 \
+      ruby \
       unzip \
       xz-utils \
       zlib1g-dev \
+      tzdata \
+      && \
+    apt-get autoremove -y && \
+    apt-get clean && \
+    ln -sf /usr/share/zoneinfo/UTC /etc/localtime && \
+    dpkg-reconfigure -f noninteractive tzdata
+
+RUN apt-get update -y && \
+    apt-get install --no-install-recommends -y \
+      openjdk-17-jdk \
+      openjdk-17-jdk-headless \
+      openjdk-17-jre \
+      openjdk-17-jre-headless \
       && \
     apt-get autoremove -y && \
     apt-get clean
 
-RUN ls -l /usr/bin/ | grep -- '[^9] ->.*-9$' | sed -e 's@^.* \(.\+\) -> \(.\+\)-9$@ln -sf \2-10 /usr/bin/\1@' | bash && \
+RUN apt-get update -y && \
+    apt-get install --no-install-recommends -y \
+      dotnet-sdk-7.0 \
+      mono-complete \
+      && \
+    apt-get autoremove -y && \
+    apt-get clean
+
+RUN ls -l /usr/bin/ | grep -- '[^0] ->.*-10$' | sed -e 's@^.* \(.\+\) -> \(.\+\)-10$@ln -sf \2-11 /usr/bin/\1@' | bash && \
     mkdir -p /opt/nodejs && \
     wget https://nodejs.org/dist/v16.13.1/node-v16.13.1-linux-x64.tar.xz \
         -O - | tar -xJ -C /opt/nodejs --strip-components=1 && \
@@ -70,15 +80,29 @@ RUN ls -l /usr/bin/ | grep -- '[^9] ->.*-9$' | sed -e 's@^.* \(.\+\) -> \(.\+\)-
         chmod +x /tmp/rustup-init && \
         RUSTUP_HOME=/opt/rust/rustup CARGO_HOME=/opt/rust/cargo /tmp/rustup-init --no-modify-path --default-host=x86_64-unknown-linux-gnu --default-toolchain=stable --profile=default -y --quiet && \
         rm /tmp/rustup-init && \
-    wget https://github.com/omegaup/karel.js/releases/download/v0.2.1/karel \
-        -O /opt/nodejs/karel.wasm && \
-    wget https://github.com/omegaup/karel.js/releases/download/v0.2.1/karel.js \
-        -O /opt/nodejs/karel.js && \
-    chmod +x /opt/nodejs/karel.wasm /opt/nodejs/karel.js && \
-    wget https://raw.githubusercontent.com/omegaup/libkarel/v0.0.99/libkarel.py \
+    wget https://github.com/kishtarn555/rekarel-cli/releases/download/2.3.2/commands.min.cjs \
+        -O /opt/nodejs/commands.min.cjs && \
+    echo '#!/usr/bin/env node' > /opt/nodejs/karel && \
+    echo 'require("./commands.min.cjs");' >> /opt/nodejs/karel && \
+    chmod +x /opt/nodejs/karel /opt/nodejs/commands.min.cjs && \
+    mkdir -p /usr/bin && \
+    echo '#!/bin/bash' > /usr/bin/rekarel-wrapper.js && \
+    echo 'exec /opt/nodejs/bin/node /opt/nodejs/commands.min.cjs "$@"' >> /usr/bin/rekarel-wrapper.js && \
+    chmod +x /usr/bin/rekarel-wrapper.js && \
+    cp /usr/bin/rekarel-wrapper.js /opt/nodejs/karel.wasm && \
+    chmod +x /opt/nodejs/karel.wasm && \
+    git clone --depth=1 https://github.com/kishtarn555/rekarel-cpp-interpreter /tmp/rekarel-cpp && \
+    mkdir -p /tmp/rekarel-cpp/bin && \
+    ln -sf /usr/bin/g++-11 /usr/local/bin/g++ && \
+    make -C /tmp/rekarel-cpp karel && \
+    install -m 755 /tmp/rekarel-cpp/bin/karel /usr/local/bin/karel && \
+    rm -f /usr/local/bin/g++ && \
+    rm -rf /tmp/rekarel-cpp && \
+    ln -sf /opt/nodejs/bin/node /usr/bin/node && \
+    wget https://raw.githubusercontent.com/omegaup/libkarel/v1.1.2/libkarel/libkarel.py \
         -O /usr/lib/python2.7/libkarel.py && \
-    python3.9 -m pip install --target=/usr/lib/python3/dist-packages \
-        libkarel==1.0.2 omegaup==1.5.4 parsy==1.4.0
+    python3 -m pip install --target=/usr/lib/python3/dist-packages \
+        libkarel==1.1.2 omegaup==2.0.18 parsy==1.4.0
 
 RUN mkdir /src
 WORKDIR /src
@@ -93,21 +117,15 @@ FROM setup AS runtime
 RUN wget --quiet https://github.com/omegaup/libinteractive/releases/download/v2.0.29/libinteractive.jar \
     -O /usr/share/java/libinteractive.jar
 
-RUN ln -s /opt/nodejs/bin/node /usr/bin/node && \
-    ln -s /opt/nodejs/lib/node_modules /usr/lib/node_modules && \
-    ln -s /opt/rust/rustup /etc/rustup && \
+RUN if [ ! -e /usr/bin/node ]; then ln -s /opt/nodejs/bin/node /usr/bin/node; fi && \
+    if [ ! -e /usr/lib/node_modules ]; then ln -s /opt/nodejs/lib/node_modules /usr/lib/node_modules; fi && \
+    if [ ! -e /etc/rustup ]; then ln -s /opt/rust/rustup /etc/rustup; fi && \
     mkdir -p /var/lib/omegajail/root/dev/ && \
     cp /dev/null /var/lib/omegajail/root/dev/null
 
 COPY --from=rootfs-build \
-         /var/lib/omegajail/root-java/java-16-openjdk-amd64/lib/server/classes.jsa \
-         /usr/lib/jvm/java-16-openjdk-amd64/lib/server/classes.jsa
-COPY --from=rootfs-build \
-         /var/lib/omegajail/root-java/java.base.so \
-         /usr/lib/jvm/java.base.so
-COPY --from=rootfs-build \
-         /var/lib/omegajail/root-java/kotlin-stdlib.jar.so \
-         /usr/lib/jvm/kotlin-stdlib.jar.so
+         /var/lib/omegajail/root-java/java-17-openjdk-amd64/lib/server/classes.jsa \
+         /usr/lib/jvm/java-17-openjdk-amd64/lib/server/classes.jsa
 COPY --from=rootfs-build \
          /var/lib/omegajail/root-dotnet/Main.runtimeconfig.json \
          /var/lib/omegajail/root-dotnet/Release.rsp \
@@ -115,6 +133,9 @@ COPY --from=rootfs-build \
 COPY --from=rootfs-build \
          /var/lib/omegajail/root-compilers/rust-toolchain.toml \
          /rust-toolchain.toml
+COPY --from=rootfs-build \
+         /var/lib/omegajail/root-js \
+         /var/lib/omegajail/root-js
 
 COPY --from=omegaup/omegajail-builder-distrib /var/lib/omegajail/ /var/lib/omegajail
 RUN mv /var/lib/omegajail/bin/omegajail /var/lib/omegajail/bin/omegajail.wrapped

@@ -40,6 +40,7 @@ _LANGUAGES = [
     'js',
     'kj',
     'kp',
+    'rk',
     'cs',
 ]
 _EXTENSIONS = {
@@ -57,7 +58,7 @@ _EXTENSIONS = {
     'py2': 'py',
     'py3': 'py',
 }
-_KAREL_LANGUAGES = set(['kj', 'kp'])
+_KAREL_LANGUAGES = set(['kj', 'kp', 'rk'])
 _PWD = os.path.abspath(os.path.dirname(__file__))
 
 
@@ -82,12 +83,21 @@ def _omegajail_compile(
     lang_dir = os.path.join(_PWD, 'run', lang)
     if os.path.isdir(lang_dir):
         shutil.rmtree(lang_dir, True)
-    os.makedirs(lang_dir)
+    os.makedirs(lang_dir, exist_ok=True)
     target = 'Main'
     source = '{}.{}'.format(target, _EXTENSIONS.get(lang, lang))
+    dest = os.path.join(lang_dir, source)
+    if os.path.exists(dest):
+        os.remove(dest)
     os.link(
         os.path.join(_PWD, 'sumas.{}'.format(lang)),
-        os.path.join(lang_dir, source))
+        dest)
+    if lang == 'cs':
+        csproj_dest = os.path.join(lang_dir, 'Main.csproj')
+        if os.path.exists(os.path.join(_PWD, 'Main.csproj')):
+            if os.path.exists(csproj_dest):
+                os.remove(csproj_dest)
+            os.link(os.path.join(_PWD, 'Main.csproj'), csproj_dest)
     if strace:
         args = [
             'strace', '-f', '-o',
@@ -122,9 +132,6 @@ def _omegajail_compile(
         '--cgroup-path',
         cgroup_path,
     ]
-    if lang == 'cs':
-        os.symlink('/usr/share/dotnet/Main.runtimeconfig.json',
-                   os.path.join(lang_dir, 'Main.runtimeconfig.json'))
     return _check_call(args)
 
 
@@ -187,6 +194,10 @@ def _omegajail_run(
 
 
 def _main() -> None:
+    # Clean the 'run' directory before starting tests to avoid permission issues and leftover files
+    run_dir = os.path.join(_PWD, 'run')
+    if os.path.isdir(run_dir):
+        shutil.rmtree(run_dir, True)
     parser = argparse.ArgumentParser()
     parser.add_argument('--languages', type=str)
     parser.add_argument('--strace', action='store_true')
@@ -208,9 +219,6 @@ def _main() -> None:
                                  'cgroup.subtree_control'), 'w') as f:
                 f.write('+memory')
             os.makedirs(smoketest_cgroup, exist_ok=True)
-            with open(os.path.join(smoketest_cgroup, 'cgroup.controllers'),
-                      'w') as f:
-                f.write('+memory')
         with open(os.path.join(smoketest_cgroup, 'cgroup.procs'), 'w') as f:
             f.write(str(os.getpid()))
 
