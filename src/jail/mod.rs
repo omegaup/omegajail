@@ -305,7 +305,6 @@ mod tests {
     use std::ffi::CString;
     use std::fs::{create_dir, read_to_string, write, File};
     use std::path::PathBuf;
-    use std::env;
     use std::process::Command;
     use std::time::Duration;
 
@@ -491,8 +490,8 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "Test freezes in CI - cgroups v2 incompatibility"]
     fn test_oom() -> Result<()> {
-        if should_skip_problematic_tests() { return Ok(()); }
         init();
         let result = run_test_case(TestCase {
             widget: "oom",
@@ -533,8 +532,8 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "Test freezes in CI - cgroups v2 incompatibility"]
     fn test_sigxcpu() -> Result<()> {
-        if should_skip_problematic_tests() { return Ok(()); }
         init();
         let result = run_test_case(TestCase {
             widget: "sigxcpu",
@@ -552,8 +551,8 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "Test freezes in CI - cgroups v2 incompatibility"]
     fn test_sleep() -> Result<()> {
-        if should_skip_problematic_tests() { return Ok(()); }
         init();
         let result = run_test_case(TestCase {
             widget: "sleep",
