@@ -37,7 +37,7 @@ jobs:
       - name: Smoketest
         run: |
           # Configure cgroups (v2 or v1 depending on availability)
-          if [ -d "/sys/fs/cgroup/cgroup.controllers" ]; then
+          if [ -f "/sys/fs/cgroup/cgroup.controllers" ]; then
             # Configuration for cgroups v2
             sudo mkdir -p /sys/fs/cgroup/omegajail
             echo "+memory +pids +cpu" | sudo tee /sys/fs/cgroup/cgroup.subtree_control || true
