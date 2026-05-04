@@ -12,15 +12,26 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
+      - name: Free disk space
+        if: always()
+        run: |
+          # Remove unnecessary pre-installed software on GitHub runners
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
+          sudo docker system prune -af || true
+          df -h
+
       - uses: actions/checkout@v5
         with:
           submodules: recursive
-          fetch-depth: 0
+          fetch-depth: 1  # Reduced from 0 to save space (only fetch latest commit)
 
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libcap-dev util-linux
+          # Clean up apt cache to free space
+          sudo apt-get clean
+          sudo rm -rf /var/lib/apt/lists/*
 
       - name: Build
         run: |
@@ -30,6 +41,15 @@ jobs:
 
       - name: Test
         run: make test
+      
+      - name: Clean build artifacts
+        if: always()
+        run: |
+          # Remove cargo build artifacts to free space
+          cargo clean || true
+          # Clean any intermediate object files
+          make clean || true
+          df -h
 
       - name: Build rootfs
         run: make OMEGAJAIL_RELEASE=${{ github.sha }} rootfs
@@ -62,9 +82,30 @@ jobs:
           name: test-logs
           path: smoketest/run/
           if-no-files-found: ignore
+          retention-days: 7  # Auto-delete artifacts after 7 days
 
-  smoketest-docker:
-    runs-on: ubuntu-22.04
+      - name: Final cleanup
+        if: always()
+        run: |
+        name: Free disk space
+        if: always()
+        run: |
+          # Remove unnecessary pre-installed software
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
+          # Clean up any existing Docker resources
+          sudo docker system prune -af --volumes || true
+          df -h
+
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+          fetch-depth: 1  # Reduced from 0 to save space
+
+      - name: Build container
+        run: |
+          make OMEGAJAIL_RELEASE=${{ github.sha }} .omegajail-builder-rootfs-runtime.stamp
+          # Remove intermediate build layers to save space
+          docker image prune -f || true
 
     steps:
       - uses: actions/checkout@v5
@@ -87,7 +128,17 @@ jobs:
             --rm \
             --mount "type=bind,source=$(pwd)/smoketest,target=/src" \
             --tmpfs "/home:mode=1777,uid=$(id -u),gid=$(id -g)" \
-            --user "$(id -u):$(id -g)" \
+            --user "$(id -u):$(id -
+          retention-days: 7  # Auto-delete artifacts after 7 days
+
+      - name: Final cleanup
+        if: always()
+        run: |
+          # Aggressive Docker cleanup
+          sudo docker system prune -af --volumes || true
+          # Remove build artifacts
+          sudo rm -rf ./smoketest/run || true
+          df -hg)" \
             omegaup/omegajail-builder-rootfs-runtime-debug \
             /usr/bin/python3 /src/test || \
            echo "Some Docker tests failed, but continuing workflow..." && true)
