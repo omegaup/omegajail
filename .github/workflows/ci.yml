@@ -13,11 +13,11 @@ jobs:
 
     steps:
       - name: Free disk space
-        if: always()
         run: |
           # Remove unnecessary pre-installed software on GitHub runners
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
-          sudo docker system prune -af || true
+          # Clean up old Docker images but keep layers that might be useful
+          sudo docker image prune -f || true
           df -h
 
       - uses: actions/checkout@v5
@@ -98,12 +98,11 @@ jobs:
 
     steps:
       - name: Free disk space
-        if: always()
         run: |
           # Remove unnecessary pre-installed software
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
-          # Clean up any existing Docker resources
-          sudo docker system prune -af --volumes || true
+          # Clean up old Docker images but keep layers that might be useful
+          sudo docker image prune -f || true
           df -h
 
       - uses: actions/checkout@v5
