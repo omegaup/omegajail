@@ -87,7 +87,17 @@ jobs:
       - name: Final cleanup
         if: always()
         run: |
-        name: Free disk space
+          # Clean up rootfs and any remaining large files
+          sudo rm -rf ./rootfs || true
+          sudo rm -rf ./smoketest/run || true
+          cargo clean || true
+          df -h
+
+  smoketest-docker:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Free disk space
         if: always()
         run: |
           # Remove unnecessary pre-installed software
@@ -107,16 +117,6 @@ jobs:
           # Remove intermediate build layers to save space
           docker image prune -f || true
 
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          submodules: recursive
-          fetch-depth: 0
-
-      - name: Build container
-        run: |
-          make OMEGAJAIL_RELEASE=${{ github.sha }} .omegajail-builder-rootfs-runtime.stamp
-
       - name: Smoketest (Docker)
         run: |
           # First try with normal sandboxing
@@ -128,17 +128,7 @@ jobs:
             --rm \
             --mount "type=bind,source=$(pwd)/smoketest,target=/src" \
             --tmpfs "/home:mode=1777,uid=$(id -u),gid=$(id -g)" \
-            --user "$(id -u):$(id -
-          retention-days: 7  # Auto-delete artifacts after 7 days
-
-      - name: Final cleanup
-        if: always()
-        run: |
-          # Aggressive Docker cleanup
-          sudo docker system prune -af --volumes || true
-          # Remove build artifacts
-          sudo rm -rf ./smoketest/run || true
-          df -hg)" \
+            --user "$(id -u):$(id -g)" \
             omegaup/omegajail-builder-rootfs-runtime-debug \
             /usr/bin/python3 /src/test || \
            echo "Some Docker tests failed, but continuing workflow..." && true)
@@ -150,3 +140,13 @@ jobs:
           name: test-logs-docker
           path: smoketest/run/
           if-no-files-found: ignore
+          retention-days: 7  # Auto-delete artifacts after 7 days
+
+      - name: Final cleanup
+        if: always()
+        run: |
+          # Aggressive Docker cleanup
+          sudo docker system prune -af --volumes || true
+          # Remove build artifacts
+          sudo rm -rf ./smoketest/run || true
+          df -h
