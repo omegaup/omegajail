@@ -1,6 +1,12 @@
 FROM ubuntu:focal AS setup
 
 ENV DEBIAN_FRONTEND=noninteractive
+
+# Configure apt for better reliability with network issues
+RUN echo 'Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries && \
+    echo 'Acquire::http::Timeout "120";' >> /etc/apt/apt.conf.d/80-retries && \
+    echo 'Acquire::ftp::Timeout "120";' >> /etc/apt/apt.conf.d/80-retries
+
 RUN apt-get update -y && \
     apt-get install --no-install-recommends -y \
       ca-certificates \

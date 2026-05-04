@@ -115,7 +115,22 @@ jobs:
         run: |
           echo "Testing network connectivity..."
           ping -c 3 8.8.8.8 || true
-          curl -I https://deb.debian.org/ || true
+          echo "Testing Ubuntu archive mirrors..."
+          curl -I http://archive.ubuntu.com/ubuntu/ || true
+          curl -I http://us.archive.ubuntu.com/ubuntu/ || true
+          echo "Testing Microsoft package repository..."
+          curl -I https://packages.microsoft.com/ || true
+          echo "DNS resolution test..."
+          nslookup archive.ubuntu.com || true
+          
+      - name: Configure Docker for better network reliability
+        run: |
+          # Configure Docker daemon for better retry behavior
+          echo '{"max-concurrent-downloads": 3}' | sudo tee /etc/docker/daemon.json
+          sudo systemctl restart docker || true
+          # Wait for Docker to be ready
+          sleep 5
+          docker info
           
       - name: Build container
         run: |
