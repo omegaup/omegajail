@@ -1,6 +1,9 @@
 FROM ubuntu:focal AS setup
 
 ENV DEBIAN_FRONTEND=noninteractive
+# Use alternative mirrors for better reliability on GitHub Actions runners
+RUN sed -i 's|http://archive.ubuntu.com/ubuntu/|http://mirrors.wikimedia.org/ubuntu/|g' /etc/apt/sources.list && \
+    sed -i 's|http://security.ubuntu.com/ubuntu/|http://mirrors.wikimedia.org/ubuntu/|g' /etc/apt/sources.list
 RUN apt-get update -y && \
     apt-get install --no-install-recommends -y \
       ca-certificates \
