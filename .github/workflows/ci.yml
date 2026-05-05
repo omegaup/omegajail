@@ -13,11 +13,9 @@ jobs:
 
     steps:
       - name: Free disk space
-        if: always()
         run: |
           # Remove unnecessary pre-installed software on GitHub runners
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
-          sudo docker system prune -af || true
           df -h
 
       - uses: actions/checkout@v5
@@ -87,19 +85,22 @@ jobs:
       - name: Final cleanup
         if: always()
         run: |
-        name: Free disk space
-        if: always()
+          sudo rm -rf ./rootfs || true
+          cargo clean || true
+
+  smoketest-docker:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Free disk space
         run: |
-          # Remove unnecessary pre-installed software
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
-          # Clean up any existing Docker resources
-          sudo docker system prune -af --volumes || true
           df -h
 
       - uses: actions/checkout@v5
         with:
           submodules: recursive
-          fetch-depth: 1  # Reduced from 0 to save space
+          fetch-depth: 0
 
       - name: Build container
         run: |
