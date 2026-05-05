@@ -18,8 +18,10 @@ jobs:
           fetch-depth: 0
 
       - name: Install dependencies
+        timeout-minutes: 5
         run: |
-          sudo apt-get update
+          # Add timeout to apt-get update to prevent hanging
+          timeout 300 sudo apt-get update || (echo "apt-get update timed out, retrying..." && timeout 300 sudo apt-get update)
           sudo apt-get install -y libcap-dev util-linux
 
       - name: Build
