@@ -40,7 +40,10 @@ jobs:
           if [ -f "/sys/fs/cgroup/cgroup.controllers" ]; then
             # Configuration for cgroups v2
             sudo mkdir -p /sys/fs/cgroup/omegajail
+            # Enable controllers at root level
             echo "+memory +pids +cpu" | sudo tee /sys/fs/cgroup/cgroup.subtree_control || true
+            # Enable controllers at omegajail level for child cgroups
+            echo "+memory +pids +cpu" | sudo tee /sys/fs/cgroup/omegajail/cgroup.subtree_control || true
             sudo chown -R $(whoami) /sys/fs/cgroup/omegajail
 
             # Run smoketest
