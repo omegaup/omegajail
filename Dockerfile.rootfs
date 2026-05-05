@@ -3,22 +3,35 @@ FROM ubuntu:focal AS setup
 ENV DEBIAN_FRONTEND=noninteractive
 # Use US mirrors for better reliability on GitHub Actions runners (AWS-hosted)
 RUN sed -i 's|http://archive.ubuntu.com/ubuntu/|http://us.archive.ubuntu.com/ubuntu/|g' /etc/apt/sources.list && \
-    sed -i 's|http://security.ubuntu.com/ubuntu/|http://security.ubuntu.com/ubuntu/|g' /etc/apt/sources.list && \
-    echo 'Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries && \
-    echo 'Acquire::http::Timeout "120";' > /etc/apt/apt.conf.d/80-timeout
-RUN apt-get update -y && \
+    sed -i 's|http://security.ubuntu.com/ubuntu/|http://us.archive.ubuntu.com/ubuntu/|g' /etc/apt/sources.list && \
+    echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries && \
+    echo 'Acquire::http::Timeout "120";' > /etc/apt/apt.conf.d/80-timeout && \
+    echo 'Acquire::https::Timeout "120";' > /etc/apt/apt.conf.d/81-https-timeout
+RUN for i in 1 2 3; do \
+      echo "apt-get update attempt $i" && \
+      apt-get update -y --allow-releaseinfo-change && break || \
+      ([ $i -eq 3 ] && exit 1 || sleep 10); \
+    done && \
     apt-get install --no-install-recommends -y \
       ca-certificates \
       wget && \
     apt-get autoremove -y && \
     apt-get clean
 
-RUN wget https://packages.microsoft.com/config/ubuntu/20.04/packages-microsoft-prod.deb \
-      -O packages-microsoft-prod.deb && \
+RUN for i in 1 2 3; do \
+      echo "wget packages-microsoft-prod attempt $i" && \
+      wget https://packages.microsoft.com/config/ubuntu/20.04/packages-microsoft-prod.deb \
+        -O packages-microsoft-prod.deb && break || \
+      ([ $i -eq 3 ] && exit 1 || sleep 5); \
+    done && \
     dpkg -i packages-microsoft-prod.deb && \
     rm packages-microsoft-prod.deb
 
-RUN apt-get update -y && \
+RUN for i in 1 2 3; do \
+      echo "apt-get update attempt $i" && \
+      apt-get update -y --allow-releaseinfo-change && break || \
+      ([ $i -eq 3 ] && exit 1 || sleep 10); \
+    done && \
     apt-get install --no-install-recommends -y \
       aspnetcore-runtime-6.0=6.0.1-1 \
       aspnetcore-targeting-pack-6.0=6.0.0-1 \

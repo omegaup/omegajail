@@ -74,7 +74,21 @@ jobs:
 
       - name: Build container
         run: |
-          make OMEGAJAIL_RELEASE=${{ github.sha }} .omegajail-builder-rootfs-runtime.stamp
+          # Retry docker build up to 3 times to handle transient network errors
+          for i in 1 2 3; do
+            echo "Build attempt $i of 3..."
+            if make OMEGAJAIL_RELEASE=${{ github.sha }} .omegajail-builder-rootfs-runtime.stamp; then
+              echo "Build succeeded on attempt $i"
+              break
+            else
+              if [ $i -eq 3 ]; then
+                echo "Build failed after 3 attempts"
+                exit 1
+              fi
+              echo "Build failed, waiting 10 seconds before retry..."
+              sleep 10
+            fi
+          done
 
       - name: Smoketest (Docker)
         run: |
