@@ -1,5 +1,11 @@
 FROM ubuntu:focal
 
+# Use US mirrors for better reliability on GitHub Actions runners (AWS-hosted)
+RUN sed -i 's|http://archive.ubuntu.com/ubuntu/|http://us.archive.ubuntu.com/ubuntu/|g' /etc/apt/sources.list && \
+    sed -i 's|http://security.ubuntu.com/ubuntu/|http://security.ubuntu.com/ubuntu/|g' /etc/apt/sources.list && \
+    echo 'Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries && \
+    echo 'Acquire::http::Timeout "120";' > /etc/apt/apt.conf.d/80-timeout
+
 RUN apt-get update -y && \
     apt-get install --no-install-recommends -y \
       ca-certificates \
