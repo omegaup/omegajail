@@ -225,16 +225,15 @@ def _main() -> None:
                                      'cgroup.subtree_control'), 'w', encoding='utf-8') as f:
                     f.write('+memory')
                 os.makedirs(smoketest_cgroup, exist_ok=True)
-                with open(os.path.join(smoketest_cgroup, 'cgroup.subtree_control'),
-                          'w', encoding='utf-8') as f:
-                    f.write('+memory')
-            except PermissionError:
-                pass  # Skip cgroup setup if we don't have permissions
+                # Don't enable subtree_control here - smoketest should be a leaf cgroup
+                # that can contain processes
+            except (PermissionError, OSError):
+                pass  # Skip cgroup setup if we don't have permissions or resource busy
         try:
             with open(os.path.join(smoketest_cgroup, 'cgroup.procs'), 'w', encoding='utf-8') as f:
                 f.write(str(os.getpid()))
-        except PermissionError:
-            pass  # Skip joining cgroup if we don't have permissions
+        except (PermissionError, OSError):
+            pass  # Skip joining cgroup if we don't have permissions or resource busy
 
     args.root = os.path.abspath(args.root)
 
