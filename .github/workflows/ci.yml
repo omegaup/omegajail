@@ -41,17 +41,15 @@ jobs:
           # Configure cgroups (v2 or v1 depending on availability)
           if [ -f "/sys/fs/cgroup/cgroup.controllers" ]; then
             # Configuration for cgroups v2
-            sudo mkdir -p /sys/fs/cgroup/omegajail/smoketest-runner
-            # Enable controllers at root level (no processes should be in root)
+            sudo mkdir -p /sys/fs/cgroup/omegajail
+            # Enable controllers at root level
             echo "+memory +pids +cpu" | sudo tee /sys/fs/cgroup/cgroup.subtree_control || true
             # Enable controllers at omegajail level for child cgroups
             echo "+memory +pids +cpu" | sudo tee /sys/fs/cgroup/omegajail/cgroup.subtree_control || true
-            # Move this shell process to the leaf cgroup (before chown, while we still have sudo)
-            echo $$ | sudo tee /sys/fs/cgroup/omegajail/smoketest-runner/cgroup.procs
-            # Give ownership to the user after moving the process
+            # Delegate cgroup management to the runner user
             sudo chown -R $(whoami) /sys/fs/cgroup/omegajail
 
-            # Run smoketest
+            # Run smoketest - it will create and join /sys/fs/cgroup/omegajail/smoketest
             ./smoketest/test --root=./rootfs --cgroup-path=/omegajail
           else
             # Legacy configuration for cgroups v1
