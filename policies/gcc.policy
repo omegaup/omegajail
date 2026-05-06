@@ -11,7 +11,6 @@ chmod: allow
 close: allow
 {dup, dup2}: allow
 faccessat: allow
-faccessat: allow
 {fcntl[arch=x86_64], fcntl64[arch=armv7]}: arg1 == F_GETFL || arg1 == F_SETFD || arg1 == F_GETFD || arg1 == F_SETFL
 {fstat[arch=x86_64], fstat64[arch=armv7]}: allow
 ioctl: arg1 == TCGETS || arg1 == FIONBIO || arg1 == TIOCGWINSZ
