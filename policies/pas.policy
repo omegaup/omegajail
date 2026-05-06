@@ -9,6 +9,7 @@ ioctl: return ENOTTY
 open: allow
 close: allow
 {stat[arch=x86_64], stat64[arch=armv7]}: allow
+newfstatat: allow
 select: allow
 read: allow
 readlink: allow
@@ -25,6 +26,11 @@ munmap: allow
 
 # Environment
 {getrlimit[arch=x86_64], ugetrlimit[arch=armv7]}: allow
+
+# glibc 2.35+ initialization
+set_robust_list: allow
+set_tid_address: allow
+rseq: allow
 
 # Time
 time: allow

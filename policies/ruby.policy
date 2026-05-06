@@ -8,8 +8,10 @@
 access: allow
 close: allow
 dup: allow
-{fcntl[arch=x86_64], fcntl64[arch=armv7]}: arg1 == F_GETFL || arg1 == F_SETFL || arg1 == F_SETFD || arg1 == F_GETFD
+{fcntl[arch=x86_64], fcntl64[arch=armv7]}: allow
+flock: allow
 {fstat[arch=x86_64], fstat64[arch=armv7]}: allow
+newfstatat: allow
 getcwd: allow
 getdents64: allow
 ioctl: return ENOTTY
@@ -60,6 +62,7 @@ prctl: arg0 == PR_SET_NAME || arg0 == PR_SET_THP_DISABLE
 sched_getaffinity: allow
 set_robust_list: allow
 set_tid_address: allow
+rseq: allow
 
 # Time
 clock_gettime: allow

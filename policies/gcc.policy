@@ -6,27 +6,38 @@
 
 # I/O
 access: allow
-socket: return ENETDOWN
+chdir: allow
 chmod: allow
 close: allow
 {dup, dup2}: allow
-{fcntl[arch=x86_64], fcntl64[arch=armv7]}: arg1 == F_GETFL || arg1 == F_SETFD || arg1 == F_GETFD
+faccessat: allow
+faccessat2: allow
+{fcntl[arch=x86_64], fcntl64[arch=armv7]}: arg1 == F_GETFL || arg1 == F_SETFD || arg1 == F_GETFD || arg1 == F_SETFL
 {fstat[arch=x86_64], fstat64[arch=armv7]}: allow
 ioctl: arg1 == TCGETS || arg1 == FIONBIO || arg1 == TIOCGWINSZ
 {lseek, _llseek[arch=armv7]}: allow
 {lstat[arch=x86_64], lstat64[arch=armv7]}: allow
+newfstatat: allow
 openat: allow
-pipe2: allow
+{pipe, pipe2}: allow
+poll: allow
 pread64: allow
 read: allow
 readlink: allow
+recvfrom: allow
+socket: return ENETDOWN
+socketpair: allow
 {stat[arch=x86_64], stat64[arch=armv7]}: allow
+statx: allow
 umask: allow
 unlink: allow
 {write, writev}: allow
 
 # Environment
 getcwd: allow
+getrandom: allow
+{getgid[arch=x86_64], getgid32[arch=armv7]}: allow
+{getuid[arch=x86_64], getuid32[arch=armv7]}: allow
 
 # Memory
 {arch_prctl[arch=x86_64], ARM_set_tls[arch=armv7]}: allow
@@ -48,8 +59,20 @@ uname[arch=armv7]: allow
 
 # Processes / threads
 clone: arg0 == CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID
+futex: allow
+sched_getaffinity: allow
+sched_setaffinity: allow
+set_robust_list: allow
+set_tid_address: allow
+setresgid: allow
+setresuid: allow
+sigaltstack: allow
 vfork: allow
 wait4: allow
+waitid: allow
+
+# glibc 2.35+ initialization
+rseq: allow
 
 # abort()
 getpid: allow

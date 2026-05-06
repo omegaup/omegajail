@@ -10,8 +10,10 @@ chmod: allow
 close: allow
 {dup, dup2}: allow
 fallocate: allow
+faccessat2: allow
 {fcntl[arch=x86_64], fcntl64[arch=armv7]}: arg1 == F_GETFD || arg1 == F_GETFL || arg1 == F_SETFD || arg1 == F_SETFL
 {fstat[arch=x86_64], fstat64[arch=armv7]}: allow
+newfstatat: allow
 {ftruncate[arch=x86_64], ftruncate64[arch=armv7]}: allow
 getdents64: allow
 ioctl: return ENOTTY
@@ -30,6 +32,7 @@ unlink: allow
 
 # Environment
 getcwd: allow
+getrandom: allow
 getrusage: allow
 prlimit64: {arg1 == RLIMIT_STACK || arg2 == 0; allow, return EPERM}
 sysinfo: allow
@@ -57,6 +60,7 @@ timerfd_settime: allow
 
 # Processes / threads
 clone: arg0 == CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID
+clone3: allow
 getpid: allow
 futex: allow
 sched_yield: allow
@@ -66,5 +70,6 @@ rt_sigprocmask: allow
 rt_sigreturn: allow
 set_robust_list: allow
 set_tid_address: allow
+rseq: allow
 vfork: allow
 wait4: allow

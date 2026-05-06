@@ -6,11 +6,13 @@
 
 # I/O
 access: allow
+faccessat2: allow
 close: allow
 dup: allow
 dup2: allow
 fchdir: allow
 {fcntl[arch=x86_64], fcntl64[arch=armv7]}: arg1 == F_GETFD || arg1 == F_GETFL || arg1 == F_SETFD || arg1 == F_SETFL
+flock: allow
 ftruncate: allow
 {fstat[arch=x86_64], fstat64[arch=armv7]}: allow
 getcwd: allow
@@ -25,6 +27,7 @@ openat: allow
 readlink: allow
 socket: return ENETDOWN
 {stat[arch=x86_64], stat64[arch=armv7]}: allow
+statx: allow
 unlink: allow
 write: allow
 
@@ -41,6 +44,7 @@ munmap: allow
 {geteuid[arch=x86_64], geteuid32[arch=armv7]}: allow
 getpid: allow
 gettid: allow
+getrandom: allow
 {getuid[arch=x86_64], getuid32[arch=armv7]}: allow
 getrusage: allow
 prlimit64: {arg1 == RLIMIT_STACK || arg2 == 0; allow, return EPERM}
@@ -49,6 +53,7 @@ uname: allow
 
 # Processes / threads
 clone: arg0 == CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID
+clone3: allow
 clock_nanosleep: allow
 futex: allow
 prctl: arg0 == PR_SET_NAME
@@ -59,6 +64,7 @@ sched_getaffinity: allow
 sched_yield: allow
 set_robust_list: allow
 set_tid_address: allow
+rseq: allow
 setpriority: return SIGSYS
 tgkill: allow
 

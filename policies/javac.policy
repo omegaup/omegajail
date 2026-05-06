@@ -34,6 +34,8 @@ socket: return ENETDOWN
 socketpair: allow
 {stat[arch=x86_64], stat64[arch=armv7]}: allow
 statfs: allow
+statx: allow
+faccessat2: allow
 umask: allow
 unlink: allow
 {write, writev}: allow
@@ -60,6 +62,8 @@ uname: allow
 # Processes / threads
 clock_nanosleep: allow
 clone: arg0 == CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID || arg0 == CLONE_VM|CLONE_VFORK|SIGCHLD || arg0 == CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD
+clone3: allow
+flock: allow
 futex: allow
 getpriority: allow
 kill: {arg0 == 2; allow, return SIGSYS}
@@ -71,6 +75,7 @@ sched_getaffinity: allow
 sched_yield: allow
 set_robust_list: allow
 set_tid_address: allow
+rseq: allow
 setpriority: return SIGSYS
 tgkill: allow  # This is needed by the compilation wrapper.
 vfork: allow  # This is needed by the compilation wrapper.

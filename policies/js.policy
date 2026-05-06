@@ -8,6 +8,7 @@
 access: allow
 close: allow
 {fstat[arch=x86_64], fstat64[arch=armv7]}: allow
+newfstatat: allow
 {fcntl[arch=x86_64], fcntl64[arch=armv7]}: arg1 == F_GETFL || arg1 == F_SETFD || arg1 == F_GETFD
 getcwd: allow
 ioctl: {arg1 == FIOCLEX || arg1 == TCGETS; allow, return EPERM}
@@ -33,6 +34,7 @@ munmap: allow
 
 # Threads
 clone: arg0 == CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID
+clone3: allow
 futex: allow
 prctl: arg0 == PR_SET_NAME
 rt_sigaction: allow
@@ -40,6 +42,7 @@ rt_sigprocmask: allow
 rt_sigreturn: allow
 set_robust_list: allow
 set_tid_address: allow
+rseq: allow
 sched_yield: allow
 
 # Environment
