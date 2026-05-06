@@ -6,7 +6,7 @@
 
 # I/O
 access: allow
-faccessat2: allow
+faccessat: allow
 close: allow
 dup: allow
 dup2: allow
