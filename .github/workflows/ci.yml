@@ -38,6 +38,18 @@ jobs:
 
       - name: Smoketest
         run: |
+          set -euxo pipefail
+
+          echo "== Runner identity =="
+          id
+          whoami
+
+          echo "== Cgroup mount info =="
+          mount | grep cgroup || true
+
+          echo "== /sys/fs/cgroup =="
+          ls -la /sys/fs/cgroup || true
+
           # Configure cgroups (v2 or v1 depending on availability)
           if [ -f "/sys/fs/cgroup/cgroup.controllers" ]; then
             # Configuration for cgroups v2
@@ -48,8 +60,26 @@ jobs:
             echo "+memory +pids +cpu" | sudo tee /sys/fs/cgroup/omegajail/cgroup.subtree_control || true
             # Delegate cgroup management to the runner user
             sudo chown -R $(whoami) /sys/fs/cgroup/omegajail
+            sudo chgrp -R $(id -gn) /sys/fs/cgroup/omegajail || true
+            sudo chmod -R g+rwX /sys/fs/cgroup/omegajail || true
 
-            # Run smoketest - it will create and join /sys/fs/cgroup/omegajail/smoketest
+            echo "== cgroup v2 debug =="
+            ls -la /sys/fs/cgroup/omegajail || true
+            cat /sys/fs/cgroup/cgroup.controllers || true
+            cat /sys/fs/cgroup/cgroup.subtree_control || true
+            cat /sys/fs/cgroup/omegajail/cgroup.controllers || true
+            cat /sys/fs/cgroup/omegajail/cgroup.subtree_control || true
+
+            # Preflight: run one language to capture first actionable failure.
+            set +e
+            ./smoketest/test --root=./rootfs --cgroup-path=/omegajail --languages c
+            preflight_status=$?
+            set -e
+            echo "preflight_status=$preflight_status"
+            sed -n '1,220p' smoketest/run/c/compile.err || true
+            sed -n '1,220p' smoketest/run/c/compile.out || true
+
+            # Full smoketest - it will create and join /sys/fs/cgroup/omegajail/smoketest
             ./smoketest/test --root=./rootfs --cgroup-path=/omegajail
           else
             # Legacy configuration for cgroups v1
