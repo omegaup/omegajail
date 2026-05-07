@@ -70,17 +70,9 @@ jobs:
             cat /sys/fs/cgroup/omegajail/cgroup.controllers || true
             cat /sys/fs/cgroup/omegajail/cgroup.subtree_control || true
 
-            # IMPORTANT: move this shell into the delegated subtree as root.
-            # Otherwise, later non-root migrations to /omegajail/* fail with EACCES
-            # because source and destination cgroups have a common ancestor outside
-            # the delegated subtree.
-            echo $$ | sudo tee /sys/fs/cgroup/omegajail/cgroup.procs
-            echo "self cgroup after move:"
-            cat /proc/self/cgroup || true
-
             # Preflight: run one language to capture first actionable failure.
             set +e
-            ./smoketest/test --root=./rootfs --cgroup-path=/omegajail --languages c
+            sudo ./smoketest/test --root=./rootfs --cgroup-path=/omegajail --languages c
             preflight_status=$?
             set -e
             echo "preflight_status=$preflight_status"
@@ -88,7 +80,7 @@ jobs:
             sed -n '1,220p' smoketest/run/c/compile.out || true
 
             # Full smoketest - it will create and join /sys/fs/cgroup/omegajail/smoketest
-            ./smoketest/test --root=./rootfs --cgroup-path=/omegajail
+            sudo ./smoketest/test --root=./rootfs --cgroup-path=/omegajail
           else
             # Legacy configuration for cgroups v1
             sudo mkdir -p -m 0775 /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
