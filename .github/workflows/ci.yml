@@ -70,6 +70,14 @@ jobs:
             cat /sys/fs/cgroup/omegajail/cgroup.controllers || true
             cat /sys/fs/cgroup/omegajail/cgroup.subtree_control || true
 
+            # IMPORTANT: move this shell into the delegated subtree as root.
+            # Otherwise, later non-root migrations to /omegajail/* fail with EACCES
+            # because source and destination cgroups have a common ancestor outside
+            # the delegated subtree.
+            echo $$ | sudo tee /sys/fs/cgroup/omegajail/cgroup.procs
+            echo "self cgroup after move:"
+            cat /proc/self/cgroup || true
+
             # Preflight: run one language to capture first actionable failure.
             set +e
             ./smoketest/test --root=./rootfs --cgroup-path=/omegajail --languages c
