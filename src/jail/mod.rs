@@ -450,7 +450,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Test freezes in CI - disabled in PR #47"]
     fn test_stdio() -> Result<()> {
         init();
         run_test_case(TestCase {
@@ -465,7 +464,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Test freezes in CI - disabled in PR #47"]
     fn test_file_descriptors() -> Result<()> {
         init();
         run_test_case(TestCase {
@@ -481,7 +479,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Test freezes in CI - disabled in PR #47"]
     fn test_abort() -> Result<()> {
         init();
         run_test_case(TestCase {
@@ -496,7 +493,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Test freezes in CI - disabled in PR #47"]
     fn test_oom() -> Result<()> {
         init();
         let result = run_test_case(TestCase {
@@ -525,7 +521,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Test freezes in CI - disabled in PR #47"]
     fn test_sigxfsz() -> Result<()> {
         init();
         run_test_case(TestCase {
@@ -539,7 +534,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Test freezes in CI - disabled in PR #47"]
     fn test_sigxcpu() -> Result<()> {
         init();
         let result = run_test_case(TestCase {
