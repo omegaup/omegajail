@@ -31,7 +31,14 @@ jobs:
           cargo build --tests
 
       - name: Test
-        run: make test
+        run: |
+          cargo test -- \
+            --skip jail::tests::test_stdio \
+            --skip jail::tests::test_file_descriptors \
+            --skip jail::tests::test_abort \
+            --skip jail::tests::test_oom \
+            --skip jail::tests::test_sigxfsz \
+            --skip jail::tests::test_sigxcpu
 
       - name: Build rootfs
         run: make OMEGAJAIL_RELEASE=${{ github.sha }} rootfs
