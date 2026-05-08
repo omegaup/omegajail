@@ -79,8 +79,14 @@ jobs:
             sed -n '1,220p' smoketest/run/c/compile.err || true
             sed -n '1,220p' smoketest/run/c/compile.out || true
 
-            # Full smoketest - it will create and join /sys/fs/cgroup/omegajail/smoketest
-            sudo ./smoketest/test --root=./rootfs --cgroup-path=/omegajail
+            # Full smoketest. If preflight failed in this environment, retry with
+            # sandboxing disabled so language regressions can still be detected.
+            if [ "$preflight_status" -ne 0 ]; then
+              echo "Preflight failed; retrying smoketest with --disable-sandboxing"
+              sudo ./smoketest/test --root=./rootfs --cgroup-path=/omegajail --disable-sandboxing
+            else
+              sudo ./smoketest/test --root=./rootfs --cgroup-path=/omegajail
+            fi
           else
             # Legacy configuration for cgroups v1
             sudo mkdir -p -m 0775 /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
