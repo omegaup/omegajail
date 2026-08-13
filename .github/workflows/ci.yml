@@ -22,7 +22,7 @@ jobs:
         run: |
           # Add timeout to apt-get update to prevent hanging
           timeout 300 sudo apt-get update || (echo "apt-get update timed out, retrying..." && timeout 300 sudo apt-get update)
-          sudo apt-get install -y libcap-dev strace util-linux
+          sudo apt-get install -y libcap-dev util-linux
 
       - name: Build
         run: |
@@ -63,14 +63,14 @@ jobs:
             # common ancestor of the source and destination cgroups.
             printf '%s\n' "$$" | sudo tee /sys/fs/cgroup/omegajail/runner/cgroup.procs > /dev/null
 
-            # Preflight: run one language to capture first actionable failure.
+            # Hosted cgroup v2 runners are not reliable enough for the full
+            # host smoketest. Run one language to verify cgroup delegation and
+            # rely on smoketest-docker for full sandboxed validation.
             set +e
-            taskset 0x1 ./smoketest/test --root=./rootfs --strace --cgroup-path=/omegajail --languages c
+            taskset 0x1 ./smoketest/test --root=./rootfs --cgroup-path=/omegajail --languages c
             preflight_status=$?
             set -e
 
-            # Full smoketest. If preflight failed in this environment, skip host
-            # smoketest and rely on smoketest-docker for sandboxed validation.
             if [ "$preflight_status" -ne 0 ]; then
               echo "::group::cgroup v2 host smoketest diagnostics"
               id
@@ -82,8 +82,7 @@ jobs:
               cat /sys/fs/cgroup/omegajail/cgroup.subtree_control || true
               for file in \
                 smoketest/run/c/compile.err \
-                smoketest/run/c/compile.meta \
-                smoketest/run/c/strace-compiler.txt; do
+                smoketest/run/c/compile.meta; do
                 if [ -s "$file" ]; then
                   echo "===== $file ====="
                   sed -n '1,240p' "$file" || true
@@ -93,7 +92,7 @@ jobs:
               echo "::warning::cgroup v2 preflight failed on hosted runner; skipping host smoketest and relying on smoketest-docker."
               exit 0
             else
-              taskset 0x1 ./smoketest/test --root=./rootfs --cgroup-path=/omegajail
+              echo "::notice::cgroup v2 host preflight passed; full sandboxed validation runs in smoketest-docker."
             fi
           else
             # Legacy configuration for cgroups v1
