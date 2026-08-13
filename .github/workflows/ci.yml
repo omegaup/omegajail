@@ -50,7 +50,7 @@ jobs:
           # Configure cgroups (v2 or v1 depending on availability)
           if [ -f "/sys/fs/cgroup/cgroup.controllers" ]; then
             # Configuration for cgroups v2
-            sudo mkdir -p -m 0775 /sys/fs/cgroup/omegajail
+            sudo mkdir -p -m 0775 /sys/fs/cgroup/omegajail/runner
             # Enable controllers at root level
             echo "+memory +pids +cpu" | sudo tee /sys/fs/cgroup/cgroup.subtree_control || true
             # Enable controllers at omegajail level for child cgroups
@@ -58,6 +58,10 @@ jobs:
             # Delegate cgroup management to the runner user
             sudo chown -R "$(id -u):$(id -g)" /sys/fs/cgroup/omegajail
             sudo chmod -R g+rwX /sys/fs/cgroup/omegajail || true
+            # Keep the workflow and its children inside the delegated subtree.
+            # cgroup v2 process migration also checks write access on the
+            # common ancestor of the source and destination cgroups.
+            printf '%s\n' "$$" | sudo tee /sys/fs/cgroup/omegajail/runner/cgroup.procs > /dev/null
 
             # Preflight: run one language to capture first actionable failure.
             set +e
