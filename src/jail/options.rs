@@ -514,14 +514,8 @@ impl JailOptions {
                     });
                     execve_args.extend([
                         String::from("/opt/nodejs/bin/node"),
-                        String::from("/opt/nodejs/commands.min.cjs"),
+                        String::from("/opt/nodejs/karel.js"),
                         String::from("compile"),
-                        String::from("-l"),
-                        String::from(match lang {
-                            args::Language::KarelJava => "java",
-                            args::Language::KarelPascal => "pascal",
-                            _ => panic!("unreachable"),
-                        }),
                         String::from("-o"),
                         format!("{}.kx", &args.compile_target),
                     ]);
@@ -531,24 +525,32 @@ impl JailOptions {
                     seccomp_profile_name = String::from("csc");
                     mounts.push(MountArgs {
                         source: Some(root.join("root-dotnet")),
-                        target: rootfs.join("usr/share/dotnet"),
+                        target: rootfs.join("usr/lib/dotnet"),
                         fstype: None,
                         flags: MsFlags::MS_BIND | MsFlags::MS_RDONLY,
                         data: None,
                     });
-                    let sdk_version = std::fs::read_dir(root.join("root-dotnet/sdk"))
-                        .context("could not read root-dotnet/sdk")?
+                    let dotnet_root = if args.disable_sandboxing {
+                        PathBuf::from("/usr/lib/dotnet")
+                    } else {
+                        root.join("root-dotnet")
+                    };
+                    let sdk_version = std::fs::read_dir(dotnet_root.join("sdk"))
+                        .with_context(|| format!("could not read {:?}", dotnet_root.join("sdk")))?
                         .filter_map(|e| e.ok())
                         .filter(|e| e.path().is_dir())
                         .filter_map(|e| e.file_name().into_string().ok())
                         .next()
                         .context("no .NET SDK version found in root-dotnet/sdk")?;
                     execve_args.extend([
-                        String::from("/usr/share/dotnet/dotnet"),
-                        format!("/usr/share/dotnet/sdk/{sdk_version}/Roslyn/bincore/csc.dll"),
+                        String::from("/usr/lib/dotnet/dotnet"),
+                        format!("/usr/lib/dotnet/sdk/{sdk_version}/Roslyn/bincore/csc.dll"),
                     ]);
-                    if root.join("root-dotnet/Release.rsp").exists() {
-                        execve_args.extend([String::from("-noconfig"), String::from("@/usr/share/dotnet/Release.rsp")]);
+                    if dotnet_root.join("Release.rsp").exists() {
+                        execve_args.extend([
+                            String::from("-noconfig"),
+                            String::from("@/usr/lib/dotnet/Release.rsp"),
+                        ]);
                     }
                     execve_args.extend([
                         format!(
@@ -633,7 +635,8 @@ impl JailOptions {
                         )]);
                     }
                     let has_java_base_aot = root.join("root-java/java.base.so").exists();
-                    let has_kotlin_stdlib_aot = root.join("root-java/kotlin-stdlib.jar.so").exists();
+                    let has_kotlin_stdlib_aot =
+                        root.join("root-java/kotlin-stdlib.jar.so").exists();
                     let has_program_aot = PathBuf::from(&args.homedir)
                         .join(format!("{}.so", &args.run_target))
                         .exists();
@@ -741,7 +744,7 @@ impl JailOptions {
                     execve_args.extend([
                         String::from("/opt/nodejs/bin/node"),
                         String::from("--jitless"),
-                        String::from("/opt/nodejs/commands.min.cjs"),
+                        String::from("/opt/nodejs/karel.js"),
                         String::from("run"),
                         String::from(format!("{}.kx", &args.run_target)),
                     ]);
@@ -753,13 +756,13 @@ impl JailOptions {
                     seccomp_profile_name = String::from("cs");
                     mounts.push(MountArgs {
                         source: Some(root.join("root-dotnet")),
-                        target: rootfs.join("usr/share/dotnet"),
+                        target: rootfs.join("usr/lib/dotnet"),
                         fstype: None,
                         flags: MsFlags::MS_BIND | MsFlags::MS_RDONLY,
                         data: None,
                     });
                     execve_args.extend([
-                        String::from("/usr/share/dotnet/dotnet"),
+                        String::from("/usr/lib/dotnet/dotnet"),
                         format!("{}.dll", &args.run_target),
                     ]);
                     env.push("DOTNET_CLI_TELEMETRY_OPTOUT=1");

@@ -129,7 +129,7 @@ def _omegajail_compile(
         args.append('--disable-sandboxing')
 
     if lang == 'cs':
-        os.symlink('/usr/share/dotnet/Main.runtimeconfig.json',
+        os.symlink('/usr/lib/dotnet/Main.runtimeconfig.json',
                    os.path.join(lang_dir, 'Main.runtimeconfig.json'))
     return _check_call(args)
 
