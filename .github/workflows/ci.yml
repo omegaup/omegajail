@@ -49,51 +49,10 @@ jobs:
 
           # Configure cgroups (v2 or v1 depending on availability)
           if [ -f "/sys/fs/cgroup/cgroup.controllers" ]; then
-            # Configuration for cgroups v2
-            sudo mkdir -p -m 0775 /sys/fs/cgroup/omegajail/runner
-            # Enable controllers at root level
-            echo "+memory +pids +cpu" | sudo tee /sys/fs/cgroup/cgroup.subtree_control || true
-            # Enable controllers at omegajail level for child cgroups
-            echo "+memory +pids +cpu" | sudo tee /sys/fs/cgroup/omegajail/cgroup.subtree_control || true
-            # Delegate cgroup management to the runner user
-            sudo chown -R "$(id -u):$(id -g)" /sys/fs/cgroup/omegajail
-            sudo chmod -R g+rwX /sys/fs/cgroup/omegajail || true
-            # Keep the workflow and its children inside the delegated subtree.
-            # cgroup v2 process migration also checks write access on the
-            # common ancestor of the source and destination cgroups.
-            printf '%s\n' "$$" | sudo tee /sys/fs/cgroup/omegajail/runner/cgroup.procs > /dev/null
-
-            # Hosted cgroup v2 runners are not reliable enough for the full
-            # host smoketest. Run one language to verify cgroup delegation and
-            # rely on smoketest-docker for full sandboxed validation.
-            set +e
-            taskset 0x1 ./smoketest/test --root=./rootfs --cgroup-path=/omegajail --languages c
-            preflight_status=$?
-            set -e
-
-            if [ "$preflight_status" -ne 0 ]; then
-              echo "::group::cgroup v2 host smoketest diagnostics"
-              id
-              cat /proc/self/cgroup || true
-              findmnt -T /sys/fs/cgroup -o TARGET,FSTYPE,OPTIONS || true
-              cat /sys/fs/cgroup/cgroup.controllers || true
-              cat /sys/fs/cgroup/cgroup.subtree_control || true
-              cat /sys/fs/cgroup/omegajail/cgroup.controllers || true
-              cat /sys/fs/cgroup/omegajail/cgroup.subtree_control || true
-              for file in \
-                smoketest/run/c/compile.err \
-                smoketest/run/c/compile.meta; do
-                if [ -s "$file" ]; then
-                  echo "===== $file ====="
-                  sed -n '1,240p' "$file" || true
-                fi
-              done
-              echo "::endgroup::"
-              echo "::warning::cgroup v2 preflight failed on hosted runner; skipping host smoketest and relying on smoketest-docker."
-              exit 0
-            else
-              echo "::notice::cgroup v2 host preflight passed; full sandboxed validation runs in smoketest-docker."
-            fi
+            # GitHub-hosted Ubuntu 22.04 runners expose cgroup v2, but host
+            # sandbox execution is not reliable there. The Docker job runs the
+            # full smoketest and fails the workflow on real smoketest failures.
+            echo "::notice::Skipping host smoketest on cgroup v2 hosted runner; smoketest-docker performs full sandboxed validation."
           else
             # Legacy configuration for cgroups v1
             sudo mkdir -p -m 0775 /sys/fs/cgroup/memory/system.slice/omegaup-runner.service/omegajail
