@@ -22,7 +22,7 @@ jobs:
         run: |
           # Add timeout to apt-get update to prevent hanging
           timeout 300 sudo apt-get update || (echo "apt-get update timed out, retrying..." && timeout 300 sudo apt-get update)
-          sudo apt-get install -y libcap-dev util-linux
+          sudo apt-get install -y libcap-dev strace util-linux
 
       - name: Build
         run: |
@@ -50,29 +50,46 @@ jobs:
           # Configure cgroups (v2 or v1 depending on availability)
           if [ -f "/sys/fs/cgroup/cgroup.controllers" ]; then
             # Configuration for cgroups v2
-            sudo mkdir -p /sys/fs/cgroup/omegajail
+            sudo mkdir -p -m 0775 /sys/fs/cgroup/omegajail
             # Enable controllers at root level
             echo "+memory +pids +cpu" | sudo tee /sys/fs/cgroup/cgroup.subtree_control || true
             # Enable controllers at omegajail level for child cgroups
             echo "+memory +pids +cpu" | sudo tee /sys/fs/cgroup/omegajail/cgroup.subtree_control || true
             # Delegate cgroup management to the runner user
-            sudo chown -R $(whoami) /sys/fs/cgroup/omegajail
-            sudo chgrp -R $(id -gn) /sys/fs/cgroup/omegajail || true
+            sudo chown -R "$(id -u):$(id -g)" /sys/fs/cgroup/omegajail
             sudo chmod -R g+rwX /sys/fs/cgroup/omegajail || true
 
             # Preflight: run one language to capture first actionable failure.
             set +e
-            sudo ./smoketest/test --root=./rootfs --cgroup-path=/omegajail --languages c
+            taskset 0x1 ./smoketest/test --root=./rootfs --strace --cgroup-path=/omegajail --languages c
             preflight_status=$?
             set -e
 
             # Full smoketest. If preflight failed in this environment, skip host
             # smoketest and rely on smoketest-docker for sandboxed validation.
             if [ "$preflight_status" -ne 0 ]; then
+              echo "::group::cgroup v2 host smoketest diagnostics"
+              id
+              cat /proc/self/cgroup || true
+              findmnt -T /sys/fs/cgroup -o TARGET,FSTYPE,OPTIONS || true
+              cat /sys/fs/cgroup/cgroup.controllers || true
+              cat /sys/fs/cgroup/cgroup.subtree_control || true
+              cat /sys/fs/cgroup/omegajail/cgroup.controllers || true
+              cat /sys/fs/cgroup/omegajail/cgroup.subtree_control || true
+              for file in \
+                smoketest/run/c/compile.err \
+                smoketest/run/c/compile.meta \
+                smoketest/run/c/strace-compiler.txt; do
+                if [ -s "$file" ]; then
+                  echo "===== $file ====="
+                  sed -n '1,240p' "$file" || true
+                fi
+              done
+              echo "::endgroup::"
               echo "::warning::cgroup v2 preflight failed on hosted runner; skipping host smoketest and relying on smoketest-docker."
               exit 0
             else
-              sudo ./smoketest/test --root=./rootfs --cgroup-path=/omegajail
+              taskset 0x1 ./smoketest/test --root=./rootfs --cgroup-path=/omegajail
             fi
           else
             # Legacy configuration for cgroups v1
