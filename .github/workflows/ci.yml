@@ -121,19 +121,20 @@ jobs:
 
       - name: Smoketest (Docker)
         run: |
+          set -euo pipefail
+
           # First try with normal sandboxing
-          make OMEGAJAIL_RELEASE=${{ github.sha }} smoketest-docker || \
-          # If that fails, try running directly (wrapper already adds --disable-sandboxing)
-          # Mark as success regardless of outcome
-          echo "Retrying Docker smoketest with direct approach..." && \
-          (docker run \
-            --rm \
-            --mount "type=bind,source=$(pwd)/smoketest,target=/src" \
-            --tmpfs "/home:mode=1777,uid=$(id -u),gid=$(id -g)" \
-            --user "$(id -u):$(id -g)" \
-            omegaup/omegajail-builder-rootfs-runtime-debug \
-            /usr/bin/python3 /src/test || \
-           echo "Some Docker tests failed, but continuing workflow..." && true)
+          make OMEGAJAIL_RELEASE=${{ github.sha }} smoketest-docker || {
+            # If that fails, try running directly (wrapper already adds --disable-sandboxing)
+            echo "Retrying Docker smoketest with direct approach..."
+            docker run \
+              --rm \
+              --mount "type=bind,source=$(pwd)/smoketest,target=/src" \
+              --tmpfs "/home:mode=1777,uid=$(id -u),gid=$(id -g)" \
+              --user "$(id -u):$(id -g)" \
+              omegaup/omegajail-builder-rootfs-runtime-debug \
+              /usr/bin/python3 /src/test
+          }
 
       - name: Upload artifacts
         if: ${{ always() }}
