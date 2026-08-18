@@ -300,9 +300,9 @@ impl Jail {
     }
 }
 
-// TODO: Several tests are currently disabled with #[ignore] because they freeze
-// in CI environments with Ubuntu 22.04. This is likely due to changes in cgroups v2
-// or other system-level components. These tests need investigation.
+// Some CI environments cannot run every jail unit test reliably because they
+// lack the namespace/cgroup behavior required by the sandbox. Keep the tests
+// enabled for local/suitable hosts; the workflow skips known hosted-runner cases.
 #[cfg(test)]
 mod tests {
     use std::ffi::CString;

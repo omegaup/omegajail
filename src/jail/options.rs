@@ -516,6 +516,11 @@ impl JailOptions {
                         String::from("/opt/nodejs/bin/node"),
                         String::from("/opt/nodejs/karel.js"),
                         String::from("compile"),
+                        String::from(match lang {
+                            args::Language::KarelJava => "java",
+                            args::Language::KarelPascal => "pascal",
+                            _ => panic!("unreachable"),
+                        }),
                         String::from("-o"),
                         format!("{}.kx", &args.compile_target),
                     ]);
@@ -742,10 +747,7 @@ impl JailOptions {
                         data: None,
                     });
                     execve_args.extend([
-                        String::from("/opt/nodejs/bin/node"),
-                        String::from("--jitless"),
-                        String::from("/opt/nodejs/karel.js"),
-                        String::from("run"),
+                        String::from("/opt/nodejs/karel.wasm"),
                         String::from(format!("{}.kx", &args.run_target)),
                     ]);
                 }

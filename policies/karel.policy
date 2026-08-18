@@ -9,22 +9,13 @@ access: allow
 close: allow
 {dup, dup2, dup3}: allow
 {fstat[arch=x86_64], fstat64[arch=armv7]}: allow
-newfstatat: allow
 ioctl: return ENOTTY
 {lseek, _llseek[arch=armv7]}: allow
 openat: allow
-pread64: allow
 read: allow
 readlink: allow
-{fcntl[arch=x86_64], fcntl64[arch=armv7]}: allow
-epoll_create1: allow
-epoll_ctl: allow
-epoll_wait: allow
-eventfd2: allow
-pipe2: allow
 socket: return ENETDOWN
 {stat[arch=x86_64], stat64[arch=armv7]}: allow
-statx: allow
 {write, writev}: allow
 
 # Memory
@@ -44,24 +35,11 @@ gettimeofday: allow
 # Environment
 uname: allow
 getrandom: allow
-{getuid[arch=x86_64], getuid32[arch=armv7]}: allow
-{geteuid[arch=x86_64], geteuid32[arch=armv7]}: allow
-{getgid[arch=x86_64], getgid32[arch=armv7]}: allow
-{getegid[arch=x86_64], getegid32[arch=armv7]}: allow
-prlimit64: {arg1 == RLIMIT_STACK || arg2 == 0; allow, return EPERM}
-
-# glibc 2.35+ initialization
-clone3: allow
-futex: allow
-sched_yield: allow
-set_robust_list: allow
-set_tid_address: allow
-rseq: allow
 
 # abort()
 getpid: allow
 gettid: allow
-rt_sigaction: allow
+rt_sigaction: arg0 != SIGSYS
 rt_sigprocmask: allow
 rt_sigreturn: allow
 tgkill: arg0 != 1

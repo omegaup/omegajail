@@ -355,7 +355,9 @@ pub(crate) fn seccomp_read_notification(fd: RawFd, buf: &mut [u8]) -> Result<Opt
             }
         }
     }
-    Ok(Some(unsafe { &*(buf as *mut _ as *mut SeccompNotif) }.clone()))
+    Ok(Some(
+        unsafe { &*(buf as *mut _ as *mut SeccompNotif) }.clone(),
+    ))
 }
 
 pub(crate) fn pidfd_open(pid: Pid, flags: i32) -> Result<File> {
