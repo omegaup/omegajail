@@ -117,7 +117,7 @@ rootfs: .omegajail-builder-rootfs-runtime.stamp .omegajail-builder-rootfs-setup.
 		.
 	touch $@
 
-omegajail-focal-rootfs-x86_64.tar.xz: .omegajail-builder-rootfs-build.stamp
+omegajail-jammy-rootfs-x86_64.tar.xz: .omegajail-builder-rootfs-build.stamp
 	rm -f $@
 	touch ".$@.tmp"
 	docker run \
@@ -129,7 +129,7 @@ omegajail-focal-rootfs-x86_64.tar.xz: .omegajail-builder-rootfs-build.stamp
 		--exclude /var/lib/omegajail/bin \
 		--exclude /var/lib/omegajail/policies \
 		/var/lib/omegajail/ && \
-	mv ".$@.tmp" "$@" || rm ".$@.tmp"
+		mv ".$@.tmp" "$@" || rm ".$@.tmp"
 
 .omegajail-builder-distrib.stamp: Dockerfile.distrib $(wildcard src/*.rs src/jail/*.rs tools/omegajail-setup policies/*.frequency policies/*.policy)
 	docker build \
@@ -139,7 +139,7 @@ omegajail-focal-rootfs-x86_64.tar.xz: .omegajail-builder-rootfs-build.stamp
 		.
 	touch $@
 
-omegajail-focal-distrib-x86_64.tar.xz: .omegajail-builder-distrib.stamp
+omegajail-jammy-distrib-x86_64.tar.xz: .omegajail-builder-distrib.stamp
 	rm -f $@
 	touch ".$@.tmp"
 	docker run \

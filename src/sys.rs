@@ -338,20 +338,26 @@ ioctl_readwrite!(
     SeccompNotif
 );
 
-pub(crate) fn seccomp_read_notification(fd: RawFd, buf: &mut [u8]) -> Result<SeccompNotif> {
+pub(crate) fn seccomp_read_notification(fd: RawFd, buf: &mut [u8]) -> Result<Option<SeccompNotif>> {
     loop {
         match unsafe { seccomp_notif_recv(fd, buf as *mut _ as *mut SeccompNotif) } {
             Err(Errno::EINTR) => {}
+            Err(Errno::ENOENT) => {
+                // The notification was cancelled because the target process exited or
+                // the pending notification was invalidated. Treat as normal process exit.
+                return Ok(None);
+            }
             Err(err) => {
-                log::error!("failed: {:#}", err);
-                break;
+                return Err(err.into());
             }
             Ok(_) => {
                 break;
             }
         }
     }
-    Ok(unsafe { &*(buf as *mut _ as *mut SeccompNotif) }.clone())
+    Ok(Some(
+        unsafe { &*(buf as *mut _ as *mut SeccompNotif) }.clone(),
+    ))
 }
 
 pub(crate) fn pidfd_open(pid: Pid, flags: i32) -> Result<File> {

@@ -9,6 +9,7 @@ access: allow
 close: allow
 dup3: allow
 {fstat[arch=x86_64], fstat64[arch=armv7]}: allow
+newfstatat: allow
 {lseek, _llseek[arch=armv7]}: allow
 ioctl: return ENOTTY
 openat: allow
@@ -26,8 +27,14 @@ mprotect: allow
 mremap: allow
 munmap: allow
 
+# glibc 2.35+ initialization
+set_robust_list: allow
+set_tid_address: allow
+rseq: allow
+
 # Environment
-getpid: allow
+getrandom: allow
+prlimit64: {arg1 == RLIMIT_STACK || arg2 == 0; allow, return EPERM}
 
 # abort()
 rt_sigaction: arg0 != SIGSYS

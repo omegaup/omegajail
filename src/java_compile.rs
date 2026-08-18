@@ -1,5 +1,6 @@
 use std::env;
 use std::ffi::CString;
+use std::path::Path;
 use std::process::Command;
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -48,6 +49,8 @@ fn main() -> Result<()> {
         "--output".into(),
         format!("{}.so", args.target),
     ];
+    let has_java_base_aot = Path::new("/usr/lib/jvm/java.base.so").exists();
+    let has_kotlin_stdlib_aot = Path::new("/usr/lib/jvm/kotlin-stdlib.jar.so").exists();
     let mut compiler_args = match args.language {
         Language::Java => vec![
             "/usr/bin/javac".into(),
@@ -61,7 +64,6 @@ fn main() -> Result<()> {
             "-Xshare:on".into(),
             "-XX:+UseSerialGC".into(),
             "-XX:+UnlockExperimentalVMOptions".into(),
-            "-XX:AOTLibrary=/usr/lib/jvm/java.base.so".into(),
             "-cp".into(),
             "/usr/lib/jvm/kotlinc/lib/kotlin-preloader.jar".into(),
             "org.jetbrains.kotlin.preloading.Preloader".into(),
@@ -70,11 +72,17 @@ fn main() -> Result<()> {
             "org.jetbrains.kotlin.cli.jvm.K2JVMCompiler".into(),
         ],
     };
+    if args.language == Language::Kotlin && has_java_base_aot {
+        compiler_args.push("-XX:AOTLibrary=/usr/lib/jvm/java.base.so".into());
+    }
     if args.language == Language::Kotlin {
-        jaotc_args.extend_from_slice(&[
-            "-J-XX:+UnlockExperimentalVMOptions".into(),
-            "-J-XX:AOTLibrary=/usr/lib/jvm/java.base.so,/usr/lib/jvm/kotlin-stdlib.jar.so".into(),
-        ]);
+        if has_java_base_aot && has_kotlin_stdlib_aot {
+            jaotc_args.extend_from_slice(&[
+                "-J-XX:+UnlockExperimentalVMOptions".into(),
+                "-J-XX:AOTLibrary=/usr/lib/jvm/java.base.so,/usr/lib/jvm/kotlin-stdlib.jar.so"
+                    .into(),
+            ]);
+        }
     }
     compiler_args.extend_from_slice(&["-d".into(), ".".into()]);
     compiler_args.extend_from_slice(&args.sources);
@@ -89,6 +97,10 @@ fn main() -> Result<()> {
         .with_context(|| anyhow!("execve({:?})", &compiler_args))?;
     if !status.success() {
         bail!("execve({:?}) failed: {:?}", &compiler_args, status);
+    }
+
+    if !Path::new("/usr/bin/jaotc").exists() {
+        return Ok(());
     }
 
     let environ: Vec<CString> = env::vars()

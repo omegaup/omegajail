@@ -494,8 +494,17 @@ fn wait_read_seccomp_notification(
                 let notification =
                     seccomp_read_notification(seccomp_fd, &mut notification_contents)
                         .context("seccomp_read_notification")?;
-                kill(child, Signal::SIGKILL).context("kill child")?;
-                return Ok(Some(WaitStatus::Syscalled(child, notification.data.nr)));
+                match notification {
+                    None => {
+                        // Process exited while seccomp fd was readable (e.g. hangup).
+                        // Treat as normal exit.
+                        return Ok(None);
+                    }
+                    Some(notification) => {
+                        kill(child, Signal::SIGKILL).context("kill child")?;
+                        return Ok(Some(WaitStatus::Syscalled(child, notification.data.nr)));
+                    }
+                }
             }
         }
     }
