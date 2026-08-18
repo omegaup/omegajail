@@ -12,6 +12,7 @@ fchmod: allow
 {fcntl[arch=x86_64], fcntl64[arch=armv7]}: arg1 == F_GETFD || arg1 == F_GETFL || arg1 == F_SETFD || arg1 == F_SETFL || arg1 == F_DUPFD_CLOEXEC
 flock: allow
 {fstat[arch=x86_64], fstat64[arch=armv7]}: allow
+newfstatat: allow
 ftruncate: allow
 getcwd: allow
 getdents64: allow
@@ -57,11 +58,13 @@ munmap: allow
 
 # Threads
 clone: arg0 == CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID
+clone3: allow
 futex: allow
 getpid: allow
 getsid: allow
 gettid: allow
-rt_sigaction: arg0 != SIGSYS
+mknodat: allow
+rt_sigaction: {arg0 != SIGSYS; allow, return EINVAL}
 rt_sigprocmask: allow
 rt_sigreturn: allow
 sched_get_priority_max: allow
@@ -74,5 +77,6 @@ sched_setscheduler: return EPERM
 sched_yield: allow
 set_robust_list: allow
 set_tid_address: allow
+rseq: allow
 sigaltstack: allow
 tgkill: arg0 != 1

@@ -10,6 +10,7 @@ close: allow
 dup: allow
 {fcntl[arch=x86_64], fcntl64[arch=armv7]}: arg1 == F_GETFL || arg1 == F_SETFD || arg1 == F_GETFD
 {fstat[arch=x86_64], fstat64[arch=armv7]}: allow
+newfstatat: allow
 {lseek, _llseek[arch=armv7]}: allow
 openat: allow
 pread64: allow
@@ -37,9 +38,11 @@ mprotect: allow
 mremap: allow
 munmap: allow
 set_tid_address: allow
+rseq: allow
 set_robust_list: allow
 
 # System
+getrandom: allow
 ioctl: return ENOTTY
 prlimit64: {arg1 == RLIMIT_STACK || arg2 == 0; allow, return EPERM}
 sysinfo: allow

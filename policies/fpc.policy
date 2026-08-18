@@ -10,6 +10,7 @@ chmod: allow
 close: allow
 {fcntl[arch=x86_64], fcntl64[arch=armv7]}: arg1 == F_GETFD || arg1 == F_GETFL || arg1 == F_SETFD || arg1 == F_SETFL
 {fstat[arch=x86_64], fstat64[arch=armv7]}: allow
+newfstatat: allow
 getcwd: allow
 getdents64: allow
 ioctl: return ENOTTY
@@ -35,6 +36,7 @@ munmap: allow
 
 # Environment
 {getrlimit[arch=x86_64], ugetrlimit[arch=armv7]}: allow
+getrandom: allow
 getrusage: allow
 prlimit64: {arg1 == RLIMIT_STACK || arg2 == 0; allow, return EPERM}
 
@@ -49,4 +51,9 @@ gettimeofday: allow
 
 # Processes / threads
 {fork, vfork}: allow
+futex: allow
+getpid: allow
+set_robust_list: allow
+set_tid_address: allow
+rseq: allow
 wait4: allow

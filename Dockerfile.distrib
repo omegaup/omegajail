@@ -1,6 +1,18 @@
-FROM ubuntu:focal
+FROM ubuntu:22.04
 
-RUN apt-get update -y && \
+# Use US mirrors for better reliability on GitHub Actions runners (AWS-hosted)
+RUN sed -i 's|http://archive.ubuntu.com/ubuntu/|http://us.archive.ubuntu.com/ubuntu/|g' /etc/apt/sources.list && \
+    sed -i 's|http://security.ubuntu.com/ubuntu/|http://us.archive.ubuntu.com/ubuntu/|g' /etc/apt/sources.list && \
+    echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries && \
+    echo 'Acquire::http::Timeout "120";' > /etc/apt/apt.conf.d/80-timeout && \
+    echo 'Acquire::https::Timeout "120";' > /etc/apt/apt.conf.d/81-https-timeout
+
+# Install packages with retry logic to handle transient network errors
+RUN for i in 1 2 3; do \
+      echo "apt-get update attempt $i" && \
+      apt-get update -y --allow-releaseinfo-change && break || \
+      ([ $i -eq 3 ] && exit 1 || sleep 10); \
+    done && \
     apt-get install --no-install-recommends -y \
       ca-certificates \
       curl \
@@ -14,7 +26,11 @@ RUN apt-get update -y && \
     /usr/sbin/update-ca-certificates && \
     apt-get autoremove -y && \
     apt-get clean && \
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    for i in 1 2 3; do \
+      echo "rustup install attempt $i" && \
+      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && break || \
+      ([ $i -eq 3 ] && exit 1 || sleep 5); \
+    done
 
 RUN mkdir /src
 WORKDIR /src

@@ -221,7 +221,7 @@ impl JailOptions {
                 args::Language::C | args::Language::C11GCC => {
                     seccomp_profile_name = String::from("gcc");
                     execve_args.extend([
-                        String::from("/usr/bin/gcc-10"),
+                        String::from("/usr/bin/gcc-11"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c11"),
@@ -233,7 +233,7 @@ impl JailOptions {
                 args::Language::C11Clang => {
                     seccomp_profile_name = String::from("clang");
                     execve_args.extend([
-                        String::from("/usr/bin/clang-10"),
+                        String::from("/usr/bin/clang-14"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c11"),
@@ -246,7 +246,7 @@ impl JailOptions {
                 args::Language::Cpp03GCC => {
                     seccomp_profile_name = String::from("gcc");
                     execve_args.extend([
-                        String::from("/usr/bin/g++-10"),
+                        String::from("/usr/bin/g++-11"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++03"),
@@ -258,7 +258,7 @@ impl JailOptions {
                 args::Language::Cpp03Clang => {
                     seccomp_profile_name = String::from("clang");
                     execve_args.extend([
-                        String::from("/usr/bin/clang++-10"),
+                        String::from("/usr/bin/clang++-14"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++03"),
@@ -270,7 +270,7 @@ impl JailOptions {
                 args::Language::Cpp | args::Language::Cpp11 | args::Language::Cpp11GCC => {
                     seccomp_profile_name = String::from("gcc");
                     execve_args.extend([
-                        String::from("/usr/bin/g++-10"),
+                        String::from("/usr/bin/g++-11"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++11"),
@@ -282,7 +282,7 @@ impl JailOptions {
                 args::Language::Cpp11Clang => {
                     seccomp_profile_name = String::from("clang");
                     execve_args.extend([
-                        String::from("/usr/bin/clang++-10"),
+                        String::from("/usr/bin/clang++-14"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++11"),
@@ -294,7 +294,7 @@ impl JailOptions {
                 args::Language::Cpp17GCC => {
                     seccomp_profile_name = String::from("gcc");
                     execve_args.extend([
-                        String::from("/usr/bin/g++-10"),
+                        String::from("/usr/bin/g++-11"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++17"),
@@ -306,7 +306,7 @@ impl JailOptions {
                 args::Language::Cpp17Clang => {
                     seccomp_profile_name = String::from("clang");
                     execve_args.extend([
-                        String::from("/usr/bin/clang++-10"),
+                        String::from("/usr/bin/clang++-14"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++17"),
@@ -318,7 +318,7 @@ impl JailOptions {
                 args::Language::Cpp20GCC => {
                     seccomp_profile_name = String::from("gcc");
                     execve_args.extend([
-                        String::from("/usr/bin/g++-10"),
+                        String::from("/usr/bin/g++-11"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++20"),
@@ -330,7 +330,7 @@ impl JailOptions {
                 args::Language::Cpp20Clang => {
                     seccomp_profile_name = String::from("clang");
                     execve_args.extend([
-                        String::from("/usr/bin/clang++-10"),
+                        String::from("/usr/bin/clang++-14"),
                         String::from("-o"),
                         String::from(args.compile_target),
                         String::from("-std=c++20"),
@@ -432,7 +432,7 @@ impl JailOptions {
                         data: None,
                     });
                     execve_args.extend([
-                        String::from("/usr/bin/python3.9"),
+                        String::from("/usr/bin/python3.10"),
                         String::from("-m"),
                         String::from("py_compile"),
                     ]);
@@ -530,16 +530,34 @@ impl JailOptions {
                     seccomp_profile_name = String::from("csc");
                     mounts.push(MountArgs {
                         source: Some(root.join("root-dotnet")),
-                        target: rootfs.join("usr/share/dotnet"),
+                        target: rootfs.join("usr/lib/dotnet"),
                         fstype: None,
                         flags: MsFlags::MS_BIND | MsFlags::MS_RDONLY,
                         data: None,
                     });
+                    let dotnet_root = if args.disable_sandboxing {
+                        PathBuf::from("/usr/lib/dotnet")
+                    } else {
+                        root.join("root-dotnet")
+                    };
+                    let sdk_version = std::fs::read_dir(dotnet_root.join("sdk"))
+                        .with_context(|| format!("could not read {:?}", dotnet_root.join("sdk")))?
+                        .filter_map(|e| e.ok())
+                        .filter(|e| e.path().is_dir())
+                        .filter_map(|e| e.file_name().into_string().ok())
+                        .next()
+                        .context("no .NET SDK version found in root-dotnet/sdk")?;
                     execve_args.extend([
-                        String::from("/usr/share/dotnet/dotnet"),
-                        String::from("/usr/share/dotnet/sdk/6.0.101/Roslyn/bincore/csc.dll"),
-                        String::from("-noconfig"),
-                        String::from("@/usr/share/dotnet/Release.rsp"),
+                        String::from("/usr/lib/dotnet/dotnet"),
+                        format!("/usr/lib/dotnet/sdk/{sdk_version}/Roslyn/bincore/csc.dll"),
+                    ]);
+                    if dotnet_root.join("Release.rsp").exists() {
+                        execve_args.extend([
+                            String::from("-noconfig"),
+                            String::from("@/usr/lib/dotnet/Release.rsp"),
+                        ]);
+                    }
+                    execve_args.extend([
                         format!(
                             "-out:{}.dll",
                             PathBuf::from(
@@ -621,22 +639,32 @@ impl JailOptions {
                             memory_limit + JAVA_MIN_HEAP_SIZE_IN_BYTES
                         )]);
                     }
+                    let has_java_base_aot = root.join("root-java/java.base.so").exists();
+                    let has_kotlin_stdlib_aot =
+                        root.join("root-java/kotlin-stdlib.jar.so").exists();
+                    let has_program_aot = PathBuf::from(&args.homedir)
+                        .join(format!("{}.so", &args.run_target))
+                        .exists();
                     if lang == args::Language::Kotlin {
+                        if has_java_base_aot && has_kotlin_stdlib_aot && has_program_aot {
+                            execve_args.push(format!(
+                                "-XX:AOTLibrary=/usr/lib/jvm/java.base.so,/usr/lib/jvm/kotlin-stdlib.jar.so,./{}.so",
+                                args.run_target
+                            ));
+                        }
                         execve_args.extend([
-                            format!("-XX:AOTLibrary=/usr/lib/jvm/java.base.so,/usr/lib/jvm/kotlin-stdlib.jar.so,./{}.so",
-                       args.run_target),
                             String::from("-cp"),
                             String::from("/usr/lib/jvm/kotlinc/lib/kotlin-stdlib.jar:."),
                             format!("{}Kt", &args.run_target),
                         ]);
                     } else {
-                        execve_args.extend([
-                            format!(
+                        if has_java_base_aot && has_program_aot {
+                            execve_args.push(format!(
                                 "-XX:AOTLibrary=/usr/lib/jvm/java.base.so,./{}.so",
                                 args.run_target,
-                            ),
-                            args.run_target.clone(),
-                        ]);
+                            ));
+                        }
+                        execve_args.push(args.run_target.clone());
                     }
                 }
                 args::Language::Python2 => {
@@ -663,7 +691,7 @@ impl JailOptions {
                         data: None,
                     });
                     execve_args.extend([
-                        String::from("/usr/bin/python3.9"),
+                        String::from("/usr/bin/python3.10"),
                         format!("{}.py", args.run_target),
                     ]);
                 }
@@ -730,13 +758,13 @@ impl JailOptions {
                     seccomp_profile_name = String::from("cs");
                     mounts.push(MountArgs {
                         source: Some(root.join("root-dotnet")),
-                        target: rootfs.join("usr/share/dotnet"),
+                        target: rootfs.join("usr/lib/dotnet"),
                         fstype: None,
                         flags: MsFlags::MS_BIND | MsFlags::MS_RDONLY,
                         data: None,
                     });
                     execve_args.extend([
-                        String::from("/usr/share/dotnet/dotnet"),
+                        String::from("/usr/lib/dotnet/dotnet"),
                         format!("{}.dll", &args.run_target),
                     ]);
                     env.push("DOTNET_CLI_TELEMETRY_OPTOUT=1");

@@ -39,7 +39,7 @@ sequenceDiagram
 
 ## Example
 
-```ignore
+```text
 let args = omegajail::Args{
   // ...
 };

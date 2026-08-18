@@ -10,9 +10,9 @@ import shutil
 import subprocess
 import sys
 
-from typing import List
+from typing import Dict, List, Set
 
-_LANGUAGES = [
+_LANGUAGES: List[str] = [
     'c',
     'c11-gcc',
     'c11-clang',
@@ -42,7 +42,7 @@ _LANGUAGES = [
     'kp',
     'cs',
 ]
-_EXTENSIONS = {
+_EXTENSIONS: Dict[str, str] = {
     'c11-gcc': 'c',
     'c11-clang': 'c',
     'cpp03-gcc': 'cpp',
@@ -57,19 +57,19 @@ _EXTENSIONS = {
     'py2': 'py',
     'py3': 'py',
 }
-_KAREL_LANGUAGES = set(['kj', 'kp'])
+_KAREL_LANGUAGES: Set[str] = set(['kj', 'kp'])
 _PWD = os.path.abspath(os.path.dirname(__file__))
 
 
 def _check_call(args: List[str]) -> bool:
     try:
-        logging.debug('calling \'%s\'', ' '.join(
-            shlex.quote(arg) for arg in args))
+        command = ' '.join(shlex.quote(arg) for arg in args)
+        logging.debug("calling '%s'", command)
         subprocess.check_call(args, cwd=_PWD)
         return True
     except subprocess.CalledProcessError:
-        logging.error('Failed to run \'%s\'', ' '.join(
-            shlex.quote(arg) for arg in args))
+        command = ' '.join(shlex.quote(arg) for arg in args)
+        logging.error("Failed to run '%s'", command)
         return False
 
 
@@ -78,15 +78,16 @@ def _omegajail_compile(
     lang: str,
     strace: bool,
     cgroup_path: str,
+    disable_sandboxing: bool = False,
 ) -> bool:
     lang_dir = os.path.join(_PWD, 'run', lang)
     if os.path.isdir(lang_dir):
         shutil.rmtree(lang_dir, True)
     os.makedirs(lang_dir)
     target = 'Main'
-    source = '{}.{}'.format(target, _EXTENSIONS.get(lang, lang))
+    source = f'{target}.{_EXTENSIONS.get(lang, lang)}'
     os.link(
-        os.path.join(_PWD, 'sumas.{}'.format(lang)),
+        os.path.join(_PWD, f'sumas.{lang}'),
         os.path.join(lang_dir, source))
     if strace:
         args = [
@@ -122,8 +123,13 @@ def _omegajail_compile(
         '--cgroup-path',
         cgroup_path,
     ]
+
+    # Add disable-sandboxing flag if requested
+    if disable_sandboxing:
+        args.append('--disable-sandboxing')
+
     if lang == 'cs':
-        os.symlink('/usr/share/dotnet/Main.runtimeconfig.json',
+        os.symlink('/usr/lib/dotnet/Main.runtimeconfig.json',
                    os.path.join(lang_dir, 'Main.runtimeconfig.json'))
     return _check_call(args)
 
@@ -135,6 +141,7 @@ def _omegajail_run(
     input_path: str,
     output_path: str,
     cgroup_path: str,
+    disable_sandboxing: bool = False,
 ) -> bool:
     lang_dir = os.path.join(_PWD, 'run', lang)
     if strace:
@@ -174,15 +181,22 @@ def _omegajail_run(
         '--run-target',
         'Main',
     ]
+
+    # Add disable-sandboxing flag if requested
+    if disable_sandboxing:
+        args.append('--disable-sandboxing')
+
     if not _check_call(args):
         return False
-    with open(os.path.join(lang_dir, 'run.out'), 'r') as run_out:
+    with open(
+        os.path.join(lang_dir, 'run.out'), 'r', encoding='utf-8') as run_out:
         got = run_out.read().strip()
-    with open(os.path.join(_PWD, output_path), 'r') as output:
+    with open(
+        os.path.join(_PWD, output_path), 'r', encoding='utf-8') as output:
         expected = output.read().strip()
     if got != expected:
-        logging.error('Wrong answer when running \'%s\'. got %r, expected %r',
-                      lang, got, expected)
+        logging.error("Wrong answer when running '%s'. got %r, expected %r",
+                     lang, got, expected)
     return got == expected
 
 
@@ -195,6 +209,8 @@ def _main() -> None:
     parser.add_argument('--cgroup-path',
                         default='/omegajail',
                         type=str)
+    parser.add_argument('--disable-sandboxing', action='store_true',
+                        help='Disable sandboxing for troubleshooting')
     args = parser.parse_args()
 
     # Set this process up for cgroups v2, since it uses slightly different
@@ -203,16 +219,21 @@ def _main() -> None:
         smoketest_cgroup = os.path.join('/sys/fs/cgroup', args.cgroup_path[1:],
                                         'smoketest')
         if not os.path.isdir(smoketest_cgroup):
-            with open(
-                    os.path.join('/sys/fs/cgroup', args.cgroup_path[1:],
-                                 'cgroup.subtree_control'), 'w') as f:
-                f.write('+memory')
-            os.makedirs(smoketest_cgroup, exist_ok=True)
-            with open(os.path.join(smoketest_cgroup, 'cgroup.controllers'),
-                      'w') as f:
-                f.write('+memory')
-        with open(os.path.join(smoketest_cgroup, 'cgroup.procs'), 'w') as f:
-            f.write(str(os.getpid()))
+            try:
+                with open(
+                        os.path.join('/sys/fs/cgroup', args.cgroup_path[1:],
+                                     'cgroup.subtree_control'), 'w', encoding='utf-8') as f:
+                    f.write('+memory')
+                os.makedirs(smoketest_cgroup, exist_ok=True)
+                # Don't enable subtree_control here - smoketest should be a leaf cgroup
+                # that can contain processes
+            except (PermissionError, OSError):
+                pass  # Skip cgroup setup if we don't have permissions or resource busy
+        try:
+            with open(os.path.join(smoketest_cgroup, 'cgroup.procs'), 'w', encoding='utf-8') as f:
+                f.write(str(os.getpid()))
+        except (PermissionError, OSError):
+            pass  # Skip joining cgroup if we don't have permissions or resource busy
 
     args.root = os.path.abspath(args.root)
 
@@ -226,12 +247,13 @@ def _main() -> None:
     passed = True
 
     for lang in languages:
-        print('%-20s' % lang, end='')
+        print(f'{lang:<20}', end='')
         if not _omegajail_compile(
                 root=args.root,
                 lang=lang,
                 strace=args.strace,
                 cgroup_path=args.cgroup_path,
+                disable_sandboxing=args.disable_sandboxing,
         ):
             print('ERROR (COMPILE)')
             passed = False
@@ -247,6 +269,7 @@ def _main() -> None:
                 input_path=input_path,
                 output_path=output_path,
                 cgroup_path=args.cgroup_path,
+                disable_sandboxing=args.disable_sandboxing,
         ):
             print('OK')
         else:
