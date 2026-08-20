@@ -22,6 +22,10 @@ readlink: allow
 {statx[arch=x86_64], statx64[arch=armv7]}: allow
 socket: return ENETDOWN
 
+# Kernel feature probes
+io_uring_setup: return ENOSYS
+sysinfo: return ENOSYS
+
 # Memory
 {arch_prctl[arch=x86_64], ARM_set_tls[arch=armv7]}: allow
 brk: allow
@@ -43,9 +47,11 @@ rt_sigreturn: allow
 set_robust_list: allow
 set_tid_address: allow
 rseq: allow
+sched_getaffinity: allow
 sched_yield: allow
 
 # Environment
+capget: allow
 clock_getres: allow
 {getegid[arch=x86_64], getegid32[arch=armv7]}: allow
 {geteuid[arch=x86_64], geteuid32[arch=armv7]}: allow
