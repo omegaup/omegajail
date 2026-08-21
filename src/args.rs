@@ -47,6 +47,8 @@ pub enum Language {
     KarelJava,
     #[clap(name = "kp")]
     KarelPascal,
+    #[clap(name = "rk")]
+    ReKarel,
 }
 
 /// [`clap`](::clap) arguments for the sandboxing.

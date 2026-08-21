@@ -1,0 +1,25 @@
+class program {
+    program () {
+        // toma todos los zumbadores de la celda de la derecha.
+        turnleft();
+        turnleft();
+        turnleft();
+        move();
+        turnleft();
+        while (nextToABeeper()) {
+          pickbeeper();
+        }
+
+        // deja todos los zumbadores de la mochila
+        turnleft();
+        move();
+        turnleft();
+        turnleft();
+        turnleft();
+        while (anyBeepersInBeeperBag()) {
+          putbeeper();
+        }
+
+        turnoff();
+    }
+}

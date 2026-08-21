@@ -77,15 +77,15 @@ RUN mkdir -p /opt/nodejs && \
         chmod +x /tmp/rustup-init && \
         RUSTUP_HOME=/opt/rust/rustup CARGO_HOME=/opt/rust/cargo /tmp/rustup-init --no-modify-path --default-host=x86_64-unknown-linux-gnu --default-toolchain=stable --profile=default -y --quiet && \
         rm /tmp/rustup-init && \
-    wget https://github.com/omegaup/karel.js/releases/download/v0.2.1/karel \
+    wget https://github.com/omegaup/karel.js/releases/download/v1.2.8/karel \
         -O /opt/nodejs/karel.wasm && \
-    wget https://github.com/omegaup/karel.js/releases/download/v0.2.1/karel.js \
-        -O /opt/nodejs/karel.js && \
+    wget https://github.com/omegaup/karel.js/releases/download/v1.2.8/karel.js.tar.xz \
+        -O - | tar -xJ -C /opt/nodejs && \
     chmod +x /opt/nodejs/karel.wasm /opt/nodejs/karel.js && \
     wget https://raw.githubusercontent.com/omegaup/libkarel/v0.0.99/libkarel.py \
         -O /usr/lib/python2.7/libkarel.py && \
     python3.10 -m pip install --target=/usr/lib/python3/dist-packages \
-        libkarel==1.0.2 omegaup==1.5.4 parsy==1.4.0
+        libkarel==1.0.2 omegaup==2.0.18 parsy==1.4.0
 
 RUN mkdir /src
 WORKDIR /src

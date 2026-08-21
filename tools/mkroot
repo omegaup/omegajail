@@ -694,6 +694,7 @@ def _main() -> None:
                 '/opt/nodejs/karel.js',
                 '/opt/nodejs/bin/node',
                 '/opt/nodejs/karel.wasm',
+                '/opt/nodejs/*.node',
                 '/opt/nodejs/LICENSE',
         ):
             root.copyfromhost(filename, relative_to=JS_ROOT)
