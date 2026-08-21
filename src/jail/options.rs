@@ -504,7 +504,11 @@ impl JailOptions {
                 args::Language::KarelJava
                 | args::Language::KarelPascal
                 | args::Language::ReKarel => {
-                    seccomp_profile_name = String::from("js");
+                    seccomp_profile_name = String::from(if lang == args::Language::ReKarel {
+                        "rkc"
+                    } else {
+                        "js"
+                    });
                     extra_memory_size_in_bytes = NODE_EXTRA_MEMORY_SIZE_IN_BYTES;
                     vm_memory_size_in_bytes = NODE_VM_MEMORY_SIZE_IN_BYTES;
                     mounts.push(MountArgs {
@@ -737,7 +741,11 @@ impl JailOptions {
                 args::Language::KarelPascal
                 | args::Language::KarelJava
                 | args::Language::ReKarel => {
-                    seccomp_profile_name = String::from("karel");
+                    seccomp_profile_name = String::from(if lang == args::Language::ReKarel {
+                        "rk"
+                    } else {
+                        "karel"
+                    });
                     mounts.push(MountArgs {
                         source: Some(root.join("root-js")),
                         target: rootfs.join("opt/nodejs"),
