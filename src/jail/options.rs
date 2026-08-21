@@ -518,12 +518,6 @@ impl JailOptions {
                         String::from("/opt/nodejs/bin/node"),
                         String::from("/opt/nodejs/karel.js"),
                         String::from("compile"),
-                        String::from(match lang {
-                            args::Language::KarelJava => "java",
-                            args::Language::KarelPascal => "pascal",
-                            args::Language::ReKarel => "ReKarel",
-                            _ => panic!("unreachable"),
-                        }),
                         String::from("-o"),
                         format!("{}.kx", &args.compile_target),
                     ]);
