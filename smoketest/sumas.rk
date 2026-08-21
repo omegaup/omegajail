@@ -1,25 +1,22 @@
-class program {
-    program () {
-        // toma todos los zumbadores de la celda de la derecha.
-        turnleft();
-        turnleft();
-        turnleft();
-        move();
-        turnleft();
-        while (nextToABeeper()) {
-          pickbeeper();
-        }
+iniciar-programa
+    inicia-ejecucion
+        { rk debe poder detectar sintaxis Pascal en un archivo .rk }
+        gira-izquierda;
+        gira-izquierda;
+        gira-izquierda;
+        avanza;
+        gira-izquierda;
+        mientras junto-a-zumbador hacer
+            coge-zumbador;
 
-        // deja todos los zumbadores de la mochila
-        turnleft();
-        move();
-        turnleft();
-        turnleft();
-        turnleft();
-        while (anyBeepersInBeeperBag()) {
-          putbeeper();
-        }
+        gira-izquierda;
+        avanza;
+        gira-izquierda;
+        gira-izquierda;
+        gira-izquierda;
+        mientras algun-zumbador-en-la-mochila hacer
+            deja-zumbador;
 
-        turnoff();
-    }
-}
+        apagate;
+    termina-ejecucion
+finalizar-programa
