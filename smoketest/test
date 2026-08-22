@@ -238,6 +238,30 @@ def _run_rekarel_regressions(
 ) -> bool:
     passed = True
 
+    case_name = 'rk-java'
+    if _omegajail_compile(
+            root=root,
+            lang='rk',
+            strace=strace,
+            cgroup_path=cgroup_path,
+            disable_sandboxing=disable_sandboxing,
+            case_name=case_name,
+            source_path=os.path.join(_PWD, 'rekarel-java.rk'),
+            source_name='Main.rk',
+    ):
+        passed &= _omegajail_run(
+            root=root,
+            lang='rk',
+            strace=strace,
+            input_path='input-karel',
+            output_path='output-karel',
+            cgroup_path=cgroup_path,
+            disable_sandboxing=disable_sandboxing,
+            case_name=case_name,
+        )
+    else:
+        passed = False
+
     case_name = 'rk-ce'
     if _omegajail_compile(
             root=root,
