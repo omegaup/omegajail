@@ -173,11 +173,13 @@ class Chroot:
                      relative_to: Optional[str] = None,
                      exclude: Sequence[str] = (),
                      recurse: bool = False,
-                     force_symlinks: bool = False) -> None:
+                     force_symlinks: bool = False,
+                     replace_symlinks: bool = False) -> None:
         """Copies a file from the host in the same path."""
         if '*' in path:
             for p in glob.glob(path):
-                self.copyfromhost(p, relative_to, exclude)
+                self.copyfromhost(p, relative_to, exclude, recurse,
+                                  force_symlinks, replace_symlinks)
             return
         try:
             self.mkdir(os.path.dirname(path), relative_to)
@@ -186,7 +188,11 @@ class Chroot:
             # which will be outside the root.
             pass
         if not os.path.isdir(os.path.realpath(path)):
-            self.install(path, os.path.realpath(path), relative_to)
+            self.install(
+                path,
+                os.path.realpath(path),
+                relative_to,
+                replace_symlinks=replace_symlinks)
             return
         if not recurse:
             self.mkdir(path, relative_to)
@@ -206,13 +212,18 @@ class Chroot:
                         self.symlink(filepath, target)
                     else:
                         try:
-                            self.install(filepath, abspath, relative_to)
+                            self.install(
+                                filepath,
+                                abspath,
+                                relative_to,
+                                replace_symlinks=replace_symlinks)
                         except OSError:
                             logging.exception('failed to copy %s into %s',
                                               abspath, filepath)
                 else:
                     self.install(filepath, os.path.realpath(filepath),
-                                 relative_to)
+                                 relative_to,
+                                 replace_symlinks=replace_symlinks)
             for d in dirs:
                 dirpath = os.path.join(root, d)
                 if os.path.islink(dirpath):
@@ -230,7 +241,8 @@ class Chroot:
                 source: str,
                 relative_to: Optional[str] = None,
                 mode: Optional[int] = None,
-                force_symlinks: bool = False) -> None:
+                force_symlinks: bool = False,
+                replace_symlinks: bool = False) -> None:
         """Installs a file from the host using the provided path."""
         try:
             self.mkdir(os.path.dirname(path), relative_to)
@@ -245,11 +257,16 @@ class Chroot:
                     return
                 if os.path.islink(target):
                     if os.readlink(target) != source:
-                        raise ValueError(
-                            'Target file %r points to %r, but it was expected to point to %r'
-                            % (target, os.readlink(target), source))
-                    return
-                os.link(source, target)
+                        if replace_symlinks:
+                            os.unlink(target)
+                        else:
+                            raise ValueError(
+                                'Target file %r points to %r, but it was expected to point to %r'
+                                % (target, os.readlink(target), source))
+                    else:
+                        return
+                if not os.path.exists(target):
+                    os.link(source, target)
             else:
                 if os.path.islink(source) and force_symlinks:
                     target = os.readlink(source)
@@ -262,14 +279,22 @@ class Chroot:
             logging.exception('failed to install %s into %s', source, path)
             raise
 
-    def symlink(self, path: str, destination: str) -> None:
+    def symlink(
+            self,
+            path: str,
+            destination: str,
+            replace_symlinks: bool = False) -> None:
         """Creates a symlink in the chroot."""
         self.mkdir(os.path.dirname(path))
         target = self.__chroot_path(path)
         if os.path.islink(target):
-            if os.path.readlink(target) != destination:
-                raise ValueError('Target file %r points to %r, but it was expected to point to %r' % (target, os.path.readlink(target), destination))
-            return
+            if os.readlink(target) != destination:
+                if replace_symlinks:
+                    os.unlink(target)
+                else:
+                    raise ValueError('Target file %r points to %r, but it was expected to point to %r' % (target, os.readlink(target), destination))
+            else:
+                return
         if os.path.isfile(target):
             return
         try:
@@ -332,14 +357,14 @@ def _main() -> None:
         'libcap2',
         'libcrypt1',
         'libexpat1',
-        'libffi7',
+        'libffi8',
         'libgdbm-compat4',
         'libgdbm6',
         'libgmp10',
-        'libicu66',
+        'libicu70',
         'liblzma5',
         'libreadline8',
-        'libssl1.1',
+        'libssl3',
         'libstdc++6',
         'libtinfo6',
         'libunwind8',
@@ -350,13 +375,13 @@ def _main() -> None:
     ]
 
     COMPILER_PACKAGES = ROOT_PACKAGES + [
-        'clang-10',
-        'fp-compiler-3.0.4',
-        'fp-units-fcl-3.0.4',
+        'clang-14',
+        'fp-compiler-3.2.2',
+        'fp-units-fcl-3.2.2',
         'gcc',
-        'cpp-10',
-        'g++-10',
-        'gcc-10',
+        'cpp-11',
+        'g++-11',
+        'gcc-11',
         'libbsd-dev',
         'libc6-dev',
         'libffi-dev',
@@ -372,7 +397,7 @@ def _main() -> None:
     PYTHON2_ROOT = '/usr/lib/python2.7/'
     PYTHON3_ROOT = '/opt/python3/'
     JAVA_ROOT = '/usr/lib/jvm/'
-    DOTNET_ROOT = '/usr/share/dotnet/'
+    DOTNET_ROOT = '/usr/lib/dotnet/'
     JS_ROOT = '/opt/nodejs/'
     GO_ROOT = '/opt/go/'
     RUST_ROOT = '/opt/rust/'
@@ -381,20 +406,19 @@ def _main() -> None:
     PYTHON2_FILES = resolver.files_for(
         'python2.7', exclude_packages=COMPILER_PACKAGES)
     PYTHON3_FILES = resolver.files_for(
-        'python3.9', exclude_packages=COMPILER_PACKAGES)
+        'python3.10', exclude_packages=COMPILER_PACKAGES)
     HASKELL_FILES = resolver.files_for(
         'ghc', exclude_packages=COMPILER_PACKAGES + ['libncurses5-dev'])
     JAVA_FILES = resolver.files_for([
-        'openjdk-16-jdk',
-        'openjdk-16-jdk-headless',
-        'openjdk-16-jre',
-        'openjdk-16-jre-headless',
+        'openjdk-17-jdk',
+        'openjdk-17-jdk-headless',
+        'openjdk-17-jre',
+        'openjdk-17-jre-headless',
     ],
                                     recursive=False,
                                     exclude_files=['/etc'])
-    # |resolver| excludes files from /usr/shared. All the dotnet files are in
-    # that directory, so we need a new resolver that does not exclude those
-    # files.
+    # Keep the .NET package file list unfiltered; the default resolver drops
+    # some shared data paths that are still needed by the SDK.
     raw_resolver = FileResolver(exclude_files=())
     DOTNET_FILES = raw_resolver.files_for([
         'dotnet-host',
@@ -409,7 +433,8 @@ def _main() -> None:
             subprocess.check_call(
                 ['/usr/sbin/locale-gen', '--purge', 'en_US.UTF-8'])
         root.copyfromhost('/usr/lib/locale/locale-archive')
-        root.copyfromhost('/etc/localtime')
+        if os.path.exists('/etc/localtime'):
+            root.copyfromhost('/etc/localtime')
 
         root.write(
             '/etc/passwd', b'root:x:0:0:root:/:/bin/false\n'
@@ -461,9 +486,9 @@ def _main() -> None:
                      [x for x in JAVA_FILES if x.endswith('bin/java')][0])
         root.symlink('/usr/bin/python2.7', os.path.join(PYTHON2_ROOT, 'python2.7'))
         root.symlink('/usr/bin/python3', os.path.join(PYTHON3_ROOT, 'bin/python3'))
-        root.symlink('/usr/bin/python3.9', os.path.join(PYTHON3_ROOT, 'bin/python3.9'))
+        root.symlink('/usr/bin/python3.10', os.path.join(PYTHON3_ROOT, 'bin/python3.10'))
         root.symlink('/usr/lib/python3', os.path.join(PYTHON3_ROOT, 'lib/python3'))
-        root.symlink('/usr/lib/python3.9', os.path.join(PYTHON3_ROOT, 'lib/python3.9'))
+        root.symlink('/usr/lib/python3.10', os.path.join(PYTHON3_ROOT, 'lib/python3.10'))
         root.symlink('/usr/bin/node', os.path.join(JS_ROOT, 'bin/node'))
         root.symlink('/usr/lib/node_modules',
                      os.path.join(JS_ROOT, 'node_modules'))
@@ -496,9 +521,9 @@ def _main() -> None:
             if f in ('/lib', '/lib32', '/lib64', '/sbin', '/bin'):
                 continue
             if os.path.islink(f):
-                root.symlink(f, os.readlink(f))
+                root.symlink(f, os.readlink(f), replace_symlinks=True)
             else:
-                root.copyfromhost(f)
+                root.copyfromhost(f, replace_symlinks=True)
 
         root.copyfromhost('/usr/bin/fpc')
         root.copyfromhost('/etc/fpc.cfg')
@@ -508,8 +533,9 @@ def _main() -> None:
             root.copyfromhost('/usr/bin/ppcx64')
         root.symlink('/usr/bin/javac',
                      [x for x in JAVA_FILES if x.endswith('bin/javac')][0])
-        root.symlink('/usr/bin/jaotc',
-                     [x for x in JAVA_FILES if x.endswith('bin/jaotc')][0])
+        jaotc = next((x for x in JAVA_FILES if x.endswith('bin/jaotc')), None)
+        if jaotc is not None:
+            root.symlink('/usr/bin/jaotc', jaotc)
         for f in HASKELL_FILES:
             if f.startswith(HASKELL_ROOT):
                 continue
@@ -518,7 +544,7 @@ def _main() -> None:
             root.symlink(f, os.path.join(HASKELL_ROOT, f.replace('/', '_')))
 
         root.write('/rust-toolchain.toml', b'[toolchain]\npath = "/opt/rust/rustup/toolchains/stable-x86_64-unknown-linux-gnu"')
-        root.symlink('/usr/bin/cc', 'clang-10')
+        root.symlink('/usr/bin/cc', 'clang-14')
         root.mkdir('/tmp/')
         root.mkdir('/var/lib/omegajail/bin')
 
@@ -534,39 +560,41 @@ def _main() -> None:
         root.copyfromhost('/usr/lib/jvm/kotlinc',
                           relative_to=JAVA_ROOT,
                           recurse=True)
-        logging.info('Generating the Java Class Data Sharing bundle.')
-        subprocess.check_call([
-            '/usr/bin/java',
-            '-Xshare:dump',
-            f'-XX:SharedArchiveFile={root.path}/java-16-openjdk-amd64/lib/server/classes.jsa',
-        ])
-        logging.info('Precompiling critical methods from java.base.')
-        subprocess.check_call([
-            '/usr/bin/jaotc',
-            '-J-Xshare:on',
-            '-J-XX:+UseSerialGC',
-            '-J-XX:+UnlockExperimentalVMOptions',
-            f'-J-XX:SharedArchiveFile={root.path}/java-16-openjdk-amd64/lib/server/classes.jsa',
-            '--compile-commands',
-            os.path.join(_CURRENT_DIR, 'java.base.aotcfg'),
-            '--module',
-            'java.base',
-            '--output',
-            f'{root.path}/java.base.so',
-        ])
-        logging.info('Precompiling the kotlin runtime.')
-        subprocess.check_call([
-            '/usr/bin/jaotc',
-            '-J-Xshare:on',
-            '-J-XX:+UseSerialGC',
-            '-J-XX:+UnlockExperimentalVMOptions',
-            f'-J-XX:SharedArchiveFile={root.path}/java-16-openjdk-amd64/lib/server/classes.jsa',
-            '--jar',
-            '/usr/lib/jvm/kotlinc/lib/kotlin-stdlib.jar',
-            '--output',
-            f'{root.path}/kotlin-stdlib.jar.so',
-        ])
-        logging.info('Done.')
+        if os.path.exists('/usr/bin/jaotc'):
+            java = [x for x in JAVA_FILES if x.endswith('bin/java')][0]
+            java_home = os.path.dirname(os.path.dirname(java))
+            classes_jsa = os.path.join(
+                root.path,
+                os.path.relpath(java_home, JAVA_ROOT),
+                'lib/server/classes.jsa')
+            logging.info('Precompiling critical methods from java.base.')
+            subprocess.check_call([
+                '/usr/bin/jaotc',
+                '-J-Xshare:on',
+                '-J-XX:+UseSerialGC',
+                '-J-XX:+UnlockExperimentalVMOptions',
+                f'-J-XX:SharedArchiveFile={classes_jsa}',
+                '--compile-commands',
+                os.path.join(_CURRENT_DIR, 'java.base.aotcfg'),
+                '--module',
+                'java.base',
+                '--output',
+                f'{root.path}/java.base.so',
+            ])
+            logging.info('Precompiling the kotlin runtime.')
+            subprocess.check_call([
+                '/usr/bin/jaotc',
+                '-J-Xshare:on',
+                '-J-XX:+UseSerialGC',
+                '-J-XX:+UnlockExperimentalVMOptions',
+                f'-J-XX:SharedArchiveFile={classes_jsa}',
+                '--jar',
+                '/usr/lib/jvm/kotlinc/lib/kotlin-stdlib.jar',
+                '--output',
+                f'{root.path}/kotlin-stdlib.jar.so',
+            ])
+        else:
+            logging.info('Skipping Java AOT generation; /usr/bin/jaotc is unavailable.')
 
     with Chroot(
             os.path.join(args.target, 'root-python2'), PYTHON2_ROOT,
@@ -584,12 +612,12 @@ def _main() -> None:
             PYTHON3_ROOT,
             link=args.link) as root:
         root.install(
-            os.path.join(PYTHON3_ROOT, 'bin/python3.9'), '/usr/bin/python3.9')
+            os.path.join(PYTHON3_ROOT, 'bin/python3.10'), '/usr/bin/python3.10')
         root.install(
             os.path.join(PYTHON3_ROOT, 'bin/python3'), '/usr/bin/python3')
         for filename in PYTHON3_FILES:
             # Note the lack of trailing slash to match both python3 and
-            # python3.9.
+            # python3.10.
             if filename.startswith('/usr/lib/python3'):
                 root.copyfromhost(filename, relative_to='/usr/')
 
@@ -650,7 +678,7 @@ def _main() -> None:
             if filename.startswith(DOTNET_ROOT):
                 root.copyfromhost(filename)
         root.copyfromhost(
-            '/usr/share/dotnet/packs',
+            '/usr/lib/dotnet/packs',
             relative_to=DOTNET_ROOT,
             recurse=True)
         root.install(
@@ -666,6 +694,7 @@ def _main() -> None:
                 '/opt/nodejs/karel.js',
                 '/opt/nodejs/bin/node',
                 '/opt/nodejs/karel.wasm',
+                '/opt/nodejs/*.node',
                 '/opt/nodejs/LICENSE',
         ):
             root.copyfromhost(filename, relative_to=JS_ROOT)

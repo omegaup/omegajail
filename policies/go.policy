@@ -9,6 +9,7 @@ close: allow
 {dup, dup2, dup3}: allow
 {fcntl[arch=x86_64], fcntl64[arch=armv7]}: arg1 == F_GETFD || arg1 == F_GETFL || arg1 == F_SETFD || arg1 == F_SETFL || arg1 == F_DUPFD_CLOEXEC
 {fstat[arch=x86_64], fstat64[arch=armv7]}: allow
+newfstatat: allow
 ioctl: return ENOTTY
 {lseek, _llseek[arch=armv7]}: allow
 openat: allow
@@ -32,6 +33,7 @@ sched_getaffinity: allow
 sched_yield: allow
 set_robust_list: allow
 set_tid_address: allow
+rseq: allow
 sigaltstack: allow
 
 # abort()

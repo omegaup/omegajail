@@ -10,9 +10,9 @@ import shutil
 import subprocess
 import sys
 
-from typing import List
+from typing import Dict, List, Optional, Set
 
-_LANGUAGES = [
+_LANGUAGES: List[str] = [
     'c',
     'c11-gcc',
     'c11-clang',
@@ -40,9 +40,10 @@ _LANGUAGES = [
     'js',
     'kj',
     'kp',
+    'rk',
     'cs',
 ]
-_EXTENSIONS = {
+_EXTENSIONS: Dict[str, str] = {
     'c11-gcc': 'c',
     'c11-clang': 'c',
     'cpp03-gcc': 'cpp',
@@ -57,20 +58,37 @@ _EXTENSIONS = {
     'py2': 'py',
     'py3': 'py',
 }
-_KAREL_LANGUAGES = set(['kj', 'kp'])
+_KAREL_LANGUAGES: Set[str] = set(['kj', 'kp', 'rk'])
 _PWD = os.path.abspath(os.path.dirname(__file__))
 
 
-def _check_call(args: List[str]) -> bool:
+def _check_call(args: List[str], expect_success: bool = True) -> bool:
     try:
-        logging.debug('calling \'%s\'', ' '.join(
-            shlex.quote(arg) for arg in args))
+        command = ' '.join(shlex.quote(arg) for arg in args)
+        logging.debug("calling '%s'", command)
         subprocess.check_call(args, cwd=_PWD)
         return True
     except subprocess.CalledProcessError:
-        logging.error('Failed to run \'%s\'', ' '.join(
-            shlex.quote(arg) for arg in args))
+        command = ' '.join(shlex.quote(arg) for arg in args)
+        if expect_success:
+            logging.error("Failed to run '%s'", command)
+        else:
+            logging.debug("Command failed as expected: '%s'", command)
         return False
+
+
+def _file_contains(path: str, needle: str) -> bool:
+    try:
+        with open(path, 'r', encoding='utf-8') as contents:
+            haystack = contents.read()
+    except OSError as err:
+        logging.error("Failed to read %r: %s", path, err)
+        return False
+    if needle not in haystack:
+        logging.error("%r does not contain %r. got %r", path, needle,
+                      haystack)
+        return False
+    return True
 
 
 def _omegajail_compile(
@@ -78,16 +96,21 @@ def _omegajail_compile(
     lang: str,
     strace: bool,
     cgroup_path: str,
+    disable_sandboxing: bool = False,
+    case_name: Optional[str] = None,
+    source_path: Optional[str] = None,
+    source_name: Optional[str] = None,
+    output_limit: int = 10485100,
+    expect_success: bool = True,
 ) -> bool:
-    lang_dir = os.path.join(_PWD, 'run', lang)
+    lang_dir = os.path.join(_PWD, 'run', case_name or lang)
     if os.path.isdir(lang_dir):
         shutil.rmtree(lang_dir, True)
     os.makedirs(lang_dir)
     target = 'Main'
-    source = '{}.{}'.format(target, _EXTENSIONS.get(lang, lang))
-    os.link(
-        os.path.join(_PWD, 'sumas.{}'.format(lang)),
-        os.path.join(lang_dir, source))
+    source = source_name or f'{target}.{_EXTENSIONS.get(lang, lang)}'
+    os.link(source_path or os.path.join(_PWD, f'sumas.{lang}'),
+            os.path.join(lang_dir, source))
     if strace:
         args = [
             'strace', '-f', '-o',
@@ -110,7 +133,7 @@ def _omegajail_compile(
         '-t',
         '30000',
         '-O',
-        '10485100',
+        str(output_limit),
         '--root',
         root,
         '--compile',
@@ -122,10 +145,15 @@ def _omegajail_compile(
         '--cgroup-path',
         cgroup_path,
     ]
+
+    # Add disable-sandboxing flag if requested
+    if disable_sandboxing:
+        args.append('--disable-sandboxing')
+
     if lang == 'cs':
-        os.symlink('/usr/share/dotnet/Main.runtimeconfig.json',
+        os.symlink('/usr/lib/dotnet/Main.runtimeconfig.json',
                    os.path.join(lang_dir, 'Main.runtimeconfig.json'))
-    return _check_call(args)
+    return _check_call(args, expect_success=expect_success)
 
 
 def _omegajail_run(
@@ -133,10 +161,17 @@ def _omegajail_run(
     lang: str,
     strace: bool,
     input_path: str,
-    output_path: str,
+    output_path: Optional[str],
     cgroup_path: str,
+    disable_sandboxing: bool = False,
+    case_name: Optional[str] = None,
+    time_limit: int = 3000,
+    wall_time_limit: int = 3000,
+    output_limit: int = 1048510,
+    memory_limit: int = 256 * 1024 * 1024,
+    expect_success: bool = True,
 ) -> bool:
-    lang_dir = os.path.join(_PWD, 'run', lang)
+    lang_dir = os.path.join(_PWD, 'run', case_name or lang)
     if strace:
         args = [
             'strace', '-f', '-o',
@@ -158,13 +193,13 @@ def _omegajail_run(
         '-M',
         os.path.join(lang_dir, 'run.meta'),
         '-t',
-        '3000',
+        str(time_limit),
         '-w',
-        '3000',
+        str(wall_time_limit),
         '-O',
-        '1048510',
+        str(output_limit),
         '-m',
-        str(256 * 1024 * 1024),
+        str(memory_limit),
         '--root',
         root,
         '--run',
@@ -174,16 +209,120 @@ def _omegajail_run(
         '--run-target',
         'Main',
     ]
-    if not _check_call(args):
+
+    # Add disable-sandboxing flag if requested
+    if disable_sandboxing:
+        args.append('--disable-sandboxing')
+
+    if not _check_call(args, expect_success=expect_success):
         return False
-    with open(os.path.join(lang_dir, 'run.out'), 'r') as run_out:
+    if output_path is None:
+        return True
+    with open(
+        os.path.join(lang_dir, 'run.out'), 'r', encoding='utf-8') as run_out:
         got = run_out.read().strip()
-    with open(os.path.join(_PWD, output_path), 'r') as output:
+    with open(
+        os.path.join(_PWD, output_path), 'r', encoding='utf-8') as output:
         expected = output.read().strip()
     if got != expected:
-        logging.error('Wrong answer when running \'%s\'. got %r, expected %r',
-                      lang, got, expected)
+        logging.error("Wrong answer when running '%s'. got %r, expected %r",
+                     lang, got, expected)
     return got == expected
+
+
+def _run_rekarel_regressions(
+    root: str,
+    strace: bool,
+    cgroup_path: str,
+    disable_sandboxing: bool,
+) -> bool:
+    passed = True
+
+    case_name = 'rk-ce'
+    if _omegajail_compile(
+            root=root,
+            lang='rk',
+            strace=strace,
+            cgroup_path=cgroup_path,
+            disable_sandboxing=disable_sandboxing,
+            case_name=case_name,
+            source_path=os.path.join(_PWD, 'rekarel-ce.rk'),
+            source_name='Main.rk',
+            expect_success=False,
+    ):
+        logging.error("Expected ReKarel syntax error to fail compilation")
+        passed = False
+    else:
+        passed &= _file_contains(
+            os.path.join(_PWD, 'run', case_name, 'compile.meta'), 'status:1')
+
+    case_name = 'rk-ile'
+    if _omegajail_compile(
+            root=root,
+            lang='rk',
+            strace=strace,
+            cgroup_path=cgroup_path,
+            disable_sandboxing=disable_sandboxing,
+            case_name=case_name,
+            source_path=os.path.join(_PWD, 'rekarel-ile.rk'),
+            source_name='Main.rk',
+    ):
+        if _omegajail_run(
+                root=root,
+                lang='rk',
+                strace=strace,
+                input_path='input-karel-instruction-limit',
+                output_path=None,
+                cgroup_path=cgroup_path,
+                disable_sandboxing=disable_sandboxing,
+                case_name=case_name,
+                expect_success=False,
+        ):
+            logging.error("Expected ReKarel infinite loop to hit ILE")
+            passed = False
+        else:
+            passed &= _file_contains(
+                os.path.join(_PWD, 'run', case_name, 'run.meta'),
+                'status:1')
+            passed &= _file_contains(
+                os.path.join(_PWD, 'run', case_name, 'run.out'),
+                'resultadoEjecucion="LIMITE DE INSTRUCCIONES"')
+    else:
+        passed = False
+
+    case_name = 'rk-ole'
+    if _omegajail_compile(
+            root=root,
+            lang='rk',
+            strace=strace,
+            cgroup_path=cgroup_path,
+            disable_sandboxing=disable_sandboxing,
+            case_name=case_name,
+            source_path=os.path.join(_PWD, 'sumas.rk'),
+            source_name='Main.rk',
+    ):
+        if _omegajail_run(
+                root=root,
+                lang='rk',
+                strace=strace,
+                input_path='input-karel',
+                output_path=None,
+                cgroup_path=cgroup_path,
+                disable_sandboxing=disable_sandboxing,
+                case_name=case_name,
+                output_limit=16,
+                expect_success=False,
+        ):
+            logging.error("Expected ReKarel output limit case to fail")
+            passed = False
+        else:
+            passed &= _file_contains(
+                os.path.join(_PWD, 'run', case_name, 'run.meta'),
+                'signal:SIGXFSZ')
+    else:
+        passed = False
+
+    return passed
 
 
 def _main() -> None:
@@ -195,6 +334,8 @@ def _main() -> None:
     parser.add_argument('--cgroup-path',
                         default='/omegajail',
                         type=str)
+    parser.add_argument('--disable-sandboxing', action='store_true',
+                        help='Disable sandboxing for troubleshooting')
     args = parser.parse_args()
 
     # Set this process up for cgroups v2, since it uses slightly different
@@ -203,16 +344,21 @@ def _main() -> None:
         smoketest_cgroup = os.path.join('/sys/fs/cgroup', args.cgroup_path[1:],
                                         'smoketest')
         if not os.path.isdir(smoketest_cgroup):
-            with open(
-                    os.path.join('/sys/fs/cgroup', args.cgroup_path[1:],
-                                 'cgroup.subtree_control'), 'w') as f:
-                f.write('+memory')
-            os.makedirs(smoketest_cgroup, exist_ok=True)
-            with open(os.path.join(smoketest_cgroup, 'cgroup.controllers'),
-                      'w') as f:
-                f.write('+memory')
-        with open(os.path.join(smoketest_cgroup, 'cgroup.procs'), 'w') as f:
-            f.write(str(os.getpid()))
+            try:
+                with open(
+                        os.path.join('/sys/fs/cgroup', args.cgroup_path[1:],
+                                     'cgroup.subtree_control'), 'w', encoding='utf-8') as f:
+                    f.write('+memory')
+                os.makedirs(smoketest_cgroup, exist_ok=True)
+                # Don't enable subtree_control here - smoketest should be a leaf cgroup
+                # that can contain processes
+            except (PermissionError, OSError):
+                pass  # Skip cgroup setup if we don't have permissions or resource busy
+        try:
+            with open(os.path.join(smoketest_cgroup, 'cgroup.procs'), 'w', encoding='utf-8') as f:
+                f.write(str(os.getpid()))
+        except (PermissionError, OSError):
+            pass  # Skip joining cgroup if we don't have permissions or resource busy
 
     args.root = os.path.abspath(args.root)
 
@@ -226,12 +372,13 @@ def _main() -> None:
     passed = True
 
     for lang in languages:
-        print('%-20s' % lang, end='')
+        print(f'{lang:<20}', end='')
         if not _omegajail_compile(
                 root=args.root,
                 lang=lang,
                 strace=args.strace,
                 cgroup_path=args.cgroup_path,
+                disable_sandboxing=args.disable_sandboxing,
         ):
             print('ERROR (COMPILE)')
             passed = False
@@ -247,6 +394,20 @@ def _main() -> None:
                 input_path=input_path,
                 output_path=output_path,
                 cgroup_path=args.cgroup_path,
+                disable_sandboxing=args.disable_sandboxing,
+        ):
+            print('OK')
+        else:
+            print('ERROR')
+            passed = False
+
+    if 'rk' in languages:
+        print(f'{"rk-regressions":<20}', end='')
+        if _run_rekarel_regressions(
+                root=args.root,
+                strace=args.strace,
+                cgroup_path=args.cgroup_path,
+                disable_sandboxing=args.disable_sandboxing,
         ):
             print('OK')
         else:

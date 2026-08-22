@@ -55,6 +55,7 @@ getpid: allow
 gettid: allow
 set_robust_list: allow
 set_tid_address: allow
+rseq: allow
 sigaltstack: allow
 
 # abort()

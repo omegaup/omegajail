@@ -1,0 +1,6 @@
+class program {
+    program () {
+        turnleft(
+        turnoff();
+    }
+}

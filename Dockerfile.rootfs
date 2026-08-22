@@ -1,33 +1,41 @@
-FROM ubuntu:focal AS setup
+FROM ubuntu:22.04 AS setup
 
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update -y && \
+# Use US mirrors for better reliability on GitHub Actions runners (AWS-hosted)
+RUN sed -i 's|http://archive.ubuntu.com/ubuntu/|http://us.archive.ubuntu.com/ubuntu/|g' /etc/apt/sources.list && \
+    sed -i 's|http://security.ubuntu.com/ubuntu/|http://us.archive.ubuntu.com/ubuntu/|g' /etc/apt/sources.list && \
+    echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries && \
+    echo 'Acquire::http::Timeout "120";' > /etc/apt/apt.conf.d/80-timeout && \
+    echo 'Acquire::https::Timeout "120";' > /etc/apt/apt.conf.d/81-https-timeout
+RUN for i in 1 2 3; do \
+      echo "apt-get update attempt $i" && \
+      apt-get update -y --allow-releaseinfo-change && break || \
+      ([ $i -eq 3 ] && exit 1 || sleep 10); \
+    done && \
     apt-get install --no-install-recommends -y \
       ca-certificates \
       wget && \
     apt-get autoremove -y && \
     apt-get clean
 
-RUN wget https://packages.microsoft.com/config/ubuntu/20.04/packages-microsoft-prod.deb \
-      -O packages-microsoft-prod.deb && \
-    dpkg -i packages-microsoft-prod.deb && \
-    rm packages-microsoft-prod.deb
-
-RUN apt-get update -y && \
+RUN for i in 1 2 3; do \
+      echo "apt-get update attempt $i" && \
+      apt-get update -y --allow-releaseinfo-change && break || \
+      ([ $i -eq 3 ] && exit 1 || sleep 10); \
+    done && \
     apt-get install --no-install-recommends -y \
-      aspnetcore-runtime-6.0=6.0.1-1 \
-      aspnetcore-targeting-pack-6.0=6.0.0-1 \
-      clang-10 \
-      dotnet-host=6.0.1-1 \
-      dotnet-hostfxr-6.0=6.0.1-1 \
-      dotnet-runtime-6.0=6.0.1-1 \
-      dotnet-runtime-deps-6.0=6.0.1-1 \
-      dotnet-sdk-6.0=6.0.101-1 \
-      dotnet-targeting-pack-6.0=6.0.1-1 \
-      fp-compiler-3.0.4 \
-      fp-units-fcl-3.0.4 \
-      g++-10 \
-      gcc-10 \
+      aspnetcore-runtime-6.0 \
+      aspnetcore-targeting-pack-6.0 \
+      clang-14 \
+      dotnet-host \
+      dotnet-hostfxr-6.0 \
+      dotnet-runtime-6.0 \
+      dotnet-sdk-6.0 \
+      dotnet-targeting-pack-6.0 \
+      fp-compiler-3.2.2 \
+      fp-units-fcl-3.2.2 \
+      g++-11 \
+      gcc-11 \
       ghc \
       git \
       libc6-dev \
@@ -37,15 +45,15 @@ RUN apt-get update -y && \
       locales \
       lua5.3 \
       make \
-      openjdk-16-jdk \
-      openjdk-16-jdk-headless \
-      openjdk-16-jre \
-      openjdk-16-jre-headless \
+      openjdk-17-jdk \
+      openjdk-17-jdk-headless \
+      openjdk-17-jre \
+      openjdk-17-jre-headless \
       python2.7 \
       python3-apt \
       python3-pip \
-      python3.9 \
-      ruby2.7 \
+      python3.10 \
+      ruby \
       unzip \
       xz-utils \
       zlib1g-dev \
@@ -53,9 +61,8 @@ RUN apt-get update -y && \
     apt-get autoremove -y && \
     apt-get clean
 
-RUN ls -l /usr/bin/ | grep -- '[^9] ->.*-9$' | sed -e 's@^.* \(.\+\) -> \(.\+\)-9$@ln -sf \2-10 /usr/bin/\1@' | bash && \
-    mkdir -p /opt/nodejs && \
-    wget https://nodejs.org/dist/v16.13.1/node-v16.13.1-linux-x64.tar.xz \
+RUN mkdir -p /opt/nodejs && \
+    wget https://nodejs.org/dist/v22.22.0/node-v22.22.0-linux-x64.tar.xz \
         -O - | tar -xJ -C /opt/nodejs --strip-components=1 && \
     mkdir -p /opt/go && \
     wget https://go.dev/dl/go1.18beta2.linux-amd64.tar.gz \
@@ -70,15 +77,15 @@ RUN ls -l /usr/bin/ | grep -- '[^9] ->.*-9$' | sed -e 's@^.* \(.\+\) -> \(.\+\)-
         chmod +x /tmp/rustup-init && \
         RUSTUP_HOME=/opt/rust/rustup CARGO_HOME=/opt/rust/cargo /tmp/rustup-init --no-modify-path --default-host=x86_64-unknown-linux-gnu --default-toolchain=stable --profile=default -y --quiet && \
         rm /tmp/rustup-init && \
-    wget https://github.com/omegaup/karel.js/releases/download/v0.2.1/karel \
+    wget https://github.com/omegaup/karel.js/releases/download/v1.2.8/karel \
         -O /opt/nodejs/karel.wasm && \
-    wget https://github.com/omegaup/karel.js/releases/download/v0.2.1/karel.js \
-        -O /opt/nodejs/karel.js && \
+    wget https://github.com/omegaup/karel.js/releases/download/v1.2.8/karel.js.tar.xz \
+        -O - | tar -xJ -C /opt/nodejs && \
     chmod +x /opt/nodejs/karel.wasm /opt/nodejs/karel.js && \
     wget https://raw.githubusercontent.com/omegaup/libkarel/v0.0.99/libkarel.py \
         -O /usr/lib/python2.7/libkarel.py && \
-    python3.9 -m pip install --target=/usr/lib/python3/dist-packages \
-        libkarel==1.0.2 omegaup==1.5.4 parsy==1.4.0
+    python3.10 -m pip install --target=/usr/lib/python3/dist-packages \
+        libkarel==1.0.2 omegaup==2.0.18 parsy==1.4.0
 
 RUN mkdir /src
 WORKDIR /src
@@ -100,18 +107,9 @@ RUN ln -s /opt/nodejs/bin/node /usr/bin/node && \
     cp /dev/null /var/lib/omegajail/root/dev/null
 
 COPY --from=rootfs-build \
-         /var/lib/omegajail/root-java/java-16-openjdk-amd64/lib/server/classes.jsa \
-         /usr/lib/jvm/java-16-openjdk-amd64/lib/server/classes.jsa
-COPY --from=rootfs-build \
-         /var/lib/omegajail/root-java/java.base.so \
-         /usr/lib/jvm/java.base.so
-COPY --from=rootfs-build \
-         /var/lib/omegajail/root-java/kotlin-stdlib.jar.so \
-         /usr/lib/jvm/kotlin-stdlib.jar.so
-COPY --from=rootfs-build \
          /var/lib/omegajail/root-dotnet/Main.runtimeconfig.json \
          /var/lib/omegajail/root-dotnet/Release.rsp \
-         /usr/share/dotnet/
+         /usr/lib/dotnet/
 COPY --from=rootfs-build \
          /var/lib/omegajail/root-compilers/rust-toolchain.toml \
          /rust-toolchain.toml

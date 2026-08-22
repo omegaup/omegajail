@@ -1,0 +1,22 @@
+iniciar-programa
+    inicia-ejecucion
+        { rk debe poder detectar sintaxis Pascal en un archivo .rk }
+        gira-izquierda;
+        gira-izquierda;
+        gira-izquierda;
+        avanza;
+        gira-izquierda;
+        mientras junto-a-zumbador hacer
+            coge-zumbador;
+
+        gira-izquierda;
+        avanza;
+        gira-izquierda;
+        gira-izquierda;
+        gira-izquierda;
+        mientras algun-zumbador-en-la-mochila hacer
+            deja-zumbador;
+
+        apagate;
+    termina-ejecucion
+finalizar-programa
