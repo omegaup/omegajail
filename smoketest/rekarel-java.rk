@@ -1,0 +1,24 @@
+class program {
+    program () {
+        // rk should detect Java-style Karel syntax in a .rk file.
+        turnleft();
+        turnleft();
+        turnleft();
+        move();
+        turnleft();
+        while (nextToABeeper()) {
+            pickbeeper();
+        }
+
+        turnleft();
+        move();
+        turnleft();
+        turnleft();
+        turnleft();
+        while (anyBeepersInBeeperBag()) {
+            putbeeper();
+        }
+
+        turnoff();
+    }
+}
