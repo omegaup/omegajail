@@ -7,6 +7,10 @@ on:
     tags:
       - v*
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
 
   release:
@@ -74,7 +78,7 @@ jobs:
         if: ${{ steps.bump-version.outputs.part == 'major' || steps.bump-version.outputs.part == 'minor' }}
         run: |
           echo "${{ github.token }}" | \
-              docker login https://docker.pkg.github.com "--username=${{ github.actor }}" --password-stdin
-          container_name=docker.pkg.github.com/${{ github.repository }}/omegajail-builder-rootfs-runtime:${{ steps.bump-version.outputs.tag }}
+              docker login ghcr.io "--username=${{ github.actor }}" --password-stdin
+          container_name=ghcr.io/${{ github.repository }}/omegajail-builder-rootfs-runtime:${{ steps.bump-version.outputs.tag }}
           docker tag omegaup/omegajail-builder-rootfs-runtime "${container_name}"
           docker push "${container_name}"
