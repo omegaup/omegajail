@@ -450,6 +450,20 @@ mod tests {
     }
 
     #[test]
+    fn test_exit() -> Result<()> {
+        init();
+        run_test_case(TestCase {
+            widget: "exit",
+            stdin: "",
+            stdout: Some(""),
+            stderr: Some(""),
+            ..TestCase::default()
+        })?;
+
+        Ok(())
+    }
+
+    #[test]
     fn test_stdio() -> Result<()> {
         init();
         run_test_case(TestCase {

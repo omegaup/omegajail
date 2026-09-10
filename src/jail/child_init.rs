@@ -34,6 +34,14 @@ use crate::sys::{
 // Used to pass None to nix::mount::mount
 const NONE: Option<&'static [u8]> = None;
 
+#[derive(Debug, PartialEq, Eq)]
+enum SeccompEpollAction {
+    ChildExited,
+    ReadSeccompNotification,
+    SeccompFdError,
+    Continue,
+}
+
 pub(crate) fn run(mut parent_jail_sock: UnixStream, opts: JailOptions) -> Result<()> {
     set_cpu_affinity().context("set cpu affinity")?;
 
@@ -487,10 +495,11 @@ fn wait_read_seccomp_notification(
             }
             Ok(nfds) => nfds,
         };
-        for i in 0..nfds {
-            if events[i].data() == child_pidfd.as_raw_fd().try_into()? {
+        match seccomp_epoll_action(&events[..nfds], child_pidfd.as_raw_fd(), seccomp_fd) {
+            SeccompEpollAction::ChildExited => {
                 return Ok(None);
-            } else {
+            }
+            SeccompEpollAction::ReadSeccompNotification => {
                 let notification =
                     seccomp_read_notification(seccomp_fd, &mut notification_contents)
                         .context("seccomp_read_notification")?;
@@ -506,6 +515,115 @@ fn wait_read_seccomp_notification(
                     }
                 }
             }
+            SeccompEpollAction::SeccompFdError => {
+                bail!("seccomp fd reported an error");
+            }
+            SeccompEpollAction::Continue => {}
         }
+    }
+}
+
+fn seccomp_epoll_action(
+    events: &[EpollEvent],
+    child_pidfd: RawFd,
+    seccomp_fd: RawFd,
+) -> SeccompEpollAction {
+    let child_pidfd_data = child_pidfd as u64;
+    if events.iter().any(|event| event.data() == child_pidfd_data) {
+        return SeccompEpollAction::ChildExited;
+    }
+
+    if seccomp_fd < 0 {
+        return SeccompEpollAction::Continue;
+    }
+
+    let seccomp_fd_data = seccomp_fd as u64;
+    for event in events
+        .iter()
+        .filter(|event| event.data() == seccomp_fd_data)
+    {
+        let flags = event.events();
+        if flags.contains(EpollFlags::EPOLLERR) {
+            return SeccompEpollAction::SeccompFdError;
+        }
+        if flags.contains(EpollFlags::EPOLLHUP) {
+            return SeccompEpollAction::ChildExited;
+        }
+        if flags.contains(EpollFlags::EPOLLIN) {
+            return SeccompEpollAction::ReadSeccompNotification;
+        }
+    }
+
+    SeccompEpollAction::Continue
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_seccomp_epoll_action_prioritizes_child_exit() {
+        let events = [
+            EpollEvent::new(EpollFlags::EPOLLIN, 0),
+            EpollEvent::new(EpollFlags::EPOLLIN, 5),
+        ];
+
+        assert_eq!(
+            SeccompEpollAction::ChildExited,
+            seccomp_epoll_action(&events, 5, 0)
+        );
+    }
+
+    #[test]
+    fn test_seccomp_epoll_action_reads_only_on_seccomp_input() {
+        let events = [EpollEvent::new(EpollFlags::EPOLLIN, 0)];
+
+        assert_eq!(
+            SeccompEpollAction::ReadSeccompNotification,
+            seccomp_epoll_action(&events, 5, 0)
+        );
+    }
+
+    #[test]
+    fn test_seccomp_epoll_action_treats_seccomp_hangup_as_exit() {
+        let events = [EpollEvent::new(EpollFlags::EPOLLHUP, 0)];
+
+        assert_eq!(
+            SeccompEpollAction::ChildExited,
+            seccomp_epoll_action(&events, 5, 0)
+        );
+    }
+
+    #[test]
+    fn test_seccomp_epoll_action_prioritizes_hangup_over_input() {
+        let events = [EpollEvent::new(
+            EpollFlags::EPOLLIN | EpollFlags::EPOLLHUP,
+            0,
+        )];
+
+        assert_eq!(
+            SeccompEpollAction::ChildExited,
+            seccomp_epoll_action(&events, 5, 0)
+        );
+    }
+
+    #[test]
+    fn test_seccomp_epoll_action_treats_seccomp_error_as_error() {
+        let events = [EpollEvent::new(EpollFlags::EPOLLERR, 0)];
+
+        assert_eq!(
+            SeccompEpollAction::SeccompFdError,
+            seccomp_epoll_action(&events, 5, 0)
+        );
+    }
+
+    #[test]
+    fn test_seccomp_epoll_action_ignores_unknown_events() {
+        let events = [EpollEvent::new(EpollFlags::EPOLLIN, 7)];
+
+        assert_eq!(
+            SeccompEpollAction::Continue,
+            seccomp_epoll_action(&events, 5, 0)
+        );
     }
 }
