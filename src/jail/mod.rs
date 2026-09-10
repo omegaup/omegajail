@@ -300,9 +300,9 @@ impl Jail {
     }
 }
 
-// Some CI environments cannot run every jail unit test reliably because they
-// lack the namespace/cgroup behavior required by the sandbox. Keep the tests
-// enabled for local/suitable hosts; the workflow skips known hosted-runner cases.
+// These tests create real sandboxes. CI runs them in a separate serial step so
+// they keep exercising namespace/cgroup/seccomp behavior without being
+// interleaved by the Rust test harness.
 #[cfg(test)]
 mod tests {
     use std::ffi::CString;
