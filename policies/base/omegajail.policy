@@ -1,2 +1,3 @@
 execve: allow
 sendmsg: allow
+sendto: arg4 == 0 && arg5 == 0
