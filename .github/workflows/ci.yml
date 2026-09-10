@@ -30,20 +30,15 @@ jobs:
           cargo build --bins
           cargo build --tests
 
-      - name: Test
+      - name: Test non-jail cases
         run: |
-          # Hosted Jammy runners expose cgroup v2 and these jail cases have
-          # been observed to hang there. Keep them enabled in the test suite,
-          # but skip known hosted-runner cases here; sandbox-specific coverage
-          # still depends on local/suitable hosts because smoketest-docker runs
-          # through the container wrapper with --disable-sandboxing.
-          cargo test -- \
-            --skip jail::tests::test_stdio \
-            --skip jail::tests::test_file_descriptors \
-            --skip jail::tests::test_abort \
-            --skip jail::tests::test_oom \
-            --skip jail::tests::test_sigxfsz \
-            --skip jail::tests::test_sigxcpu
+          timeout 180s cargo test -- --skip 'jail::tests::'
+
+      - name: Test jail cases
+        run: |
+          # These tests create real sandboxes. Run them serially so cargo test
+          # does not interleave multiple namespace/cgroup/seccomp supervisors.
+          timeout 180s cargo test 'jail::tests::' -- --test-threads=1 --nocapture
 
       - name: Build rootfs
         run: make OMEGAJAIL_RELEASE=${{ github.sha }} rootfs
