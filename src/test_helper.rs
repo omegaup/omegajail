@@ -14,6 +14,8 @@ const NONE: Option<&'static [u8]> = None;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ArgEnum)]
 enum Widget {
+    /// Exit immediately.
+    Exit,
     /// Basic stdio test.
     Stdio,
     /// Ensure that only file descriptors 1-3 are accessible.
@@ -43,6 +45,7 @@ fn main() -> Result<()> {
     let args = Args::parse();
 
     match args.widget {
+        Widget::Exit => {}
         Widget::Stdio => {
             let mut stdin_buf = String::new();
             stdin().read_to_string(&mut stdin_buf)?;
