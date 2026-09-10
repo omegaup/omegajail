@@ -319,7 +319,7 @@ dependencies = [
 
 [[package]]
 name = "omegajail"
-version = "3.8.4"
+version = "3.11.3"
 dependencies = [
  "anyhow",
  "base64",

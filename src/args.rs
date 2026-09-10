@@ -53,7 +53,13 @@ pub enum Language {
 
 /// [`clap`](::clap) arguments for the sandboxing.
 #[derive(Parser, Clone, Debug)]
-#[clap(author, version, about, long_about = None, trailing_var_arg(true))]
+#[clap(
+    author,
+    version = env!("OMEGAJAIL_VERSION"),
+    about,
+    long_about = None,
+    trailing_var_arg(true)
+)]
 #[clap(group(ArgGroup::new("run_mode").required(true).args(&["compile", "run"])))]
 pub struct Args {
     /// Root of the omegajail runtime
