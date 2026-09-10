@@ -36,6 +36,7 @@ RUN mkdir /src
 WORKDIR /src
 
 COPY README.md ./
+COPY build.rs ./
 COPY Cargo.lock ./
 COPY Cargo.toml ./
 COPY ./src/ ./src/

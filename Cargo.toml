@@ -1,6 +1,6 @@
 [package]
 name = "omegajail"
-version = "3.8.4"
+version = "3.11.3"
 description = "The omegaUp sandbox"
 license = "BSD"
 repository = "https://github.com/omegaup/omegajail"

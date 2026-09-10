@@ -22,7 +22,12 @@ enum Language {
 }
 
 #[derive(Parser, Clone, Debug)]
-#[clap(author, version, about, long_about = None)]
+#[clap(
+    author,
+    version = env!("OMEGAJAIL_VERSION"),
+    about,
+    long_about = None
+)]
 struct Args {
     /// The language in which to compile
     #[clap(long, arg_enum, value_name = "LANGUAGE", default_value = "java")]

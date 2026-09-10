@@ -5,6 +5,7 @@ POLICY_SIGSYS_BINARIES := $(addprefix out/policies/sigsys/,$(patsubst %.policy,%
 
 MKROOT_SOURCE_FILES := Dockerfile.rootfs tools/mkroot tools/java.base.aotcfg \
                        tools/Main.runtimeconfig.json tools/Release.rsp
+RUST_SOURCE_FILES := Cargo.lock Cargo.toml build.rs $(shell find src/ -name '*.rs')
 OMEGAJAIL_RELEASE ?= $(shell git describe --tags)
 DESTDIR ?= /var/lib/omegajail
 
@@ -23,11 +24,11 @@ out/policies/sigsys: out/policies
 minijail/constants.json:
 	$(MAKE) OUT=${PWD}/minijail -C minijail constants.json
 
-out/bin/omegajail: $(shell find src/ -name '*.rs') | out/bin
+out/bin/omegajail: $(RUST_SOURCE_FILES) | out/bin
 	cargo build --release --bin=omegajail
 	cp target/release/omegajail $@
 
-out/bin/java-compile: src/java_compile.rs | out/bin
+out/bin/java-compile: $(RUST_SOURCE_FILES) | out/bin
 	cargo build --release --bin=java-compile
 	cp target/release/java-compile $@
 
@@ -131,7 +132,7 @@ omegajail-jammy-rootfs-x86_64.tar.xz: .omegajail-builder-rootfs-build.stamp
 		/var/lib/omegajail/ && \
 		mv ".$@.tmp" "$@" || rm ".$@.tmp"
 
-.omegajail-builder-distrib.stamp: Dockerfile.distrib $(wildcard src/*.rs src/jail/*.rs tools/omegajail-setup policies/*.frequency policies/*.policy)
+.omegajail-builder-distrib.stamp: Dockerfile.distrib $(RUST_SOURCE_FILES) tools/omegajail-setup $(wildcard policies/*.frequency policies/*.policy)
 	docker build \
 		--build-arg OMEGAJAIL_RELEASE=$(OMEGAJAIL_RELEASE) \
 		-t omegaup/omegajail-builder-distrib \
