@@ -47,6 +47,7 @@
 
 !Cargo.lock
 !Cargo.toml
+!build.rs
 !README.md
 !policies/*.frequency
 !policies/*.policy
