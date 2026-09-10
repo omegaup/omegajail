@@ -594,7 +594,10 @@ def _main() -> None:
                 f'{root.path}/kotlin-stdlib.jar.so',
             ])
         else:
-            logging.info('Skipping Java AOT generation; /usr/bin/jaotc is unavailable.')
+            # OpenJDK 17 no longer ships jaotc, so Jammy builds normally skip
+            # these optional AOT artifacts.
+            logging.debug(
+                'Skipping Java AOT generation; /usr/bin/jaotc is unavailable.')
 
     with Chroot(
             os.path.join(args.target, 'root-python2'), PYTHON2_ROOT,
