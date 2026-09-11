@@ -516,26 +516,40 @@ impl JailOptions {
                     ]);
                     execve_args.extend(compile_sources.iter().map(|s| s.clone()));
                 }
-                args::Language::KarelJava
-                | args::Language::KarelPascal
-                | args::Language::ReKarel => {
-                    seccomp_profile_name = String::from(if lang == args::Language::ReKarel {
-                        "rkc"
-                    } else {
-                        "js"
-                    });
+                args::Language::KarelJava | args::Language::KarelPascal => {
+                    seccomp_profile_name = String::from("js");
                     extra_memory_size_in_bytes = NODE_EXTRA_MEMORY_SIZE_IN_BYTES;
                     vm_memory_size_in_bytes = NODE_VM_MEMORY_SIZE_IN_BYTES;
                     mounts.push(MountArgs {
-                        source: Some(root.join("root-js")),
-                        target: rootfs.join("opt/nodejs"),
+                        source: Some(root.join("root-kareljs")),
+                        target: rootfs.join("opt/kareljs"),
                         fstype: None,
                         flags: MsFlags::MS_BIND | MsFlags::MS_RDONLY,
                         data: None,
                     });
                     execve_args.extend([
-                        String::from("/opt/nodejs/bin/node"),
-                        String::from("/opt/nodejs/karel.js"),
+                        String::from("/opt/kareljs/bin/node"),
+                        String::from("/opt/kareljs/karel.js"),
+                        String::from("compile"),
+                        String::from("-o"),
+                        format!("{}.kx", &args.compile_target),
+                    ]);
+                    execve_args.extend(compile_sources.iter().map(|s| s.clone()));
+                }
+                args::Language::ReKarel => {
+                    seccomp_profile_name = String::from("rkc");
+                    extra_memory_size_in_bytes = NODE_EXTRA_MEMORY_SIZE_IN_BYTES;
+                    vm_memory_size_in_bytes = NODE_VM_MEMORY_SIZE_IN_BYTES;
+                    mounts.push(MountArgs {
+                        source: Some(root.join("root-rekarel")),
+                        target: rootfs.join("opt/rekarel"),
+                        fstype: None,
+                        flags: MsFlags::MS_BIND | MsFlags::MS_RDONLY,
+                        data: None,
+                    });
+                    execve_args.extend([
+                        String::from("/opt/rekarel/bin/node"),
+                        String::from("/opt/rekarel/karel.js"),
                         String::from("compile"),
                         String::from("-o"),
                         format!("{}.kx", &args.compile_target),
@@ -753,23 +767,31 @@ impl JailOptions {
                         format!("{}.js", &args.run_target),
                     ]);
                 }
-                args::Language::KarelPascal
-                | args::Language::KarelJava
-                | args::Language::ReKarel => {
-                    seccomp_profile_name = String::from(if lang == args::Language::ReKarel {
-                        "rk"
-                    } else {
-                        "karel"
-                    });
+                args::Language::KarelPascal | args::Language::KarelJava => {
+                    seccomp_profile_name = String::from("karel");
                     mounts.push(MountArgs {
-                        source: Some(root.join("root-js")),
-                        target: rootfs.join("opt/nodejs"),
+                        source: Some(root.join("root-kareljs")),
+                        target: rootfs.join("opt/kareljs"),
                         fstype: None,
                         flags: MsFlags::MS_BIND | MsFlags::MS_RDONLY,
                         data: None,
                     });
                     execve_args.extend([
-                        String::from("/opt/nodejs/karel.wasm"),
+                        String::from("/opt/kareljs/karel.wasm"),
+                        String::from(format!("{}.kx", &args.run_target)),
+                    ]);
+                }
+                args::Language::ReKarel => {
+                    seccomp_profile_name = String::from("rk");
+                    mounts.push(MountArgs {
+                        source: Some(root.join("root-rekarel")),
+                        target: rootfs.join("opt/rekarel"),
+                        fstype: None,
+                        flags: MsFlags::MS_BIND | MsFlags::MS_RDONLY,
+                        data: None,
+                    });
+                    execve_args.extend([
+                        String::from("/opt/rekarel/karel.wasm"),
                         String::from(format!("{}.kx", &args.run_target)),
                     ]);
                 }
@@ -894,32 +916,65 @@ fn add_sources(execve_args: &mut Vec<String>, lang_flag: &str, compile_sources: 
 #[cfg(test)]
 mod tests {
     use std::fs::{create_dir_all, write};
+    use std::path::Path;
 
     use anyhow::Result;
     use tempdir::TempDir;
 
-    use super::JailOptions;
+    use super::{JailOptions, MountArgs};
     use crate::args;
 
-    fn go_compile_options(disable_sandboxing: bool) -> Result<(JailOptions, TempDir)> {
-        let tmp_dir = TempDir::new("go-compile-options")?;
+    fn write_policy(root: &Path, name: &str) -> Result<()> {
+        write(root.join(format!("policies/{name}.bpf")), [])?;
+        write(root.join(format!("policies/sigsys/{name}.bpf")), [])?;
+
+        Ok(())
+    }
+
+    fn prepare_options_root(name: &str) -> Result<(TempDir, String, String)> {
+        let tmp_dir = TempDir::new(name)?;
         let root = tmp_dir.path().join("root");
         let homedir = tmp_dir.path().join("home");
 
         create_dir_all(root.join("policies/sigsys"))?;
+        create_dir_all(root.join("root"))?;
         create_dir_all(root.join("root-compilers"))?;
+        create_dir_all(root.join("root-kareljs"))?;
+        create_dir_all(root.join("root-rekarel"))?;
         create_dir_all(&homedir)?;
-        write(root.join("policies/go-build.bpf"), [])?;
-        write(root.join("policies/sigsys/go-build.bpf"), [])?;
 
-        let options = JailOptions::new(args::Args {
-            root: root.to_string_lossy().into_owned(),
-            compile: Some(args::Language::Go),
-            compile_source: Some(vec![String::from("Main.go")]),
+        for profile in ["go-build", "js", "karel", "rkc", "rk"] {
+            write_policy(&root, profile)?;
+        }
+
+        Ok((
+            tmp_dir,
+            root.to_string_lossy().into_owned(),
+            homedir.to_string_lossy().into_owned(),
+        ))
+    }
+
+    fn args_for_language(
+        root: String,
+        homedir: String,
+        compile: Option<args::Language>,
+        run: Option<args::Language>,
+    ) -> args::Args {
+        args::Args {
+            root: root,
+            compile: compile,
+            compile_source: compile.map(|language| {
+                vec![match language {
+                    args::Language::ReKarel => String::from("Main.rk"),
+                    args::Language::KarelJava => String::from("Main.kj"),
+                    args::Language::KarelPascal => String::from("Main.kp"),
+                    _ => String::from("Main.go"),
+                }]
+            }),
             compile_target: String::from("Main"),
-            run: None,
+            run: run,
             run_target: String::from("Main"),
-            homedir: homedir.to_string_lossy().into_owned(),
+            homedir: homedir,
             homedir_writable: true,
             stdin: None,
             stdout: None,
@@ -930,11 +985,41 @@ mod tests {
             output_limit: Some(10485760),
             memory_limit: None,
             cgroup_path: String::from("/omegajail"),
-            disable_sandboxing: disable_sandboxing,
+            disable_sandboxing: false,
             bind: vec![],
             allow_sigsys_fallback: true,
             extra_args: vec![],
-        })?;
+        }
+    }
+
+    fn mount_exists<P1: AsRef<Path>, P2: AsRef<Path>>(
+        mounts: &[MountArgs],
+        source_suffix: P1,
+        target_suffix: P2,
+    ) -> bool {
+        mounts.iter().any(|mount| {
+            mount
+                .source
+                .as_ref()
+                .is_some_and(|source| source.ends_with(source_suffix.as_ref()))
+                && mount.target.ends_with(target_suffix.as_ref())
+        })
+    }
+
+    fn argv(options: &JailOptions) -> Vec<String> {
+        options
+            .args
+            .iter()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect()
+    }
+
+    fn go_compile_options(disable_sandboxing: bool) -> Result<(JailOptions, TempDir)> {
+        let (tmp_dir, root, homedir) = prepare_options_root("go-compile-options")?;
+        let mut args = args_for_language(root, homedir, Some(args::Language::Go), None);
+        args.disable_sandboxing = disable_sandboxing;
+
+        let options = JailOptions::new(args)?;
 
         Ok((options, tmp_dir))
     }
@@ -964,6 +1049,64 @@ mod tests {
             .iter()
             .any(|env| env.to_bytes() == expected_env.as_bytes()));
         assert!(go_build_cache.is_dir());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_rekarel_compile_uses_dedicated_runtime_root() -> Result<()> {
+        let (_tmp_dir, root, homedir) = prepare_options_root("rekarel-compile-options")?;
+        let options = JailOptions::new(args_for_language(
+            root,
+            homedir,
+            Some(args::Language::ReKarel),
+            None,
+        ))?;
+
+        assert_eq!("rkc", options.seccomp_profile_name);
+        assert!(mount_exists(&options.mounts, "root-rekarel", "opt/rekarel"));
+        let argv = argv(&options);
+        assert!(argv.contains(&String::from("/opt/rekarel/bin/node")));
+        assert!(argv.contains(&String::from("/opt/rekarel/karel.js")));
+        assert!(!argv.contains(&String::from("/opt/kareljs/karel.js")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_rekarel_run_uses_dedicated_runtime_root() -> Result<()> {
+        let (_tmp_dir, root, homedir) = prepare_options_root("rekarel-run-options")?;
+        let options = JailOptions::new(args_for_language(
+            root,
+            homedir,
+            None,
+            Some(args::Language::ReKarel),
+        ))?;
+
+        assert_eq!("rk", options.seccomp_profile_name);
+        assert!(mount_exists(&options.mounts, "root-rekarel", "opt/rekarel"));
+        let argv = argv(&options);
+        assert_eq!("/opt/rekarel/karel.wasm", argv[0]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_legacy_karel_uses_legacy_runtime_root() -> Result<()> {
+        let (_tmp_dir, root, homedir) = prepare_options_root("legacy-karel-options")?;
+        let options = JailOptions::new(args_for_language(
+            root,
+            homedir,
+            Some(args::Language::KarelJava),
+            None,
+        ))?;
+
+        assert_eq!("js", options.seccomp_profile_name);
+        assert!(mount_exists(&options.mounts, "root-kareljs", "opt/kareljs"));
+        let argv = argv(&options);
+        assert!(argv.contains(&String::from("/opt/kareljs/bin/node")));
+        assert!(argv.contains(&String::from("/opt/kareljs/karel.js")));
+        assert!(!argv.contains(&String::from("/opt/rekarel/karel.js")));
 
         Ok(())
     }

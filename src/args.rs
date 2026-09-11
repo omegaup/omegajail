@@ -157,3 +157,42 @@ pub struct Args {
     /// Any additional arguments to the executable
     pub extra_args: Vec<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_compile_rekarel() {
+        let args = Args::try_parse_from([
+            "omegajail",
+            "--homedir",
+            "/tmp",
+            "--compile",
+            "rk",
+            "--compile-source",
+            "Main.rk",
+            "--compile-target",
+            "Main",
+        ])
+        .unwrap();
+
+        assert_eq!(Some(Language::ReKarel), args.compile);
+    }
+
+    #[test]
+    fn test_parse_run_rekarel() {
+        let args = Args::try_parse_from([
+            "omegajail",
+            "--homedir",
+            "/tmp",
+            "--run",
+            "rk",
+            "--run-target",
+            "Main",
+        ])
+        .unwrap();
+
+        assert_eq!(Some(Language::ReKarel), args.run);
+    }
+}
