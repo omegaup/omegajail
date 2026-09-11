@@ -399,6 +399,8 @@ def _main() -> None:
     JAVA_ROOT = '/usr/lib/jvm/'
     DOTNET_ROOT = '/usr/lib/dotnet/'
     JS_ROOT = '/opt/nodejs/'
+    KARELJS_ROOT = '/opt/kareljs/'
+    REKAREL_ROOT = '/opt/rekarel/'
     GO_ROOT = '/opt/go/'
     RUST_ROOT = '/opt/rust/'
 
@@ -694,13 +696,26 @@ def _main() -> None:
     with Chroot(os.path.join(args.target, 'root-js'), JS_ROOT,
                 link=args.link) as root:
         for filename in (
-                '/opt/nodejs/karel.js',
                 '/opt/nodejs/bin/node',
-                '/opt/nodejs/karel.wasm',
-                '/opt/nodejs/*.node',
                 '/opt/nodejs/LICENSE',
         ):
             root.copyfromhost(filename, relative_to=JS_ROOT)
+
+    karel_runtime_files = (
+        '/opt/nodejs/karel.js',
+        '/opt/nodejs/bin/node',
+        '/opt/nodejs/karel.wasm',
+        '/opt/nodejs/*.node',
+        '/opt/nodejs/LICENSE',
+    )
+    for root_name, mountpoint in (
+            ('root-kareljs', KARELJS_ROOT),
+            ('root-rekarel', REKAREL_ROOT),
+    ):
+        with Chroot(os.path.join(args.target, root_name), mountpoint,
+                    link=args.link) as root:
+            for filename in karel_runtime_files:
+                root.copyfromhost(filename, relative_to=JS_ROOT)
 
     with Chroot(os.path.join(args.target, 'root-go'), GO_ROOT,
                 link=args.link) as root:

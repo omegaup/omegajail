@@ -87,6 +87,9 @@ RUN mkdir -p /opt/nodejs && \
     python3.10 -m pip install --target=/usr/lib/python3/dist-packages \
         libkarel==1.0.2 omegaup==2.0.18 parsy==1.4.0
 
+RUN ln -s /opt/nodejs /opt/kareljs && \
+    ln -s /opt/nodejs /opt/rekarel
+
 RUN mkdir /src
 WORKDIR /src
 
