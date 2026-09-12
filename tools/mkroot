@@ -454,6 +454,8 @@ def _main() -> None:
         root.mkdir(HASKELL_ROOT)
         root.mkdir(DOTNET_ROOT)
         root.mkdir(JS_ROOT)
+        root.mkdir(KARELJS_ROOT)
+        root.mkdir(REKAREL_ROOT)
         root.mkdir(RUST_ROOT)
         root.mkdir(GO_ROOT)
 
