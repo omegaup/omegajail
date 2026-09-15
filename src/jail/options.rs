@@ -548,9 +548,7 @@ impl JailOptions {
                         data: None,
                     });
                     execve_args.extend([
-                        String::from("/opt/rekarel/bin/node"),
-                        String::from("/opt/rekarel/karel.js"),
-                        String::from("compile"),
+                        String::from("/opt/rekarel/bin/rekarel-compile"),
                         String::from("-o"),
                         format!("{}.kx", &args.compile_target),
                     ]);
@@ -782,6 +780,8 @@ impl JailOptions {
                     ]);
                 }
                 args::Language::ReKarel => {
+                    extra_memory_size_in_bytes = NODE_EXTRA_MEMORY_SIZE_IN_BYTES;
+                    vm_memory_size_in_bytes = NODE_VM_MEMORY_SIZE_IN_BYTES;
                     seccomp_profile_name = String::from("rk");
                     mounts.push(MountArgs {
                         source: Some(root.join("root-rekarel")),
@@ -791,7 +791,7 @@ impl JailOptions {
                         data: None,
                     });
                     execve_args.extend([
-                        String::from("/opt/rekarel/karel.wasm"),
+                        String::from("/opt/rekarel/bin/rekarel-run"),
                         String::from(format!("{}.kx", &args.run_target)),
                     ]);
                 }
@@ -1066,8 +1066,7 @@ mod tests {
         assert_eq!("rkc", options.seccomp_profile_name);
         assert!(mount_exists(&options.mounts, "root-rekarel", "opt/rekarel"));
         let argv = argv(&options);
-        assert!(argv.contains(&String::from("/opt/rekarel/bin/node")));
-        assert!(argv.contains(&String::from("/opt/rekarel/karel.js")));
+        assert!(argv.contains(&String::from("/opt/rekarel/bin/rekarel-compile")));
         assert!(!argv.contains(&String::from("/opt/kareljs/karel.js")));
 
         Ok(())
@@ -1086,7 +1085,7 @@ mod tests {
         assert_eq!("rk", options.seccomp_profile_name);
         assert!(mount_exists(&options.mounts, "root-rekarel", "opt/rekarel"));
         let argv = argv(&options);
-        assert_eq!("/opt/rekarel/karel.wasm", argv[0]);
+        assert_eq!("/opt/rekarel/bin/rekarel-run", argv[0]);
 
         Ok(())
     }

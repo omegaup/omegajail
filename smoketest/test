@@ -91,6 +91,19 @@ def _file_contains(path: str, needle: str) -> bool:
     return True
 
 
+def _file_size_equals(path: str, expected_size: int) -> bool:
+    try:
+        actual_size = os.path.getsize(path)
+    except OSError as err:
+        logging.error("Failed to stat %r: %s", path, err)
+        return False
+    if actual_size != expected_size:
+        logging.error("%r has size %d. expected %d", path, actual_size,
+                      expected_size)
+        return False
+    return True
+
+
 def _omegajail_compile(
     root: str,
     lang: str,
@@ -238,6 +251,30 @@ def _run_rekarel_regressions(
 ) -> bool:
     passed = True
 
+    case_name = 'rk-globals'
+    if _omegajail_compile(
+            root=root,
+            lang='rk',
+            strace=strace,
+            cgroup_path=cgroup_path,
+            disable_sandboxing=disable_sandboxing,
+            case_name=case_name,
+            source_path=os.path.join(_PWD, 'rekarel-globals.rk'),
+            source_name='Main.rk',
+    ):
+        passed &= _omegajail_run(
+            root=root,
+            lang='rk',
+            strace=strace,
+            input_path='input-rekarel-globals',
+            output_path='output-rekarel-globals',
+            cgroup_path=cgroup_path,
+            disable_sandboxing=disable_sandboxing,
+            case_name=case_name,
+        )
+    else:
+        passed = False
+
     case_name = 'rk-java'
     if _omegajail_compile(
             root=root,
@@ -310,7 +347,7 @@ def _run_rekarel_regressions(
                 'status:1')
             passed &= _file_contains(
                 os.path.join(_PWD, 'run', case_name, 'run.out'),
-                'resultadoEjecucion="LIMITE DE INSTRUCCIONES"')
+                'resultadoEjecucion="LIMITE DE INSTRUCCIONES GENERAL"')
     else:
         passed = False
 
@@ -342,7 +379,12 @@ def _run_rekarel_regressions(
         else:
             passed &= _file_contains(
                 os.path.join(_PWD, 'run', case_name, 'run.meta'),
-                'signal:SIGXFSZ')
+                'status:1')
+            passed &= _file_contains(
+                os.path.join(_PWD, 'run', case_name, 'run.out'),
+                '<resultados>')
+            passed &= _file_size_equals(
+                os.path.join(_PWD, 'run', case_name, 'run.out'), 16)
     else:
         passed = False
 

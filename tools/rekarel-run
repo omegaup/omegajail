@@ -1,0 +1,88 @@
+#!/opt/rekarel/bin/node --jitless
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+
+const runtimeRoot = path.resolve(__dirname, '..');
+const { World } = require(path.join(
+  runtimeRoot,
+  'node_modules',
+  '@rekarel',
+  'core',
+  'dist',
+  'index.cjs',
+));
+const { DOMParser } = require(path.join(
+  runtimeRoot,
+  'node_modules',
+  '@xmldom',
+  'xmldom',
+  'lib',
+  'index.js',
+));
+
+function usage() {
+  console.error('usage: rekarel-run Main.kx');
+}
+
+function parseWorldXml(inputXml) {
+  const errors = [];
+  const parser = new DOMParser({
+    errorHandler: {
+      warning() {},
+      error(message) {
+        errors.push(message);
+      },
+      fatalError(message) {
+        errors.push(message);
+      },
+    },
+  });
+  const document = parser.parseFromString(inputXml, 'text/xml');
+  if (errors.length !== 0) {
+    throw new Error(`invalid Karel XML input: ${errors.join('; ')}`);
+  }
+  return document;
+}
+
+function writeAllSync(fd, text) {
+  const output = Buffer.from(text, 'utf8');
+  let offset = 0;
+  while (offset < output.length) {
+    const written = fs.writeSync(fd, output, offset, output.length - offset);
+    if (written === 0) {
+      throw new Error('failed to write complete ReKarel XML output');
+    }
+    offset += written;
+  }
+}
+
+if (process.argv.length !== 3) {
+  usage();
+  process.exit(2);
+}
+
+try {
+  const program = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+  const inputXml = fs.readFileSync(0, 'utf8');
+  const world = new World(100, 100);
+
+  world.load(parseWorldXml(inputXml));
+  world.runtime.load(program);
+  while (world.runtime.step()) {}
+
+  writeAllSync(1, world.output());
+
+  if (world.runtime.state.error) {
+    console.error(`ReKarel runtime error: ${world.runtime.state.error}`);
+    process.exit(1);
+  }
+} catch (error) {
+  if (error && error.message) {
+    console.error(error.message);
+  } else {
+    console.error(String(error));
+  }
+  process.exit(1);
+}
