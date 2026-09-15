@@ -32,7 +32,19 @@ munmap: allow
 time: allow
 gettimeofday: allow
 
+# Threads
+clone: arg0 == CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID
+clone3: allow
+futex: allow
+prctl: arg0 == PR_SET_NAME
+set_robust_list: allow
+set_tid_address: allow
+rseq: allow
+sched_getaffinity: allow
+sched_yield: allow
+
 # Environment
+prlimit64: {arg1 == RLIMIT_STACK || arg2 == 0; allow, return EPERM}
 uname: allow
 getrandom: allow
 
