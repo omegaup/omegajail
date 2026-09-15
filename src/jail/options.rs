@@ -1091,6 +1091,25 @@ mod tests {
     }
 
     #[test]
+    fn test_rekarel_run_policy_uses_nodejs_syscall_surface() {
+        let js_policy = include_str!("../../policies/js.policy");
+        let rkc_policy = include_str!("../../policies/rkc.policy");
+        let rk_policy = include_str!("../../policies/rk.policy");
+        let karel_policy = include_str!("../../policies/karel.policy");
+        let nodejs_policy = include_str!("../../policies/base/nodejs.policy");
+
+        assert!(js_policy.contains("@include ./base/nodejs.policy"));
+        assert!(rkc_policy.contains("@include ./base/nodejs.policy"));
+        assert!(rk_policy.contains("@include ./base/nodejs.policy"));
+        assert!(rk_policy.contains("@frequency ./rk.frequency"));
+        assert!(!karel_policy.contains("@include ./base/nodejs.policy"));
+
+        assert!(nodejs_policy.contains("newfstatat: allow"));
+        assert!(nodejs_policy.contains("io_uring_setup: return ENOSYS"));
+        assert!(nodejs_policy.contains("socket: return ENETDOWN"));
+    }
+
+    #[test]
     fn test_legacy_karel_uses_legacy_runtime_root() -> Result<()> {
         let (_tmp_dir, root, homedir) = prepare_options_root("legacy-karel-options")?;
         let options = JailOptions::new(args_for_language(

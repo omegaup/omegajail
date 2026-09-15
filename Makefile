@@ -1,5 +1,6 @@
 BINARIES := out/bin/omegajail out/bin/java-compile
 POLICIES := $(wildcard policies/*.policy)
+BASE_POLICIES := $(wildcard policies/base/*.policy)
 POLICY_NOTIFY_BINARIES := $(addprefix out/policies/,$(patsubst %.policy,%.bpf,$(notdir $(POLICIES))))
 POLICY_SIGSYS_BINARIES := $(addprefix out/policies/sigsys/,$(patsubst %.policy,%.bpf,$(notdir $(POLICIES))))
 
@@ -33,14 +34,14 @@ out/bin/java-compile: $(RUST_SOURCE_FILES) | out/bin
 	cargo build --release --bin=java-compile
 	cp target/release/java-compile $@
 
-out/policies/%.bpf: policies/%.policy policies/base/omegajail.policy | minijail/constants.json out/policies
+out/policies/%.bpf: policies/%.policy $(BASE_POLICIES) | minijail/constants.json out/policies
 	./minijail/tools/compile_seccomp_policy.py \
 		--use-kill-process \
 		--default-action=user-notify \
 		--arch-json=minijail/constants.json \
 		$< $@
 
-out/policies/sigsys/%.bpf: policies/%.policy policies/base/omegajail.policy | minijail/constants.json out/policies/sigsys
+out/policies/sigsys/%.bpf: policies/%.policy $(BASE_POLICIES) | minijail/constants.json out/policies/sigsys
 	./minijail/tools/compile_seccomp_policy.py \
 		--use-kill-process \
 		--arch-json=minijail/constants.json \
@@ -133,7 +134,7 @@ omegajail-jammy-rootfs-x86_64.tar.xz: .omegajail-builder-rootfs-build.stamp
 		/var/lib/omegajail/ && \
 		mv ".$@.tmp" "$@" || rm ".$@.tmp"
 
-.omegajail-builder-distrib.stamp: Dockerfile.distrib $(RUST_SOURCE_FILES) tools/omegajail-setup $(wildcard policies/*.frequency policies/*.policy)
+.omegajail-builder-distrib.stamp: Dockerfile.distrib $(RUST_SOURCE_FILES) tools/omegajail-setup $(wildcard policies/*.frequency policies/*.policy) $(BASE_POLICIES)
 	docker build \
 		--build-arg OMEGAJAIL_RELEASE=$(OMEGAJAIL_RELEASE) \
 		-t omegaup/omegajail-builder-distrib \
