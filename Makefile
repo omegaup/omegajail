@@ -4,7 +4,8 @@ POLICY_NOTIFY_BINARIES := $(addprefix out/policies/,$(patsubst %.policy,%.bpf,$(
 POLICY_SIGSYS_BINARIES := $(addprefix out/policies/sigsys/,$(patsubst %.policy,%.bpf,$(notdir $(POLICIES))))
 
 MKROOT_SOURCE_FILES := Dockerfile.rootfs tools/mkroot tools/java.base.aotcfg \
-                       tools/Main.runtimeconfig.json tools/Release.rsp
+                       tools/Main.runtimeconfig.json tools/Release.rsp \
+                       tools/rekarel-compile tools/rekarel-run
 RUST_SOURCE_FILES := Cargo.lock Cargo.toml build.rs $(shell find src/ -name '*.rs')
 OMEGAJAIL_RELEASE ?= $(shell git describe --tags)
 DESTDIR ?= /var/lib/omegajail

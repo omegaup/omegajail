@@ -703,21 +703,30 @@ def _main() -> None:
         ):
             root.copyfromhost(filename, relative_to=JS_ROOT)
 
-    karel_runtime_files = (
-        '/opt/nodejs/karel.js',
-        '/opt/nodejs/bin/node',
-        '/opt/nodejs/karel.wasm',
-        '/opt/nodejs/*.node',
-        '/opt/nodejs/LICENSE',
+    kareljs_runtime_files = (
+        '/opt/kareljs/karel.js',
+        '/opt/kareljs/bin/node',
+        '/opt/kareljs/karel.wasm',
+        '/opt/kareljs/*.node',
+        '/opt/kareljs/LICENSE',
     )
-    for root_name, mountpoint in (
-            ('root-kareljs', KARELJS_ROOT),
-            ('root-rekarel', REKAREL_ROOT),
-    ):
-        with Chroot(os.path.join(args.target, root_name), mountpoint,
-                    link=args.link) as root:
-            for filename in karel_runtime_files:
-                root.copyfromhost(filename, relative_to=JS_ROOT)
+    with Chroot(os.path.join(args.target, 'root-kareljs'), KARELJS_ROOT,
+                link=args.link) as root:
+        for filename in kareljs_runtime_files:
+            root.copyfromhost(filename, relative_to=KARELJS_ROOT)
+
+    rekarel_runtime_files = (
+        '/opt/rekarel/LICENSE.node',
+        '/opt/rekarel/bin/node',
+        '/opt/rekarel/bin/rekarel-compile',
+        '/opt/rekarel/bin/rekarel-run',
+        '/opt/rekarel/node_modules',
+    )
+    with Chroot(os.path.join(args.target, 'root-rekarel'), REKAREL_ROOT,
+                link=args.link) as root:
+        for filename in rekarel_runtime_files:
+            root.copyfromhost(
+                filename, relative_to=REKAREL_ROOT, recurse=os.path.isdir(filename))
 
     with Chroot(os.path.join(args.target, 'root-go'), GO_ROOT,
                 link=args.link) as root:

@@ -77,18 +77,40 @@ RUN mkdir -p /opt/nodejs && \
         chmod +x /tmp/rustup-init && \
         RUSTUP_HOME=/opt/rust/rustup CARGO_HOME=/opt/rust/cargo /tmp/rustup-init --no-modify-path --default-host=x86_64-unknown-linux-gnu --default-toolchain=stable --profile=default -y --quiet && \
         rm /tmp/rustup-init && \
+    mkdir -p /opt/kareljs/bin && \
+        ln -s /opt/nodejs/bin/node /opt/kareljs/bin/node && \
     wget https://github.com/omegaup/karel.js/releases/download/v1.2.8/karel \
-        -O /opt/nodejs/karel.wasm && \
+        -O /opt/kareljs/karel.wasm && \
     wget https://github.com/omegaup/karel.js/releases/download/v1.2.8/karel.js.tar.xz \
-        -O - | tar -xJ -C /opt/nodejs && \
-    chmod +x /opt/nodejs/karel.wasm /opt/nodejs/karel.js && \
+        -O - | tar -xJ -C /opt/kareljs && \
+    chmod +x /opt/kareljs/karel.wasm /opt/kareljs/karel.js && \
+    cp /opt/nodejs/LICENSE /opt/kareljs/LICENSE && \
+    mkdir -p /opt/rekarel/bin \
+        /opt/rekarel/node_modules/@rekarel/core \
+        /opt/rekarel/node_modules/@xmldom/xmldom \
+        /tmp/rekarel-packages && \
+        ln -s /opt/nodejs/bin/node /opt/rekarel/bin/node && \
+        cp /opt/nodejs/LICENSE /opt/rekarel/LICENSE.node && \
+    wget https://registry.npmjs.org/@rekarel/core/-/core-3.0.1.tgz \
+        -O /tmp/rekarel-packages/core-3.0.1.tgz && \
+        echo "8b390061d20c1cc72fda8c91738ef5247bbe08c0346415bac987df47a0cdf2c8  /tmp/rekarel-packages/core-3.0.1.tgz" | sha256sum -c - && \
+        tar -xzf /tmp/rekarel-packages/core-3.0.1.tgz \
+            -C /opt/rekarel/node_modules/@rekarel/core --strip-components=1 && \
+    wget https://registry.npmjs.org/@xmldom/xmldom/-/xmldom-0.8.10.tgz \
+        -O /tmp/rekarel-packages/xmldom-0.8.10.tgz && \
+        echo "6d339080138dec0a15a7df1879e369be5fa9f7542bd2019098f46ebacc0ad660  /tmp/rekarel-packages/xmldom-0.8.10.tgz" | sha256sum -c - && \
+        tar -xzf /tmp/rekarel-packages/xmldom-0.8.10.tgz \
+            -C /opt/rekarel/node_modules/@xmldom/xmldom --strip-components=1 && \
+        rm -rf /tmp/rekarel-packages && \
     wget https://raw.githubusercontent.com/omegaup/libkarel/v0.0.99/libkarel.py \
         -O /usr/lib/python2.7/libkarel.py && \
     python3.10 -m pip install --target=/usr/lib/python3/dist-packages \
         libkarel==1.0.2 omegaup==2.0.18 parsy==1.4.0
 
-RUN ln -s /opt/nodejs /opt/kareljs && \
-    ln -s /opt/nodejs /opt/rekarel
+COPY ./tools/rekarel-compile ./tools/rekarel-run /tmp/rekarel-wrappers/
+RUN install -m 0755 /tmp/rekarel-wrappers/rekarel-compile /opt/rekarel/bin/rekarel-compile && \
+    install -m 0755 /tmp/rekarel-wrappers/rekarel-run /opt/rekarel/bin/rekarel-run && \
+    rm -rf /tmp/rekarel-wrappers
 
 RUN mkdir /src
 WORKDIR /src

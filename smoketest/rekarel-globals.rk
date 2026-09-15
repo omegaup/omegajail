@@ -1,0 +1,15 @@
+import rekarel.globals;
+
+class program {
+    program () {
+        iterate (beepersInBeeperBag) {
+            putbeeper();
+        }
+
+        if (true) {
+            turnleft();
+        }
+
+        turnoff();
+    }
+}

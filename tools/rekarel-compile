@@ -1,0 +1,76 @@
+#!/opt/rekarel/bin/node
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+
+const runtimeRoot = path.resolve(__dirname, '..');
+const { compile } = require(path.join(
+  runtimeRoot,
+  'node_modules',
+  '@rekarel',
+  'core',
+  'dist',
+  'index.cjs',
+));
+
+function usage() {
+  console.error('usage: rekarel-compile -o output.kx source.rk');
+}
+
+function parseArgs(argv) {
+  let outputPath = null;
+  const sources = [];
+
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === '-o' || arg === '--output') {
+      if (i + 1 >= argv.length) {
+        throw new Error(`${arg} requires an output path`);
+      }
+      outputPath = argv[++i];
+    } else if (arg.startsWith('--output=')) {
+      outputPath = arg.slice('--output='.length);
+    } else if (arg.startsWith('-')) {
+      throw new Error(`unknown option: ${arg}`);
+    } else {
+      sources.push(arg);
+    }
+  }
+
+  if (outputPath === null || sources.length !== 1) {
+    throw new Error('expected exactly one source file and one output path');
+  }
+
+  return { outputPath, sourcePath: sources[0] };
+}
+
+function printCompilerError(error) {
+  if (error && error.message) {
+    console.error(error.message);
+  } else {
+    console.error(String(error));
+  }
+
+  if (error && error.hash) {
+    console.error(JSON.stringify(error.hash));
+  }
+}
+
+let args;
+try {
+  args = parseArgs(process.argv.slice(2));
+} catch (error) {
+  console.error(error.message);
+  usage();
+  process.exit(2);
+}
+
+try {
+  const source = fs.readFileSync(args.sourcePath, 'utf8');
+  const [program] = compile(source);
+  fs.writeFileSync(args.outputPath, `${JSON.stringify(program)}\n`);
+} catch (error) {
+  printCompilerError(error);
+  process.exit(1);
+}

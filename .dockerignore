@@ -60,3 +60,5 @@
 !tools/omegajail-cgroups-wrapper
 !tools/omegajail-container-wrapper
 !tools/omegajail-setup
+!tools/rekarel-compile
+!tools/rekarel-run
