@@ -973,9 +973,10 @@ mod tests {
         create_dir_all(root.join("root-compilers"))?;
         create_dir_all(root.join("root-kareljs"))?;
         create_dir_all(root.join("root-rekarel"))?;
+        create_dir_all(root.join("root-julia"))?;
         create_dir_all(&homedir)?;
 
-        for profile in ["go-build", "js", "karel", "rkc", "rk"] {
+        for profile in ["go-build", "js", "karel", "rkc", "rk", "jl"] {
             write_policy(&root, profile)?;
         }
 
@@ -1081,6 +1082,32 @@ mod tests {
             .iter()
             .any(|env| env.to_bytes() == expected_env.as_bytes()));
         assert!(go_build_cache.is_dir());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_julia_compile_and_run_use_dedicated_runtime_root() -> Result<()> {
+        let (_tmp_dir, root, homedir) = prepare_options_root("julia-options")?;
+        let compile = JailOptions::new(args_for_language(
+            root.clone(),
+            homedir.clone(),
+            Some(args::Language::Julia),
+            None,
+        ))?;
+        let run = JailOptions::new(args_for_language(
+            root,
+            homedir,
+            None,
+            Some(args::Language::Julia),
+        ))?;
+
+        for options in [&compile, &run] {
+            assert_eq!("jl", options.seccomp_profile_name);
+            assert!(mount_exists(&options.mounts, "root-julia", "opt/julia"));
+        }
+        assert_eq!("/opt/julia/bin/julia", argv(&compile)[0]);
+        assert_eq!("/usr/bin/julia", argv(&run)[0]);
 
         Ok(())
     }
