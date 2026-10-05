@@ -15,6 +15,7 @@ const DEFAULT_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 16 * 1024 * 1024;
 const RUBY_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 56 * 1024 * 1024;
 const GO_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 512 * 1024 * 1024;
 const NODE_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 89 * 1024 * 1024;
+const JULIA_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 512 * 1024 * 1024;
 
 // These are obtained by running an "empty" and measuring
 // its memory consumption, as reported by omegajail.
@@ -499,6 +500,22 @@ impl JailOptions {
                     ]);
                     execve_args.extend(compile_sources.iter().map(|s| s.clone()));
                 }
+                args::Language::Julia => {
+                    seccomp_profile_name = String::from("jl");
+                    mounts.push(MountArgs {
+                        source: Some(root.join("root-julia")),
+                        target: rootfs.join("opt/julia"),
+                        fstype: None,
+                        flags: MsFlags::MS_BIND | MsFlags::MS_RDONLY,
+                        data: None,
+                    });
+                    execve_args.extend([
+                        String::from("/opt/julia/bin/julia"),
+                        String::from("-e"),
+                        args.compile_target.clone(),
+                    ]);
+                    execve_args.extend(compile_sources.iter().map(|s| s.clone()));
+                }
                 args::Language::JavaScript => {
                     seccomp_profile_name = String::from("js");
                     extra_memory_size_in_bytes = NODE_EXTRA_MEMORY_SIZE_IN_BYTES;
@@ -748,6 +765,21 @@ impl JailOptions {
                     seccomp_profile_name = String::from("go");
                     execve_args.extend([format!("./{}", args.run_target)]);
                 }
+                args::Language::Julia => {
+                    extra_memory_size_in_bytes = JULIA_EXTRA_MEMORY_SIZE_IN_BYTES;
+                    seccomp_profile_name = String::from("jl");
+                    mounts.push(MountArgs {
+                        source: Some(root.join("root-julia")),
+                        target: rootfs.join("opt/julia"),
+                        fstype: None,
+                        flags: MsFlags::MS_BIND | MsFlags::MS_RDONLY,
+                        data: None,
+                    });
+                    execve_args.extend([
+                        String::from("/usr/bin/julia"),
+                        format!("{}.jl", args.run_target),
+                    ]);
+                }
                 args::Language::JavaScript => {
                     seccomp_profile_name = String::from("js");
                     extra_memory_size_in_bytes = NODE_EXTRA_MEMORY_SIZE_IN_BYTES;
@@ -941,9 +973,10 @@ mod tests {
         create_dir_all(root.join("root-compilers"))?;
         create_dir_all(root.join("root-kareljs"))?;
         create_dir_all(root.join("root-rekarel"))?;
+        create_dir_all(root.join("root-julia"))?;
         create_dir_all(&homedir)?;
 
-        for profile in ["go-build", "js", "karel", "rkc", "rk"] {
+        for profile in ["go-build", "js", "karel", "rkc", "rk", "jl"] {
             write_policy(&root, profile)?;
         }
 
@@ -1049,6 +1082,32 @@ mod tests {
             .iter()
             .any(|env| env.to_bytes() == expected_env.as_bytes()));
         assert!(go_build_cache.is_dir());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_julia_compile_and_run_use_dedicated_runtime_root() -> Result<()> {
+        let (_tmp_dir, root, homedir) = prepare_options_root("julia-options")?;
+        let compile = JailOptions::new(args_for_language(
+            root.clone(),
+            homedir.clone(),
+            Some(args::Language::Julia),
+            None,
+        ))?;
+        let run = JailOptions::new(args_for_language(
+            root,
+            homedir,
+            None,
+            Some(args::Language::Julia),
+        ))?;
+
+        for options in [&compile, &run] {
+            assert_eq!("jl", options.seccomp_profile_name);
+            assert!(mount_exists(&options.mounts, "root-julia", "opt/julia"));
+        }
+        assert_eq!("/opt/julia/bin/julia", argv(&compile)[0]);
+        assert_eq!("/usr/bin/julia", argv(&run)[0]);
 
         Ok(())
     }

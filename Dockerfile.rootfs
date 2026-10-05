@@ -67,6 +67,9 @@ RUN mkdir -p /opt/nodejs && \
     mkdir -p /opt/go && \
     wget https://go.dev/dl/go1.18beta2.linux-amd64.tar.gz \
         -O - | tar -xz -C /opt/go --strip-components=1 && \
+    mkdir -p /opt/julia && \
+    wget https://julialang-s3.julialang.org/bin/linux/x64/1.13/julia-1.13.0-linux-x86_64.tar.gz \
+        -O - | tar -xz -C /opt/julia --strip-components=1 && \
     mkdir -p /tmp/kotlin && \
     wget https://github.com/JetBrains/kotlin/releases/download/v1.6.10/kotlin-compiler-1.6.10.zip \
         -O /tmp/kotlin/compiler.zip && \

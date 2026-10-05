@@ -41,6 +41,8 @@ pub enum Language {
     #[clap(name = "rs")]
     Rust,
     Go,
+    #[clap(name = "jl")]
+    Julia,
     #[clap(name = "js")]
     JavaScript,
     #[clap(name = "kj")]
