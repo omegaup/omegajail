@@ -29,7 +29,6 @@ const NODE_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 224 * 1024 * 1024;
 // (>= ~360 MiB) for every realistic problem memory limit.
 const REKAREL_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 512 * 1024 * 1024;
 const GO_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 1024 * 1024 * 1024;
-const NODE_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 89 * 1024 * 1024;
 
 // These are obtained by running an "empty" and measuring
 // its memory consumption, as reported by omegajail.
