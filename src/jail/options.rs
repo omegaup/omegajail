@@ -13,8 +13,22 @@ use crate::args;
 
 const DEFAULT_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 16 * 1024 * 1024;
 const RUBY_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 56 * 1024 * 1024;
+// Node.js 22 / V8 reserves a large virtual address-space "cage" at startup
+// (pointer compression). On Ubuntu Jammy, 89 MiB of extra address space is
+// not enough for Node to even finish initializing: for a 32 MiB problem the
+// resulting RLIMIT_AS of 121 MiB causes Node to hang/abort during startup.
+// Native x86_64 measurements (Node v22.22.0): plain `node --jitless` starts
+// reliably from ~224 MiB of total RLIMIT_AS upward.
+const NODE_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 224 * 1024 * 1024;
+// ReKarel loads @rekarel/core + @xmldom/xmldom on top of Node, which allocates
+// additional array buffers during startup. This makes its startup much more
+// sensitive to RLIMIT_AS: native x86_64 measurements show *non-monotonic* V8
+// failures at specific total address-space sizes (e.g. catastrophic failures
+// at 288/352/356 MiB) that plain JavaScript never hits. A large allowance
+// keeps the resulting RLIMIT_AS inside the uniformly-stable high region
+// (>= ~360 MiB) for every realistic problem memory limit.
+const REKAREL_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 512 * 1024 * 1024;
 const GO_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 1024 * 1024 * 1024;
-const NODE_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 89 * 1024 * 1024;
 
 // These are obtained by running an "empty" and measuring
 // its memory consumption, as reported by omegajail.
@@ -538,7 +552,7 @@ impl JailOptions {
                 }
                 args::Language::ReKarel => {
                     seccomp_profile_name = String::from("rkc");
-                    extra_memory_size_in_bytes = NODE_EXTRA_MEMORY_SIZE_IN_BYTES;
+                    extra_memory_size_in_bytes = REKAREL_EXTRA_MEMORY_SIZE_IN_BYTES;
                     vm_memory_size_in_bytes = NODE_VM_MEMORY_SIZE_IN_BYTES;
                     mounts.push(MountArgs {
                         source: Some(root.join("root-rekarel")),
@@ -780,7 +794,7 @@ impl JailOptions {
                     ]);
                 }
                 args::Language::ReKarel => {
-                    extra_memory_size_in_bytes = NODE_EXTRA_MEMORY_SIZE_IN_BYTES;
+                    extra_memory_size_in_bytes = REKAREL_EXTRA_MEMORY_SIZE_IN_BYTES;
                     vm_memory_size_in_bytes = NODE_VM_MEMORY_SIZE_IN_BYTES;
                     seccomp_profile_name = String::from("rk");
                     mounts.push(MountArgs {
@@ -1101,6 +1115,70 @@ mod tests {
         assert!(mount_exists(&options.mounts, "root-rekarel", "opt/rekarel"));
         let argv = argv(&options);
         assert_eq!("/opt/rekarel/bin/rekarel-run", argv[0]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_javascript_run_adds_node_extra_to_address_space_limit() -> Result<()> {
+        let (_tmp_dir, root, homedir) = prepare_options_root("js-run-memory-limit")?;
+        let mut args = args_for_language(root, homedir, None, Some(args::Language::JavaScript));
+        args.memory_limit = Some(32 * 1024 * 1024);
+
+        let options = JailOptions::new(args)?;
+
+        // 32 MiB problem limit + 224 MiB Node allowance = 256 MiB RLIMIT_AS.
+        assert_eq!(Some(256 * 1024 * 1024), options.memory_limit);
+        assert!(!options.use_cgroups_for_memory_limit);
+        // The 31 MiB RSS deduction used for memory accounting must be untouched.
+        assert_eq!(31 * 1024 * 1024, options.vm_memory_size_in_bytes);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_rekarel_run_adds_rekarel_extra_to_address_space_limit() -> Result<()> {
+        let (_tmp_dir, root, homedir) = prepare_options_root("rekarel-run-memory-limit")?;
+        let mut args = args_for_language(root, homedir, None, Some(args::Language::ReKarel));
+        args.memory_limit = Some(32 * 1024 * 1024);
+
+        let options = JailOptions::new(args)?;
+
+        // ReKarel needs a larger allowance than plain JavaScript because its
+        // V8 startup is non-monotonically sensitive to RLIMIT_AS. 32 MiB
+        // problem limit + 512 MiB ReKarel allowance = 544 MiB RLIMIT_AS.
+        assert_eq!(Some(544 * 1024 * 1024), options.memory_limit);
+        assert!(!options.use_cgroups_for_memory_limit);
+        // The 31 MiB RSS deduction used for memory accounting must be untouched.
+        assert_eq!(31 * 1024 * 1024, options.vm_memory_size_in_bytes);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_node_based_compiles_share_the_node_address_space_limit() -> Result<()> {
+        // JavaScript, Karel Java and Karel Pascal all compile by running the
+        // same Node v22 binary, so they must all receive the larger Node
+        // startup allowance (not just the JavaScript/ReKarel run phases).
+        for language in [
+            args::Language::JavaScript,
+            args::Language::KarelJava,
+            args::Language::KarelPascal,
+        ] {
+            let (_tmp_dir, root, homedir) = prepare_options_root("node-compile-memory-limit")?;
+            let mut args = args_for_language(root, homedir, Some(language), None);
+            args.memory_limit = Some(32 * 1024 * 1024);
+
+            let options = JailOptions::new(args)?;
+
+            // 32 MiB problem limit + 224 MiB Node allowance = 256 MiB RLIMIT_AS.
+            assert_eq!(
+                Some(256 * 1024 * 1024),
+                options.memory_limit,
+                "unexpected RLIMIT_AS for {language:?} compile"
+            );
+            assert_eq!(31 * 1024 * 1024, options.vm_memory_size_in_bytes);
+        }
 
         Ok(())
     }
