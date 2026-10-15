@@ -13,7 +13,6 @@ use crate::args;
 
 const DEFAULT_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 16 * 1024 * 1024;
 const RUBY_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 56 * 1024 * 1024;
-const GO_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 512 * 1024 * 1024;
 // Node.js 22 / V8 reserves a large virtual address-space "cage" at startup
 // (pointer compression). On Ubuntu Jammy, 89 MiB of extra address space is
 // not enough for Node to even finish initializing: for a 32 MiB problem the
@@ -29,6 +28,8 @@ const NODE_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 224 * 1024 * 1024;
 // keeps the resulting RLIMIT_AS inside the uniformly-stable high region
 // (>= ~360 MiB) for every realistic problem memory limit.
 const REKAREL_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 512 * 1024 * 1024;
+const GO_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 1024 * 1024 * 1024;
+const NODE_EXTRA_MEMORY_SIZE_IN_BYTES: u64 = 89 * 1024 * 1024;
 
 // These are obtained by running an "empty" and measuring
 // its memory consumption, as reported by omegajail.
@@ -957,7 +958,7 @@ mod tests {
         create_dir_all(root.join("root-rekarel"))?;
         create_dir_all(&homedir)?;
 
-        for profile in ["go-build", "js", "karel", "rkc", "rk"] {
+        for profile in ["go", "go-build", "js", "karel", "rkc", "rk"] {
             write_policy(&root, profile)?;
         }
 
@@ -1063,6 +1064,21 @@ mod tests {
             .iter()
             .any(|env| env.to_bytes() == expected_env.as_bytes()));
         assert!(go_build_cache.is_dir());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_go_run_adds_one_gibibyte_to_address_space_limit() -> Result<()> {
+        let (_tmp_dir, root, homedir) = prepare_options_root("go-run-memory-limit")?;
+        let mut args = args_for_language(root, homedir, None, Some(args::Language::Go));
+        args.memory_limit = Some(32 * 1024 * 1024);
+
+        let options = JailOptions::new(args)?;
+
+        assert_eq!(Some(1056 * 1024 * 1024), options.memory_limit);
+        assert!(!options.use_cgroups_for_memory_limit);
+        assert_eq!(0, options.vm_memory_size_in_bytes);
 
         Ok(())
     }
